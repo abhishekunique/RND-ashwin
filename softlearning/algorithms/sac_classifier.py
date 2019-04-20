@@ -205,7 +205,6 @@ class SACClassifier(SAC):
     def _evaluate_rollouts(self, paths, env):
         """Compute evaluation metrics for the given rollouts."""
         diagnostics = super(SACClassifier, self)._evaluate_rollouts(paths, env)
-        
         observations = [path['observations'] for path in paths]
         observations = np.concatenate(observations)
         learned_reward = self._session.run(self._reward_t,

@@ -28,6 +28,13 @@ def create_VICE_RAQ_algorithm(variant, *args, **kwargs):
 
     return algorithm
 
+def create_VICEGoalConditioned_algorithm(variant, *args, **kwargs):
+    from .vice_goal_conditioned import VICEGoalConditioned
+
+    algorithm = VICEGoalConditioned(*args, **kwargs)
+
+    return algorithm
+
 def create_SAC_algorithm(variant, *args, **kwargs):
     from .sac import SAC
 
@@ -51,6 +58,7 @@ ALGORITHM_CLASSES = {
     'RAQ': create_RAQ_algorithm,
     'VICE': create_VICE_algorithm,
     'VICERAQ': create_VICE_RAQ_algorithm,
+    'VICEGoalConditioned': create_VICEGoalConditioned_algorithm,
 }
 
 
