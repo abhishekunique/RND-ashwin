@@ -24,11 +24,14 @@ def get_environment_from_variant(variant):
 
     return get_environment(universe, domain, task, env_params)
 
-def get_goal_example_environment_from_variant(variant):
+def get_goal_example_environment_from_variant(variant, gym_adapter=True):
     import gym
     
     if variant['task'] not in [env.id for env  in gym.envs.registry.all()]:
         from multiworld.envs.mujoco import register_goal_example_envs
         register_goal_example_envs()
 
-    return GymAdapter(env=gym.make(variant['task']))
+    if gym_adapter:
+        return GymAdapter(env=gym.make(variant['task']))
+    else:
+        return gym.make(variant['task'])

@@ -8,7 +8,7 @@ import softlearning.algorithms.utils as alg_utils
 import softlearning.environments.utils as env_utils
 from softlearning.misc.utils import datetimestamp
 
-DEFAULT_TASK = 'StateSawyerDoorPullHookEnv-v0'
+DEFAULT_TASK = 'Image48SawyerPushMultiGoalEnv-v0'
 DEFAULT_ALGORITHM = 'VICEGoalConditioned'
 AVAILABLE_ALGORITHMS = set(alg_utils.ALGORITHM_CLASSES.keys())
 
@@ -162,9 +162,10 @@ def get_parser(allow_policy_list=False):
         '--universe', type=str, default='multiworld', choices=('multiworld', ))
     parser.add_argument(
         '--domain', type=str, default='mujoco', choices=('mujoco',))
-    # parser.add_argument(
-    #     '--task', type=str, default=DEFAULT_TASK, 
-    #     choices=goal_example_envs)
+    parser.add_argument(
+        '--task', type=str, default=DEFAULT_TASK, 
+        choices=('Image48SawyerPushMultiGoalEnv-v0','Image48SawyerDoorHookMultiGoalEnv-v0'))
+
     # parser.add_argument(
     #     '--n_goal_examples', type=int, default=10)
     parser.add_argument(

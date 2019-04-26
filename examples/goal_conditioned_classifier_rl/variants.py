@@ -239,7 +239,8 @@ def get_variant_spec_classifier(universe,
 def get_variant_spec(args):
     universe, domain = args.universe, args.domain
     # task, algorithm, n_epochs = args.task, args.algorithm, args.n_epochs
-    task = args.task = 'Image48SawyerPushNIPSEasyXY'
+    #task = args.task = 'Image48SawyerPushNIPSEasyXY'
+    task = args.task
     algorithm, n_epochs = args.algorithm, args.n_epochs
     # active_query_frequency = args.active_query_frequency
 

@@ -26,42 +26,16 @@ class ExperimentRunnerClassifierRL(ExperimentRunner):
     def _build(self):
         variant = copy.deepcopy(self._variant)
 
-        # env = self.env = get_goal_example_environment_from_variant(variant)
-        from multiworld.envs.mujoco.sawyer_xyz.sawyer_push_nips import SawyerPushAndReachXYEasyEnv
-        from multiworld.core.image_env import ImageEnv
-
-        base_env = SawyerPushAndReachXYEasyEnv(
-            force_puck_in_goal_space=False,
-            mocap_low=(-0.1, 0.55, 0.0),
-            mocap_high=(0.1, 0.65, 0.5),
-            hand_goal_low=(-0.1, 0.55),
-            hand_goal_high=(0.1, 0.65),
-            puck_goal_low=(-0.15, 0.5),
-            puck_goal_high=(0.15, 0.7),
-            hide_goal=True,
-            reward_info=dict(
-                type="puck_success",
-            )
-        )
-
-        from softlearning.environments.adapters.gym_adapter import GymAdapter
-        from multiworld.envs.mujoco.cameras import sawyer_pusher_camera_upright_v2
+        image_env = self.env = get_goal_example_environment_from_variant(variant, gym_adapter=False)
+            
+        # image_env = get_pusher_env()
+        #TODO avi this should also move to get_env_from_variant
         from multiworld.core.flat_goal_env import FlatGoalEnv
-
-        #debug from states
-        # env=GymAdapter(env=base_env, observation_keys=['state_observation', 'state_desired_goal'])
-        imsize = 48
-        image_env = ImageEnv(
-                    base_env, 
-                    imsize=imsize,
-                    init_camera=sawyer_pusher_camera_upright_v2,
-                    normalize=True,)
-
+        from softlearning.environments.adapters.gym_adapter import GymAdapter
         flat_env = FlatGoalEnv(image_env, 
                         obs_keys=['image_observation'], 
                         goal_keys=['image_desired_goal'],
                         append_goal_to_obs=True)
-
         env = self.env = GymAdapter(env=flat_env)
         # env = self.env = GymAdapter(env=image_env, 
         #     observation_keys=['image_observation', 'image_desired_goal'])
