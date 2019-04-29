@@ -117,7 +117,7 @@ DEFAULT_NUM_EPOCHS = 200
 NUM_CHECKPOINTS = 10
 
 
-def get_variant_spec_base(universe, domain, task, policy, algorithm):
+def get_variant_spec_base(universe, domain, task, task_evaluation, policy, algorithm):
     # algorithm_params = deep_update(
     #     ALGORITHM_PARAMS_BASE,
     #     ALGORITHM_PARAMS_PER_DOMAIN.get(domain, {})
@@ -135,6 +135,7 @@ def get_variant_spec_base(universe, domain, task, policy, algorithm):
     variant_spec = {
         'domain': domain,
         'task': task,
+        'task_evaluation': task_evaluation,
         'universe': universe,
         'git_sha': get_git_rev(),
 
@@ -181,12 +182,13 @@ def get_variant_spec_base(universe, domain, task, policy, algorithm):
 def get_variant_spec_classifier(universe,
                                 domain,
                                 task,
+                                task_evaluation,
                                 policy,
                                 algorithm,
                                 *args,
                                 **kwargs):
     variant_spec = get_variant_spec_base(
-        universe, domain, task, policy, algorithm, *args, **kwargs)
+        universe, domain, task, task_evaluation, policy, algorithm, *args, **kwargs)
 
     classifier_layer_size = L = 256
     variant_spec['classifier_params'] = {
@@ -241,15 +243,19 @@ def get_variant_spec(args):
     # task, algorithm, n_epochs = args.task, args.algorithm, args.n_epochs
     #task = args.task = 'Image48SawyerPushNIPSEasyXY'
     task = args.task
+    if args.task is None:
+        task_evaluation = task
+    else:
+        task_evaluation = args.task
     algorithm, n_epochs = args.algorithm, args.n_epochs
     # active_query_frequency = args.active_query_frequency
 
     if args.algorithm in ['VICEGoalConditioned']:
         variant_spec = get_variant_spec_classifier(
-            universe, domain, task, args.policy, args.algorithm)
+            universe, domain, task, task_evaluation, args.policy, args.algorithm)
     else:
         variant_spec = get_variant_spec_base(
-            universe, domain, task, args.policy, args.algorithm)
+            universe, domain, task, task_evaluation, args.policy, args.algorithm)
 
     # if args.algorithm in ['RAQ', 'VICERAQ']:
     #     variant_spec['algorithm_params']['kwargs']['active_query_frequency'] = \

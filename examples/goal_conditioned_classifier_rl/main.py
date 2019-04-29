@@ -21,38 +21,45 @@ from softlearning.misc.utils import set_seed, initialize_tf_variables
 from examples.instrument import run_example_local
 from examples.development.main import ExperimentRunner
 
+# TODO Avi this should happen either in multiworld or in environment/utils.py
+def flatten_multiworld_env(env):
+    from multiworld.core.flat_goal_env import FlatGoalEnv
+    from softlearning.environments.adapters.gym_adapter import GymAdapter
+    flat_env = FlatGoalEnv(env, 
+                    obs_keys=['image_observation'], 
+                    goal_keys=['image_desired_goal'],
+                    append_goal_to_obs=True)
+    env = GymAdapter(env=flat_env)
+    return env
+
 class ExperimentRunnerClassifierRL(ExperimentRunner):
 
     def _build(self):
         variant = copy.deepcopy(self._variant)
 
-        image_env = self.env = get_goal_example_environment_from_variant(variant, gym_adapter=False)
-            
-        # image_env = get_pusher_env()
-        #TODO avi this should also move to get_env_from_variant
-        from multiworld.core.flat_goal_env import FlatGoalEnv
-        from softlearning.environments.adapters.gym_adapter import GymAdapter
-        flat_env = FlatGoalEnv(image_env, 
-                        obs_keys=['image_observation'], 
-                        goal_keys=['image_desired_goal'],
-                        append_goal_to_obs=True)
-        env = self.env = GymAdapter(env=flat_env)
-        # env = self.env = GymAdapter(env=image_env, 
-        #     observation_keys=['image_observation', 'image_desired_goal'])
-        
-        #import IPython; IPython.embed()
+        training_environment = self.training_environment = (
+            get_goal_example_environment_from_variant(variant['task'], gym_adapter=False))
+        evaluation_environment = self.evaluation_environment = (
+            get_goal_example_environment_from_variant(variant['task_evaluation'], 
+                gym_adapter=False))
+
+        training_environment = self.training_environment = (
+            flatten_multiworld_env(self.training_environment))
+        evaluation_environment = self.evaluation_environment = (
+            flatten_multiworld_env(self.evaluation_environment))
 
         replay_pool = self.replay_pool = (
-            get_replay_pool_from_variant(variant, env))
+            get_replay_pool_from_variant(variant, training_environment))
         sampler = self.sampler = get_sampler_from_variant(variant)
-        Qs = self.Qs = get_Q_function_from_variant(variant, env)
-        policy = self.policy = get_policy_from_variant(variant, env, Qs)
+        Qs = self.Qs = get_Q_function_from_variant(variant, training_environment)
+        policy = self.policy = get_policy_from_variant(variant, training_environment, Qs)
         initial_exploration_policy = self.initial_exploration_policy = (
-            get_policy('UniformPolicy', env))
+            get_policy('UniformPolicy', training_environment))
 
         algorithm_kwargs = {
             'variant': self._variant,
-            'env': self.env,
+            'training_environment': self.training_environment,
+            'evaluation_environment': self.evaluation_environment,
             'policy': policy,
             'initial_exploration_policy': initial_exploration_policy,
             'Qs': Qs,
@@ -63,7 +70,7 @@ class ExperimentRunnerClassifierRL(ExperimentRunner):
 
         if self._variant['algorithm_params']['type'] in ['VICEGoalConditioned']:
             reward_classifier = self.reward_classifier \
-                = get_reward_classifier_from_variant(self._variant, env)
+                = get_reward_classifier_from_variant(self._variant, training_environment)
             algorithm_kwargs['classifier'] = reward_classifier
 
             # goal_examples_train, goal_examples_validation = \
@@ -87,10 +94,13 @@ class ExperimentRunnerClassifierRL(ExperimentRunner):
             with open(pickle_path, 'rb') as f:
                 picklable = pickle.load(f)
 
-        env = self.env = picklable['env']
+        training_environment = self.training_environment = picklable[
+            'training_environment']
+        evaluation_environment = self.evaluation_environment = picklable[
+            'evaluation_environment']
 
         replay_pool = self.replay_pool = (
-            get_replay_pool_from_variant(self._variant, env))
+            get_replay_pool_from_variant(self._variant, training_environment))
 
         if self._variant['run_params'].get('checkpoint_replay_pool', False):
             self._restore_replay_pool(checkpoint_dir)
@@ -99,14 +109,15 @@ class ExperimentRunnerClassifierRL(ExperimentRunner):
         Qs = self.Qs = picklable['Qs']
         # policy = self.policy = picklable['policy']
         policy = self.policy = (
-            get_policy_from_variant(self._variant, env, Qs))
+            get_policy_from_variant(self._variant, training_environment, Qs))
         self.policy.set_weights(picklable['policy_weights'])
         initial_exploration_policy = self.initial_exploration_policy = (
-            get_policy('UniformPolicy', env))
+            get_policy('UniformPolicy', training_environment))
 
         algorithm_kwargs = {
             'variant': self._variant,
-            'env': self.env,
+            'training_environment': self.training_environment,
+            'evaluation_environment': self.evaluation_environment,
             'policy': policy,
             'initial_exploration_policy': initial_exploration_policy,
             'Qs': Qs,
@@ -145,7 +156,8 @@ class ExperimentRunnerClassifierRL(ExperimentRunner):
     def picklables(self):
         picklables = {
             'variant': self._variant,
-            'env': self.env,
+            'training_environment': self.training_environment,
+            'evaluation_environment': self.evaluation_environment,
             'sampler': self.sampler,
             'algorithm': self.algorithm,
             'Qs': self.Qs,
@@ -166,7 +178,6 @@ def main(argv=None):
     Run 'softlearning launch_example_{gce,ec2} --help' for further
     instructions.
     """
-    # __package__ should be `development.main`
     run_example_local('goal_conditioned_classifier_rl.main', argv)
 
 

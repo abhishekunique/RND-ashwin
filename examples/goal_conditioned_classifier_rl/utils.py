@@ -151,6 +151,11 @@ def add_ray_tune_args(parser):
         default=False,
         help=tune_help_string("Starts a background Tune server. Needed for"
                               " using the Client API."))
+    parser.add_argument(
+        '--server-port',
+        type=int,
+        default=4321,
+        help=tune_help_string("Port number for launching TuneServer."))
 
     return parser
 
@@ -164,12 +169,16 @@ def get_parser(allow_policy_list=False):
         '--domain', type=str, default='mujoco', choices=('mujoco',))
     parser.add_argument(
         '--task', type=str, default=DEFAULT_TASK, 
+        choices=('Image48SawyerPushMultiGoalEnv-v0','Image48SawyerDoorHookMultiGoalEnv-v0',
+            'Image48SawyerDoorHookMultiGoalResetFreeEnv-v0'))
+    parser.add_argument(
+        '--task_evaluation', type=str, default=DEFAULT_TASK, 
         choices=('Image48SawyerPushMultiGoalEnv-v0','Image48SawyerDoorHookMultiGoalEnv-v0'))
 
     # parser.add_argument(
     #     '--n_goal_examples', type=int, default=10)
     parser.add_argument(
-        '--n_epochs', type=int, default=1000)
+        '--n-epochs', type=int, default=1000)
     # parser.add_argument(
     #     '--active_query_frequency', type=int, default=1)
 
