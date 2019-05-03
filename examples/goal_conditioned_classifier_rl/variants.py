@@ -221,6 +221,22 @@ def get_variant_spec(args):
         variant_spec = get_variant_spec_base(
             universe, domain, task, task_evaluation, args.policy, args.algorithm)
 
+    binary_reward_tasks = [
+            'Image48SawyerDoorHookMultiGoalResetFreeEnv-v0',
+            'Image48SawyerDoorHookMultiGoalEnv-v0']
+    distance_reward_tasks = [
+            'Image48SawyerPushMultiGoalEnv-v0']
+
+
+    if task in binary_reward_tasks:
+        relabel_reward = 1.0
+    elif task in distance_reward_tasks:
+        relabel_reward = 0.0
+    else:
+        raise NotImplementedError
+
+    variant_spec['replay_pool_params']['kwargs']['relabel_reward'] = relabel_reward
+
     # if args.algorithm in ['RAQ', 'VICERAQ']:
     #     variant_spec['algorithm_params']['kwargs']['active_query_frequency'] = \
     #         active_query_frequency

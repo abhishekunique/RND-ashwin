@@ -10,12 +10,13 @@ def random_int_with_variable_range(mins, maxs):
 
 class RelabelReplayPool(FlexibleReplayPool):
     def __init__(self, observation_space, action_space, *args,
-        relabel_probability=0.8, **kwargs):
-        
+        relabel_probability=0.8, relabel_reward=1.0, **kwargs):
+
         self._observation_space = observation_space
         self._action_space = action_space
         self._relabel_probability = relabel_probability
-        
+        self._relabel_reward = relabel_reward
+
         observation_fields = normalize_observation_fields(observation_space)
         # It's a bit memory inefficient to save the observations twice,
         # but it makes the code *much* easier since you no longer have
@@ -108,8 +109,10 @@ class RelabelReplayPool(FlexibleReplayPool):
         future_sample_inds = random_int_with_variable_range(
             indices, future_indices_max)
 
+        future_sample_inds = future_sample_inds % self._size
+
         obs_dim = int(self.fields['observations'].shape[1]/2)
-        future_obs = self.fields['observations'][indices][:, :obs_dim]
+        future_obs = self.fields['observations'][future_sample_inds][:, :obs_dim]
 
         relabeled_batch = {
             'observations': np.copy(initial_batch['observations']),
@@ -120,7 +123,7 @@ class RelabelReplayPool(FlexibleReplayPool):
         #assumes the reward to be 1/0
         relabeled_batch['observations'][:, obs_dim:] = future_obs
         relabeled_batch['next_observations'][:, obs_dim:] = future_obs
-        relabeled_batch['rewards'][:, obs_dim:] = 1.0
+        relabeled_batch['rewards'][:, obs_dim:] = self._relabel_reward
 
         resample_index = (
             np.random.rand(batch_size) < self._relabel_probability)
