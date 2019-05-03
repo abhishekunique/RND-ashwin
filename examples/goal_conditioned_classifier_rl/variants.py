@@ -152,9 +152,11 @@ def get_variant_spec_base(universe, domain, task, task_evaluation, policy, algor
         },
         'algorithm_params': algorithm_params,
         'replay_pool_params': {
-            'type': 'SimpleReplayPool',
+            # 'type': 'SimpleReplayPool',
+            'type': 'RelabelReplayPool',
             'kwargs': {
                 'max_size': 1e6,
+                'relabel_probability': 0.8,
             }
         },
         'sampler_params': {
@@ -197,44 +199,6 @@ def get_variant_spec_classifier(universe,
             'hidden_layer_sizes': (L,L),
             }
         }
-
-    # variant_spec['data_params'] = {
-    #     'n_goal_examples': n_goal_examples,
-    #     'n_goal_examples_validation_max': 100,
-    # }
-
-    if algorithm in ['RAQ', 'VICERAQ']:
-
-        if task in DOOR_TASKS:
-            is_goal_key = 'angle_success'
-        elif task in PUSH_TASKS:
-            is_goal_key = 'puck_success'
-        elif task in PICK_TASKS:
-            is_goal_key = 'obj_success'
-        else:
-            raise NotImplementedError('Success metric not defined for task')
-
-        variant_spec.update({
-
-            'sampler_params': {
-                'type': 'ActiveSampler',
-                'kwargs': {
-                    'is_goal_key': is_goal_key,
-                    'max_path_length': MAX_PATH_LENGTH_PER_DOMAIN.get(
-                        domain, DEFAULT_MAX_PATH_LENGTH),
-                    'min_pool_size': MAX_PATH_LENGTH_PER_DOMAIN.get(
-                        domain, DEFAULT_MAX_PATH_LENGTH),
-                    'batch_size': 256,
-                }
-            },
-            'replay_pool_params': {
-                'type': 'ActiveReplayPool',
-                'kwargs': {
-                    'max_size': 1e6,
-                }
-            },
-
-            })
 
     return variant_spec
 

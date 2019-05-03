@@ -5,11 +5,13 @@ from . import (
     extra_policy_info_replay_pool,
     union_pool,
     trajectory_replay_pool,
+    relabel_replay_pool,
     active_replay_pool)
 
 
 POOL_CLASSES = {
     'SimpleReplayPool': simple_replay_pool.SimpleReplayPool,
+    'RelabelReplayPool': relabel_replay_pool.RelabelReplayPool,
     'ActiveReplayPool': active_replay_pool.ActiveReplayPool,
     'TrajectoryReplayPool': trajectory_replay_pool.TrajectoryReplayPool,
     'ExtraPolicyInfoReplayPool': (
