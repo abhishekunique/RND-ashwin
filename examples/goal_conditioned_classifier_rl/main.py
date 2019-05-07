@@ -68,7 +68,7 @@ class ExperimentRunnerClassifierRL(ExperimentRunner):
             'session': self._session,
         }
 
-        if self._variant['algorithm_params']['type'] in ['VICEGoalConditioned']:
+        if self._variant['algorithm_params']['type'] in ['VICEGoalConditioned', 'VICEGANGoalConditioned']:
             reward_classifier = self.reward_classifier \
                 = get_reward_classifier_from_variant(self._variant, training_environment)
             algorithm_kwargs['classifier'] = reward_classifier
