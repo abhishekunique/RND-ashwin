@@ -102,35 +102,35 @@ class RelabelReplayPool(FlexibleReplayPool):
 
         assert self.fields['observations'].shape[1] % 2 == 0
 
-        # import IPython; IPython.embed()
-        future_indices_max = np.copy(initial_batch['timesteps_left_in_episode'])
-        future_indices_max = np.squeeze(future_indices_max, axis=1)
-        future_indices_max += indices
-        future_sample_inds = random_int_with_variable_range(
-            indices, future_indices_max)
+        if self._relabel_probability > 0.:
+            future_indices_max = np.copy(initial_batch['timesteps_left_in_episode'])
+            future_indices_max = np.squeeze(future_indices_max, axis=1)
+            future_indices_max += indices
+            future_sample_inds = random_int_with_variable_range(
+                indices, future_indices_max)
 
-        future_sample_inds = future_sample_inds % self._size
+            future_sample_inds = future_sample_inds % self._size
 
-        obs_dim = int(self.fields['observations'].shape[1]/2)
-        future_obs = self.fields['observations'][future_sample_inds][:, :obs_dim]
+            obs_dim = int(self.fields['observations'].shape[1]/2)
+            future_obs = self.fields['observations'][future_sample_inds][:, :obs_dim]
 
-        relabeled_batch = {
-            'observations': np.copy(initial_batch['observations']),
-            'next_observations': np.copy(initial_batch['next_observations']),
-            'rewards': np.copy(initial_batch['rewards'])
-        }
+            relabeled_batch = {
+                'observations': np.copy(initial_batch['observations']),
+                'next_observations': np.copy(initial_batch['next_observations']),
+                'rewards': np.copy(initial_batch['rewards'])
+            }
 
-        #assumes the reward to be 1/0
-        relabeled_batch['observations'][:, obs_dim:] = future_obs
-        relabeled_batch['next_observations'][:, obs_dim:] = future_obs
-        relabeled_batch['rewards'][:, obs_dim:] = self._relabel_reward
+            #assumes the reward to be 1/0
+            relabeled_batch['observations'][:, obs_dim:] = future_obs
+            relabeled_batch['next_observations'][:, obs_dim:] = future_obs
+            relabeled_batch['rewards'][:, obs_dim:] = self._relabel_reward
 
-        resample_index = (
-            np.random.rand(batch_size) < self._relabel_probability)
-        where_resampled = np.where(resample_index)
+            resample_index = (
+                np.random.rand(batch_size) < self._relabel_probability)
+            where_resampled = np.where(resample_index)
 
-        for key in ['observations', 'next_observations', 'rewards']:
-            initial_batch[key][where_resampled] = relabeled_batch[key][where_resampled]
+            for key in ['observations', 'next_observations', 'rewards']:
+                initial_batch[key][where_resampled] = relabeled_batch[key][where_resampled]
 
         return initial_batch
 
