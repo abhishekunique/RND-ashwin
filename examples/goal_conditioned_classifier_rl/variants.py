@@ -175,7 +175,7 @@ def get_variant_spec_base(universe, domain, task, task_evaluation, policy, algor
             'type': 'RelabelReplayPool',
             'kwargs': {
                 'max_size': 1e6,
-                'relabel_probability': 0.0,
+                'relabel_probability': 0.8,
             }
         },
         'sampler_params': {
