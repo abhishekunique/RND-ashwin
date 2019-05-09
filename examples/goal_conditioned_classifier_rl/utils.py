@@ -170,7 +170,7 @@ def get_parser(allow_policy_list=False):
     parser.add_argument(
         '--task', type=str, default=DEFAULT_TASK, 
         choices=('Image48SawyerPushMultiGoalEnv-v0','Image48SawyerDoorHookMultiGoalEnv-v0',
-            'Image48SawyerDoorHookMultiGoalResetFreeEnv-v0'))
+            'Image48SawyerPushMultiGoalCurriculumEnv-v0','Image48SawyerDoorHookMultiGoalResetFreeEnv-v0'))
     parser.add_argument(
         '--task_evaluation', type=str, default=DEFAULT_TASK, 
         choices=('Image48SawyerPushMultiGoalEnv-v0','Image48SawyerDoorHookMultiGoalEnv-v0'))

@@ -49,7 +49,7 @@ ALGORITHM_PARAMS_BASE = {
         'n_train_repeat': 1,
         'eval_render_mode': None,
         'eval_n_episodes': 5,
-        'eval_deterministic': True,
+        'eval_deterministic': False,
 
         'discount': 0.99,
         'tau': 5e-3,
@@ -175,7 +175,7 @@ def get_variant_spec_base(universe, domain, task, task_evaluation, policy, algor
             'type': 'RelabelReplayPool',
             'kwargs': {
                 'max_size': 1e6,
-                'relabel_probability': 0.8,
+                'relabel_probability': 0.0,
             }
         },
         'sampler_params': {
@@ -226,10 +226,8 @@ def get_variant_spec(args):
     # task, algorithm, n_epochs = args.task, args.algorithm, args.n_epochs
     #task = args.task = 'Image48SawyerPushNIPSEasyXY'
     task = args.task
-    if args.task is None:
-        task_evaluation = task
-    else:
-        task_evaluation = args.task
+    task_evaluation = args.task_evaluation
+
     algorithm, n_epochs = args.algorithm, args.n_epochs
     # active_query_frequency = args.active_query_frequency
 
@@ -244,7 +242,8 @@ def get_variant_spec(args):
             'Image48SawyerDoorHookMultiGoalResetFreeEnv-v0',
             'Image48SawyerDoorHookMultiGoalEnv-v0']
     distance_reward_tasks = [
-            'Image48SawyerPushMultiGoalEnv-v0']
+            'Image48SawyerPushMultiGoalEnv-v0',
+            'Image48SawyerPushMultiGoalCurriculumEnv-v0']
 
 
     if task in binary_reward_tasks:
