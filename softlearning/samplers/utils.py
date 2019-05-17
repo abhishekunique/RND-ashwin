@@ -72,7 +72,17 @@ def rollout(env,
                     imsize = env.unwrapped.imsize
                 else:
                     imsize = 200
-                image = env.unwrapped.sim.render(imsize, imsize)
+                
+                imsize_flat = imsize*imsize*3
+                #for goal conditioned stuff
+                if observation.shape[0] == 2*imsize_flat:
+                    image1 = observation[:imsize_flat].reshape(48,48,3)
+                    image2 = observation[imsize_flat:].reshape(48,48,3)
+                    image1 = (image1*255.0).astype(np.uint8)
+                    image2 = (image2*255.0).astype(np.uint8)
+                    image = np.concatenate([image1, image2], axis=1)
+                else:    
+                    image = env.unwrapped.sim.render(imsize, imsize)
                 #image = env.render(mode=render_mode)
                 images.append(image)
             else:
