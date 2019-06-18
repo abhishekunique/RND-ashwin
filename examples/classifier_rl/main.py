@@ -51,8 +51,9 @@ class ExperimentRunnerClassifierRL(ExperimentRunner):
         }
 
         if self._variant['algorithm_params']['type'] in ['SACClassifier', 'RAQ', 'VICE', 'VICEGAN', 'VICERAQ']:
-            reward_classifier = self.reward_classifier \
-                = get_reward_classifier_from_variant(self._variant, training_environment)
+            reward_classifier = self.reward_classifier = (
+                get_reward_classifier_from_variant(
+                    self._variant, training_environment))
             algorithm_kwargs['classifier'] = reward_classifier
 
             goal_examples_train, goal_examples_validation = \
@@ -147,7 +148,7 @@ class ExperimentRunnerClassifierRL(ExperimentRunner):
             'policy_weights': self.policy.get_weights(),
         }
 
-        if hasattr(self, 'reward_classifier'): 
+        if hasattr(self, 'reward_classifier'):
             picklables['reward_classifier'] = self.reward_classifier
 
         return picklables

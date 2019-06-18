@@ -3,9 +3,11 @@ from gym.spaces import Dict
 from .flexible_replay_pool import FlexibleReplayPool, Field
 
 
-class SimpleReplayPool(FlexibleReplayPool):
+class GoalReplayPool(FlexibleReplayPool):
     def __init__(self,
                  environment,
+                 observation_fields=None,
+                 new_observation_fields=None,
                  *args,
                  extra_fields=None,
                  **kwargs):
@@ -26,6 +28,7 @@ class SimpleReplayPool(FlexibleReplayPool):
                     shape=observation_space.shape)
                 for name, observation_space
                 in observation_space.spaces.items()
+                if name not in environment.goal_key_map.keys()
             },
             'next_observations': {
                 name: Field(
@@ -34,6 +37,16 @@ class SimpleReplayPool(FlexibleReplayPool):
                     shape=observation_space.shape)
                 for name, observation_space
                 in observation_space.spaces.items()
+                if name not in environment.goal_key_map.keys()
+            },
+            'goals': {
+                name: Field(
+                    name=name,
+                    dtype=observation_space.dtype,
+                    shape=observation_space.shape)
+                for name, observation_space
+                in observation_space.spaces.items()
+                if name in environment.goal_key_map.values()
             },
             'actions': Field(
                 name='actions',
@@ -51,5 +64,31 @@ class SimpleReplayPool(FlexibleReplayPool):
             **extra_fields
         }
 
-        super(SimpleReplayPool, self).__init__(
-            *args, fields=fields, **kwargs)
+        super(GoalReplayPool, self).__init__(*args, fields=fields, **kwargs)
+
+    def add_samples(self, samples, *args, **kwargs):
+        full_observations = samples['observations']
+        observations = type(full_observations)(
+            (key, values)
+            for key, values in full_observations.items()
+            if key not in self._environment.goal_key_map.keys()
+        )
+        next_observations = type(samples['next_observations'])(
+            (key, values)
+            for key, values in samples['next_observations'].items()
+            if key not in self._environment.goal_key_map.keys()
+        )
+        goals = type(full_observations)(
+            (goal_key, full_observations[observation_key])
+            for observation_key, goal_key
+            in self._environment.goal_key_map.items()
+        )
+
+        samples.update({
+            'observations': observations,
+            'next_observations': next_observations,
+            'goals': goals,
+        })
+
+        return super(GoalReplayPool, self).add_samples(
+            samples, *args, **kwargs)
