@@ -2,7 +2,7 @@ from .simple_sampler import SimpleSampler
 
 
 class ActiveSampler(SimpleSampler):
-    def __init__(self, is_goal_key='is_goal', **kwargs):
+    def __init__(self, is_goal_key='is_goals', **kwargs):
         super(ActiveSampler, self).__init__(**kwargs)
         self._is_goal_key = is_goal_key
 
@@ -19,7 +19,7 @@ class ActiveSampler(SimpleSampler):
             'rewards': [reward],
             'terminals': [terminal],
             'next_observations': next_observation,
-            'is_goal': [info[self._is_goal_key]],
+            'is_goals': [info[self._is_goal_key]],
             'infos': info,
         }
 
