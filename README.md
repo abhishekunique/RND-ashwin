@@ -1,22 +1,22 @@
 # reward-learning-rl
 
-This repository is the official implementation of the following paper: 
+This repository is the official implementation of the following paper:
 
 **End-to-End Robotic Reinforcement Learning without Reward Engineering** <br/>
 Avi Singh, Larry Yang, Kristian Hartikainen, Chelsea Finn, Sergey Levine <br/>
 [Robotics: Science and Systems](http://www.roboticsconference.org/) 2019 <br/>
 [Website](https://sites.google.com/view/reward-learning-rl/) | [Video](https://www.youtube.com/watch?v=9pWJzb4G-CA) | [Arxiv](https://arxiv.org/abs/1904.07854)
 
-| Visual Draping             |  Visual Pushing | Visual Bookshelf | 
+| Visual Draping             |  Visual Pushing | Visual Bookshelf |
 :-------------------------:|:-------------------------:|:-------------------------:
 ![](https://imgur.com/CbwNUZv.gif)  |  ![](https://imgur.com/NPQBnBW.gif) |  ![](https://imgur.com/bl6Qszu.gif) <br/> ![](https://imgur.com/MpNlZxK.gif)
 
 
-| Visual Door Opening      |   Visual Pusher | Visual Picker | 
+| Visual Door Opening      |   Visual Pusher | Visual Picker |
 :-------------------------:|:-------------------------:|:-------------------------:
 ![](https://imgur.com/zPI1zAa.gif) | ![](https://imgur.com/pns0uwY.gif) | ![](https://imgur.com/UYbpTLt.gif) |
 
-We propose a method for end-to-end learning of robotic skills in the real world using deep reinforcement learning. We learn these policies directly on pixel observations, and we do so without any hand-engineered or task-specific reward functions, and instead learn the rewards for such tasks from a small number of user-provided goal examples (around 80), followed by a modest number of active queries (around 25-75).  
+We propose a method for end-to-end learning of robotic skills in the real world using deep reinforcement learning. We learn these policies directly on pixel observations, and we do so without any hand-engineered or task-specific reward functions, and instead learn the rewards for such tasks from a small number of user-provided goal examples (around 80), followed by a modest number of active queries (around 25-75).
 
 This implementation is based on [softlearning](https://github.com/rail-berkeley/softlearning).
 
@@ -94,14 +94,14 @@ softlearning run_example_local examples.classifier_rl \
 --n_epochs 300 \
 --active_query_frequency 10
 ```
-The tasks used in the paper were `Image48SawyerPushForwardEnv-v0`, `Image48SawyerDoorPullHookEnv-v0` and `Image48SawyerPickAndPlace3DEnv-v0`.  For the algorithm, you can experiment with `VICERAQ`, `VICE`,  `RAQ`, `SACClassifier`, and `SAC`. The `--num-samples` flag specifies the number of random seeds launched. All results in the paper were averaged across five random seeds. The hyperparameters are stored in `examples/classifier_rl/variants.py`. 
+The tasks used in the paper were `Image48SawyerPushForwardEnv-v0`, `Image48SawyerDoorPullHookEnv-v0` and `Image48SawyerPickAndPlace3DEnv-v0`.  For the algorithm, you can experiment with `VICERAQ`, `VICE`,  `RAQ`, `SACClassifier`, and `SAC`. The `--num-samples` flag specifies the number of random seeds launched. All results in the paper were averaged across five random seeds. The hyperparameters are stored in `examples/classifier_rl/variants.py`.
 
-`examples.classifier_rl.main` contains several different environments. For more information about the agents and configurations, run the scripts with `--help` flag: `python ./examples/classifier_rl/main.py --help`. 
+`examples.classifier_rl.main` contains several different environments. For more information about the agents and configurations, run the scripts with `--help` flag: `python ./examples/classifier_rl/main.py --help`.
 
 ## Version history
 
 ### v0.1
-- This version contains the code to reproduce the results in Singh et al, RSS 2019. 
+- This version contains the code to reproduce the results in Singh et al, RSS 2019.
 
 ## Citation
 If this codebase helps you in your academic research, you are encouraged to cite our paper. Here is an example bibtex:
@@ -115,7 +115,7 @@ If this codebase helps you in your academic research, you are encouraged to cite
 ```
 
 If you mainly use the VICE algorithm implemented here, you should also cite:
-``` 
+```
 @article{fu2018,
   title={Variational Inverse Control with Events: A General Framework for Data-Driven Reward Definition},
   author={Justin Fu and Avi Singh and Dibya Ghosh and Larry Yang and Sergey Levine},

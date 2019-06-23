@@ -1,11 +1,13 @@
 from copy import deepcopy
 
+
 def create_SAC_Classifier_algorithm(variant, *args, **kwargs):
     from .sac_classifier import SACClassifier
 
     algorithm = SACClassifier(*args, **kwargs)
 
     return algorithm
+
 
 def create_RAQ_algorithm(variant, *args, **kwargs):
     from .raq import RAQ
@@ -14,6 +16,7 @@ def create_RAQ_algorithm(variant, *args, **kwargs):
 
     return algorithm
 
+
 def create_VICE_algorithm(variant, *args, **kwargs):
     from .vice import VICE
 
@@ -21,12 +24,14 @@ def create_VICE_algorithm(variant, *args, **kwargs):
 
     return algorithm
 
+
 def create_VICE_GAN_algorithm(variant, *args, **kwargs):
     from .vice_gan import VICEGAN
 
     algorithm = VICEGAN(*args, **kwargs)
 
     return algorithm
+
 
 def create_VICE_RAQ_algorithm(variant, *args, **kwargs):
     from .viceraq import VICERAQ

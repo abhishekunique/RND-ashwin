@@ -1,3 +1,5 @@
+from copy import deepcopy
+
 from ray import tune
 import numpy as np
 
@@ -14,6 +16,8 @@ GAUSSIAN_POLICY_PARAMS_BASE = {
     'kwargs': {
         'hidden_layer_sizes': (M, M),
         'squash': True,
+        'observation_keys': None,
+        'observation_preprocessors_params': {}
     }
 }
 
@@ -47,7 +51,7 @@ ALGORITHM_PARAMS_BASE = {
         'epoch_length': 1000,
         'train_every_n_steps': 1,
         'n_train_repeat': 1,
-        'eval_render_mode': None,
+        'eval_render_kwargs': {},
         'eval_n_episodes': 5,
         'eval_deterministic': True,
 
@@ -68,7 +72,6 @@ ALGORITHM_PARAMS_ADDITIONAL = {
             'target_update_interval': 1,
             'tau': 5e-3,
             'target_entropy': 'auto',
-            'store_extra_policy_info': False,
             'action_prior': 'uniform',
             'n_initial_exploration_steps': int(1e3),
             'n_epochs': 200,
@@ -82,7 +85,6 @@ ALGORITHM_PARAMS_ADDITIONAL = {
             'target_update_interval': 1,
             'tau': 5e-3,
             'target_entropy': 'auto',
-            'store_extra_policy_info': False,
             'action_prior': 'uniform',
             'classifier_lr': 1e-4,
             'classifier_batch_size': 128,
@@ -103,7 +105,6 @@ ALGORITHM_PARAMS_ADDITIONAL = {
             'tau': 5e-3,
             'target_entropy': 'auto',
             #'target_entropy': tune.grid_search([-10, -7, -5, -2, 0, 5]),
-            'store_extra_policy_info': False,
             'action_prior': 'uniform',
             'classifier_lr': 1e-4,
             'classifier_batch_size': 128,
@@ -124,7 +125,6 @@ ALGORITHM_PARAMS_ADDITIONAL = {
             'target_update_interval': 1,
             'tau': 5e-3,
             'target_entropy': 'auto',
-            'store_extra_policy_info': False,
             'action_prior': 'uniform',
             'classifier_lr': 1e-4,
             'classifier_batch_size': 128,
@@ -143,7 +143,6 @@ ALGORITHM_PARAMS_ADDITIONAL = {
             'target_update_interval': 1,
             'tau': 5e-3,
             'target_entropy': 'auto',
-            'store_extra_policy_info': False,
             'action_prior': 'uniform',
             'classifier_lr': 1e-4,
             'classifier_batch_size': 128,
@@ -162,7 +161,6 @@ ALGORITHM_PARAMS_ADDITIONAL = {
             'target_update_interval': 1,
             'tau': 5e-3,
             'target_entropy': 'auto',
-            'store_extra_policy_info': False,
             'action_prior': 'uniform',
             'classifier_lr': 1e-4,
             'classifier_batch_size': 128,
@@ -224,10 +222,23 @@ def get_variant_spec_base(universe, domain, task, policy, algorithm):
             POLICY_PARAMS_BASE[policy],
             POLICY_PARAMS_FOR_DOMAIN[policy].get(domain, {})
         ),
+        'exploration_policy_params': {
+            'type': 'UniformPolicy',
+            'kwargs': {
+                'observation_keys': tune.sample_from(lambda spec: (
+                    spec.get('config', spec)
+                    ['policy_params']
+                    ['kwargs']
+                    .get('observation_keys')
+                ))
+            },
+        },
         'Q_params': {
             'type': 'double_feedforward_Q_function',
             'kwargs': {
                 'hidden_layer_sizes': (M, M),
+                'observation_keys': None,
+                'observation_preprocessors_params': {}
             }
         },
         'algorithm_params': algorithm_params,
@@ -271,7 +282,7 @@ def get_variant_spec_classifier(universe,
         universe, domain, task, policy, algorithm, *args, **kwargs)
 
     classifier_layer_size = L = 256
-    variant_spec['classifier_params'] = {
+    variant_spec['reward_classifier_params'] = {
         'type': 'feedforward_classifier',
         'kwargs': {
             'hidden_layer_sizes': (L,L),
@@ -335,33 +346,50 @@ def get_variant_spec(args):
         variant_spec['algorithm_params']['kwargs']['active_query_frequency'] = \
             active_query_frequency
 
-    variant_spec['algorithm_params']['kwargs']['n_epochs'] = \
-            n_epochs
+    variant_spec['algorithm_params']['kwargs']['n_epochs'] = n_epochs
 
     if 'Image48' in task:
         preprocessor_params = {
             'type': 'convnet_preprocessor',
             'kwargs': {
-                #'image_shape': variant_spec['env_params']['image_shape'],
-                'image_shape': (48, 48, 3),
-                'output_size': M,
-                'conv_filters': (8, 8),
-                'conv_kernel_sizes': ((5, 5), (5, 5)),
-                'pool_type': 'MaxPool2D',
-                'pool_sizes': ((2, 2), (2, 2)),
-                'pool_strides': (2, 2),
-                'dense_hidden_layer_sizes': (),
+                'conv_filters': (64, ) * 3,
+                'conv_kernel_sizes': (3, ) * 3,
+                'conv_strides': (2, ) * 3,
+                'normalization_type': 'layer',
+                'downsampling_type': 'conv',
             },
         }
-        variant_spec['policy_params']['kwargs']['preprocessor_params'] = (
-            preprocessor_params.copy())
-        variant_spec['Q_params']['kwargs']['preprocessor_params'] = (
-            preprocessor_params.copy())
-        variant_spec['replay_pool_params']['kwargs']['max_size'] = int(n_epochs*1000)
+
+        variant_spec['policy_params']['kwargs']['hidden_layer_sizes'] = (M, M)
+        variant_spec['policy_params']['kwargs'][
+            'observation_preprocessors_params'] = {
+                'pixels': deepcopy(preprocessor_params)
+            }
+
+        variant_spec['Q_params']['kwargs']['hidden_layer_sizes'] = (
+            tune.sample_from(lambda spec: (deepcopy(
+                spec.get('config', spec)
+                ['policy_params']
+                ['kwargs']
+                ['hidden_layer_sizes']
+            )))
+        )
+        variant_spec['Q_params']['kwargs'][
+            'observation_preprocessors_params'] = (
+                tune.sample_from(lambda spec: (deepcopy(
+                    spec.get('config', spec)
+                    ['policy_params']
+                    ['kwargs']
+                    ['observation_preprocessors_params']
+                )))
+            )
 
         if args.algorithm in ['SACClassifier', 'RAQ', 'VICE', 'VICEGAN', 'VICERAQ']:
-            variant_spec['classifier_params']['kwargs']['preprocessor_params'] = (
-                preprocessor_params.copy())
+            (variant_spec
+             ['reward_classifier_params']
+             ['kwargs']
+             ['observation_preprocessors_params']) = (
+                 preprocessor_params.copy())
 
     elif 'Image' in task:
         raise NotImplementedError('Add convnet preprocessor for this image input')

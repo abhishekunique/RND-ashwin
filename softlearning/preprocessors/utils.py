@@ -23,8 +23,8 @@ def get_feedforward_preprocessor(observation_shape,
                                  name='feedforward_preprocessor',
                                  **kwargs):
     from softlearning.models.feedforward import feedforward_model
-    preprocessor = feedforward_model(
-        input_shapes=(observation_shape, ), name=name, **kwargs)
+
+    preprocessor = feedforward_model(name=name, **kwargs)
 
     return preprocessor
 
@@ -49,7 +49,6 @@ def get_preprocessor_from_params(env, preprocessor_params, *args, **kwargs):
 
     preprocessor = PREPROCESSOR_FUNCTIONS[
         preprocessor_type](
-            env.active_observation_shape,
             *args,
             **preprocessor_kwargs,
             **kwargs)

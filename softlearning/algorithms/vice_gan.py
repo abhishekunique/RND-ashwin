@@ -8,7 +8,7 @@ from .sac_classifier import SACClassifier
 class VICEGAN(SACClassifier):
     """
     A modification on the VICE[1] algorithm which uses a simple discriminator
-    (similar to generative adversarial networks). 
+    (similar to generative adversarial networks).
 
     References
     ----------
@@ -17,24 +17,33 @@ class VICEGAN(SACClassifier):
     Dibya Ghosh, Larry Yang, Sergey Levine, NIPS 2018.
     """
     def _get_Q_target(self):
-        next_actions = self._policy.actions([self._next_observations_ph])
-        next_log_pis = self._policy.log_pis(
-            [self._next_observations_ph], next_actions)
+        policy_inputs = flatten_input_structure({
+            name: self._placeholders['next_observations'][name]
+            for name in self._policy.observation_keys
+        })
+        next_actions = self._policy.actions(policy_inputs)
+        next_log_pis = self._policy.log_pis(policy_inputs, next_actions)
 
         next_Qs_values = tuple(
-            Q([self._next_observations_ph, next_actions])
+            Q([self._placeholders['next_observations'], next_actions])
             for Q in self._Q_targets)
 
         min_next_Q = tf.reduce_min(next_Qs_values, axis=0)
         next_value = min_next_Q - self._alpha * next_log_pis
 
-        observation_logits = self._classifier([self._observations_ph])
+        classifier_inputs = flatten_input_structure({
+            name: self._placeholders['observations'][name]
+            for name in self._classifier.observation_keys
+        })
+        observation_logits = self._classifier(classifier_inputs)
         self._reward_t = observation_logits
+
+        terminals = tf.cast(self._placeholders['terminals'], next_values.dtype)
 
         Q_target = td_target(
             reward=self._reward_scale * self._reward_t,
             discount=self._discount,
-            next_value=(1 - self._terminals_ph) * next_value)
+            next_value=(1 - terminals) * next_value)
 
         return Q_target
 
