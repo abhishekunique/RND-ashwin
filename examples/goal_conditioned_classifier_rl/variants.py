@@ -243,6 +243,10 @@ def get_variant_spec(args):
             'Image48SawyerDoorHookMultiGoalEnv-v0']
     distance_reward_tasks = [
             'Image48SawyerPushMultiGoalEnv-v0',
+            'Image48SawyerPushMultiGoalTwoSmallPuckEnv-v0',
+            'Image48SawyerPushMultiGoalTwoSmallPuckEasyEnv-v0',
+            'Image48SawyerPushMultiGoalTwoPuckEnv-v0',
+            'Image48SawyerPushMultiGoalThreeSmallPuckEnv-v0',
             'Image48SawyerPushMultiGoalCurriculumEnv-v0']
 
 
