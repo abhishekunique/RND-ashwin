@@ -151,15 +151,28 @@ def unflatten(flattened, separator='.'):
 
     return result
 
-def mixup(features, labels, alpha=0.2):
-    def unison_shuffled_copies(a, b):
-        assert len(a) == len(b)
-        p = np.random.permutation(len(a))
-        return a[p], b[p]
 
-    features_2, labels_2 = unison_shuffled_copies(features, labels)
-    _lambda = np.random.beta(alpha, alpha, size=(features.shape[0], 1))
-    features_convex = _lambda*features + (1 - _lambda)*features_2
-    labels_convex = _lambda*labels + (1 - _lambda)*labels_2
+def mixup(features, labels, alpha=0.2):
+    assert isinstance(features, dict), (type(features), features)
+    assert all(features[key].shape[0] == labels.shape[0]
+               for key in features.keys())
+
+    num_elements = labels.shape[0]
+    permutation_idx = np.random.permutation(num_elements)
+
+    shuffled_features = type(features)((
+        (key, features[key][permutation_idx]) for key in features.keys()
+    ))
+
+    shuffled_labels = labels[permutation_idx]
+
+    lambda_ = np.random.beta(alpha, alpha, size=(num_elements, 1))
+
+    features_convex = type(features)((
+        (key, lambda_ * features[key] + (1 - lambda_) * shuffled_features[key])
+        for key in features.keys()
+    ))
+
+    labels_convex = lambda_ * labels + (1 - lambda_) * shuffled_labels
 
     return features_convex, labels_convex
