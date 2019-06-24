@@ -9,7 +9,6 @@ from . import (
 
 POOL_CLASSES = {
     'SimpleReplayPool': simple_replay_pool.SimpleReplayPool,
-    'RelabelReplayPool': relabel_replay_pool.RelabelReplayPool,
     'ActiveReplayPool': active_replay_pool.ActiveReplayPool,
     'GoalReplayPool': goal_replay_pool.GoalReplayPool,
     'TrajectoryReplayPool': trajectory_replay_pool.TrajectoryReplayPool,

@@ -172,7 +172,8 @@ def get_variant_spec_base(universe, domain, task, task_evaluation, policy, algor
         'algorithm_params': algorithm_params,
         'replay_pool_params': {
             # 'type': 'SimpleReplayPool',
-            'type': 'RelabelReplayPool',
+            #'type': 'RelabelReplayPool',
+            'type': 'HindsightExperienceReplayPool',
             'kwargs': {
                 'max_size': 1e6,
                 'relabel_probability': 0.8,
