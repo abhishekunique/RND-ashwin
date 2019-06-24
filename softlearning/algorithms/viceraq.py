@@ -16,25 +16,29 @@ class VICERAQ(VICE):
 
         if self._epoch % self._active_query_frequency == 0:
             batch_of_interest = self._pool.last_n_batch(
-                self._epoch_length*self._active_query_frequency)
+                self._epoch_length * self._active_query_frequency)
+            observations_of_interest = batch_of_interest['observations']
             labels_of_interest = batch_of_interest['is_goals']
 
             rewards_of_interest = self._session.run(
                 self._reward_t,
                 feed_dict={
                     self._placeholders['observations'][name]:
-                    batch_of_interest['observations'][name]
+                    observations_of_interest[name]
                     for name in self._classifier.observation_keys
                 }
             )
             # TODO(Avi): maybe log this quantity
             max_ind = np.argmax(rewards_of_interest)
-
             if labels_of_interest[max_ind]:
-                self._goal_examples = np.concatenate([
-                    self._goal_examples,
-                    np.expand_dims(observations_of_interest[max_ind], axis=0)
-                ])
+                self._goal_examples = {
+                    key: np.concatenate((
+                        self._goal_examples[key],
+                        observations_of_interest[key][[max_ind]],
+                    ))
+                    for key in self._goal_examples.keys()
+                }
+
             # TODO(Avi): Figure out if it makes sense to use these
             # "hard" negatives in some interesting way
             # else:
@@ -56,7 +60,8 @@ class VICERAQ(VICE):
             iteration, batch, training_paths, evaluation_paths)
 
         diagnostics.update({
-            'active_learning/positives-set-size': self._goal_examples.shape[0],
+            'active_learning/positives-set-size': self._goal_examples[
+                next(iter(self._goal_examples.keys()))].shape[0],
             # 'active_learning/negatives-set-size': self._negative_examples.shape[0],
         })
 

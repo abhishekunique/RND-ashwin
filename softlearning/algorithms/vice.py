@@ -60,22 +60,33 @@ class VICE(SACClassifier):
             self._classifier_batch_size
         )['observations']
         rand_positive_ind = np.random.randint(
-            self._goal_examples.shape[0], size=self._classifier_batch_size)
-        positives = self._goal_examples[rand_positive_ind]
+            self._goal_examples[next(iter(self._goal_examples))].shape[0],
+            size=self._classifier_batch_size)
+        positives = {
+            key: values[rand_positive_ind]
+            for key, values in self._goal_examples.items()
+        }
 
         labels_batch = np.zeros(
             (2 * self._classifier_batch_size, 2),
             dtype=np.int32)
         labels_batch[:self._classifier_batch_size, 0] = 1
         labels_batch[self._classifier_batch_size:, 1] = 1
-        observation_batch = np.concatenate([negatives, positives], axis=0)
+        observations_batch = {
+            key: np.concatenate((negatives[key], positives[key]), axis=0)
+            for key in self._classifier.observation_keys
+        }
 
         if self._mixup_alpha > 0:
-            observation_batch, labels_batch = mixup(
-                observation_batch, labels_batch, alpha=self._mixup_alpha)
+            observations_batch, labels_batch = mixup(
+                observations_batch, labels_batch, alpha=self._mixup_alpha)
 
         feed_dict = {
-            self._placeholders['observations']: observation_batch,
+            **{
+                self._placeholders['observations'][key]:
+                observations_batch[key]
+                for key in self._classifier.observation_keys
+            },
             self._placeholders['labels']: labels_batch
         }
 
@@ -117,36 +128,61 @@ class VICE(SACClassifier):
             iteration, batch, training_paths, evaluation_paths)
 
         sample_observations = batch['observations']
-        goal_index = np.random.randint(self._goal_examples.shape[0],
-                                       size=sample_observations.shape[0])
-        goal_observations = self._goal_examples[goal_index]
+        goal_index = np.random.randint(
+            self._goal_examples[next(iter(self._goal_examples))].shape[0],
+            size=sample_observations[next(iter(sample_observations))].shape[0])
+        goal_observations = {
+            key: values[goal_index] for key, values in self._goal_examples.items()
+        }
 
         goal_index_validation = np.random.randint(
-            self._goal_examples_validation.shape[0],
-            size=sample_observations.shape[0])
-        goal_observations_validation = \
-            self._goal_examples_validation[goal_index_validation]
+            self._goal_examples_validation[
+                next(iter(self._goal_examples_validation))].shape[0],
+            size=sample_observations[next(iter(sample_observations))].shape[0])
+        goal_observations_validation = {
+            key: values[goal_index_validation]
+            for key, values in self._goal_examples_validation.items()
+        }
 
-        sample_goal_observations = np.concatenate(
-            (sample_observations, goal_observations, goal_observations_validation),
-            axis=0)
+        sample_goal_observations = {
+            key: np.concatenate((
+                sample_observations[key],
+                goal_observations[key],
+                goal_observations_validation[key]
+            ), axis=0)
+            for key in sample_observations.keys()
+        }
 
-        label_1 = np.zeros((sample_observations.shape[0],2), dtype=np.int32)
-        label_2 = np.zeros((goal_observations.shape[0],2))
-        label_3 = np.zeros((goal_observations_validation.shape[0],2))
+        num_sample_observations = sample_observations[
+            next(iter(sample_observations))].shape[0]
+        sample_labels = np.repeat(((1, 0), ), num_sample_observations, axis=0)
 
-        label_1[:, 0] = 1
-        label_2[:, 1] = 1
-        label_3[:, 1] = 1
+        num_goal_observations = goal_observations[
+            next(iter(goal_observations))].shape[0]
+        goal_labels = np.repeat(((0, 1), ), num_goal_observations, axis=0)
+
+        num_goal_observations_validation = goal_observations_validation[
+            next(iter(goal_observations_validation))].shape[0]
+        goal_validation_labels = np.repeat(
+            ((0, 1), ), num_goal_observations_validation, axis=0)
 
         reward_sample_goal_observations, classifier_loss = self._session.run(
-            [self._reward_t, self._classifier_loss_t],
+            (self._reward_t, self._classifier_loss_t),
             feed_dict={
-                self._placeholders['observations']: sample_goal_observations,
+                **{
+                    self._placeholders['observations'][key]: values
+                    for key, values in sample_goal_observations.items()
+                },
                 self._placeholders['labels']: np.concatenate((
-                    label_1, label_2, label_3))
+                    sample_labels, goal_labels, goal_validation_labels,
+                ), axis=0)
             }
         )
+
+        assert (reward_sample_goal_observations.shape[0]
+                == (num_sample_observations
+                    + num_goal_observations
+                    + num_goal_observations_validation))
 
         # TODO(Avi): Make this clearer. Maybe just make all the vectors
         # the same size and specify number of splits
@@ -155,8 +191,8 @@ class VICE(SACClassifier):
          reward_goal_observations_validation) = np.split(
              reward_sample_goal_observations,
              (
-                 sample_observations.shape[0],
-                 sample_observations.shape[0]+goal_observations.shape[0]
+                 num_sample_observations,
+                 num_sample_observations + num_goal_observations
              ),
              axis=0)
 
