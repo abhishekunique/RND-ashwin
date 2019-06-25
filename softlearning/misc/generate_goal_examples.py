@@ -39,8 +39,14 @@ def get_goal_example_from_variant(variant):
 
     n_goal_examples = variant['data_params']['n_goal_examples']
 
-    goal_examples_train = goal_examples[:n_goal_examples]
-    goal_examples_validation = goal_examples[n_goal_examples:]
+    goal_examples_train = {
+        key: goal_examples[key][:n_goal_examples]
+        for key in goal_examples.keys()
+    }
+    goal_examples_validation = {
+        key: goal_examples[key][n_goal_examples:]
+        for key in goal_examples.keys()
+    }
 
     return goal_examples_train, goal_examples_validation
 
@@ -122,7 +128,12 @@ def generate_pick_goal_examples(total_goal_examples, env, task_name):
 
     assert len(goal_examples) == total_goal_examples, (
         f'Could not generate enough goal examples: {len(goal_examples)}')
-    goal_examples = np.asarray(goal_examples)
+    goal_examples = {
+        key: np.concatenate([
+            goal_example[key][None] for goal_example in goal_examples
+        ], axis=0)
+        for key in goal_examples[0].keys()
+    }
 
     return goal_examples
 
@@ -165,7 +176,12 @@ def generate_push_goal_examples(total_goal_examples, env):
             n += 1
 
     assert len(goal_examples) == total_goal_examples, 'Could not generate enough goal examples'
-    goal_examples = np.asarray(goal_examples)
+    goal_examples = {
+        key: np.concatenate([
+            goal_example[key][None] for goal_example in goal_examples
+        ], axis=0)
+        for key in goal_examples[0].keys()
+    }
 
     return goal_examples
 
@@ -220,6 +236,11 @@ def generate_door_goal_examples(total_goal_examples, env):
             n += 1
 
     assert len(goal_examples) == total_goal_examples, 'Could not generate enough goal examples'
-    goal_examples = np.asarray(goal_examples)
+    goal_examples = {
+        key: np.concatenate([
+            goal_example[key][None] for goal_example in goal_examples
+        ], axis=0)
+        for key in goal_examples[0].keys()
+    }
 
     return goal_examples

@@ -1,9 +1,9 @@
-import numpy as np
 import tensorflow as tf
-from tensorflow.python.training import training_util
 
+from softlearning.models.utils import flatten_input_structure
 from .sac import td_target
 from .sac_classifier import SACClassifier
+
 
 class VICEGAN(SACClassifier):
     """
@@ -24,12 +24,16 @@ class VICEGAN(SACClassifier):
         next_actions = self._policy.actions(policy_inputs)
         next_log_pis = self._policy.log_pis(policy_inputs, next_actions)
 
-        next_Qs_values = tuple(
-            Q([self._placeholders['next_observations'], next_actions])
-            for Q in self._Q_targets)
+        next_Q_observations = {
+            name: self._placeholders['next_observations'][name]
+            for name in self._Qs[0].observation_keys
+        }
+        next_Q_inputs = flatten_input_structure(
+            {**next_Q_observations, 'actions': next_actions})
+        next_Qs_values = tuple(Q(next_Q_inputs) for Q in self._Q_targets)
 
         min_next_Q = tf.reduce_min(next_Qs_values, axis=0)
-        next_value = min_next_Q - self._alpha * next_log_pis
+        next_values = min_next_Q - self._alpha * next_log_pis
 
         classifier_inputs = flatten_input_structure({
             name: self._placeholders['observations'][name]
@@ -43,7 +47,7 @@ class VICEGAN(SACClassifier):
         Q_target = td_target(
             reward=self._reward_scale * self._reward_t,
             discount=self._discount,
-            next_value=(1 - terminals) * next_value)
+            next_value=(1 - terminals) * next_values)
 
         return Q_target
 

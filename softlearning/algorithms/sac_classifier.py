@@ -98,49 +98,66 @@ class SACClassifier(SAC):
             learning_rate=self._classifier_lr,
             name='classifier_optimizer')
 
-        classifier_training_op = \
-            tf.contrib.layers.optimize_loss(
-                self._classifier_loss_t,
-                self.global_step,
-                learning_rate=self._classifier_lr,
-                optimizer=self._classifier_optimizer,
-                variables=self._classifier.trainable_variables,
-                increment_global_step=False,
-                # summaries=((
-                #     "loss", "gradients", "gradient_norm", "global_gradient_norm"
-                # ) if self._tf_summaries else ())
-                )
+        classifier_training_op = tf.contrib.layers.optimize_loss(
+            self._classifier_loss_t,
+            self.global_step,
+            learning_rate=self._classifier_lr,
+            optimizer=self._classifier_optimizer,
+            variables=self._classifier.trainable_variables,
+            increment_global_step=False,
+        )
 
         return classifier_training_op
 
     def _init_classifier_update(self):
-        logits = self._classifier([self._placeholders['observations']])
+        classifier_inputs = flatten_input_structure({
+            name: self._placeholders['observations'][name]
+            for name in self._classifier.observation_keys
+        })
+        logits = self._classifier(classifier_inputs)
         self._classifier_loss_t = tf.reduce_mean(
             tf.nn.sigmoid_cross_entropy_with_logits(
                 logits=logits, labels=self._placeholders['labels']))
         self._classifier_training_op = self._get_classifier_training_op()
 
     def _get_classifier_feed_dict(self):
-        negatives = self.sampler.random_batch(self._classifier_batch_size)['observations']
-        rand_positive_ind = np.random.randint(self._goal_examples.shape[0], size=self._classifier_batch_size)
-        positives = self._goal_examples[rand_positive_ind]
+        negatives = self.sampler.random_batch(
+            self._classifier_batch_size)['observations']
+        rand_positive_ind = np.random.randint(
+            self._goal_examples[next(iter(self._goal_examples))].shape[0],
+            size=self._classifier_batch_size)
+        positives = {
+            key: values[rand_positive_ind]
+            for key, values in self._goal_examples.items()
+        }
 
-        labels_batch = np.zeros((2*self._classifier_batch_size,1))
+        labels_batch = np.zeros((2*self._classifier_batch_size, 1))
         labels_batch[self._classifier_batch_size:] = 1.0
-        observation_batch = np.concatenate([negatives, positives], axis=0)
+
+        observations_batch = {
+            key: np.concatenate((negatives[key], positives[key]), axis=0)
+            for key in self._classifier.observation_keys
+        }
 
         if self._mixup_alpha > 0:
-            observation_batch, labels_batch = mixup(observation_batch, labels_batch, alpha=self._mixup_alpha)
+            observation_batch, labels_batch = mixup(
+                observations_batch, labels_batch, alpha=self._mixup_alpha)
 
         feed_dict = {
-            self._placeholders['observations']: observation_batch,
+            **{
+                self._placeholders['observations'][key]:
+                observations_batch[key]
+                for key in self._classifier.observation_keys()
+            },
             self._placeholders['labels']: labels_batch
         }
 
         return feed_dict
 
     def _train_classifier_step(self, feed_dict):
-        _, loss = self._session.run([self._classifier_training_op, self._classifier_loss_t], feed_dict)
+        _, loss = self._session.run((
+            self._classifier_training_op, self._classifier_loss_t
+        ), feed_dict)
         return loss
 
     def _epoch_after_hook(self, *args, **kwargs):
@@ -158,24 +175,32 @@ class SACClassifier(SAC):
             iteration, batch, training_paths, evaluation_paths)
 
         sample_observations = batch['observations']
-        goal_index = np.random.randint(self._goal_examples.shape[0],
-                                       size=sample_observations.shape[0])
-        goal_observations = self._goal_examples[goal_index]
+        goal_index = np.random.randint(
+            self._goal_examples[next(iter(self._goal_examples))].shape[0],
+            size=sample_observations[next(iter(sample_observations))].shape[0])
+        goal_observations = {
+            key: self._goal_examples[key][goal_index]
+            for key in self._goal_examples.keys()
+        }
 
         goal_index_validation = np.random.randint(
-            self._goal_examples_validation.shape[0],
-            size=sample_observations.shape[0])
-        goal_observations_validation = \
-            self._goal_examples_validation[goal_index_validation]
-
-        sample_goal_observations = np.concatenate(
-            (sample_observations, goal_observations, goal_observations_validation),
-            axis=0)
+            self._goal_examples_validation[
+                next(iter(self._goal_examples))].shape[0],
+            size=sample_observations[next(iter(sample_observations))].shape[0])
+        goal_observations_validation = (
+            self._goal_examples_validation[goal_index_validation])
 
         reward_sample_goal_observations, classifier_loss = self._session.run(
             (self._reward_t, self._classifier_loss_t),
             feed_dict={
-                self._placeholders['observations']: sample_goal_observations,
+                **{
+                    self._placeholders['observations'][key]: np.concatenate((
+                        sample_observations[key],
+                        goal_observations[key],
+                        goal_observations_validation[key]
+                    ), axis=0)
+                    for key in self._classifier.observation_keys
+                },
                 self._placeholders['labels']: np.concatenate([
                     np.zeros((sample_observations.shape[0], 1)),
                     np.ones((goal_observations.shape[0], 1)),
@@ -204,8 +229,10 @@ class SACClassifier(SAC):
         #     axis=0)
 
         diagnostics.update({
-            # 'reward_learning/classifier_loss_train': np.mean(classifier_loss_train),
-            # 'reward_learning/classifier_loss_validation': np.mean(classifier_loss_validation),
+            # 'reward_learning/classifier_loss_train':
+            # np.mean(classifier_loss_train),
+            # 'reward_learning/classifier_loss_validation':
+            # np.mean(classifier_loss_validation),
             'reward_learning/classifier_loss': classifier_loss,
             'reward_learning/reward_sample_obs_mean': np.mean(
                 reward_sample_observations),
