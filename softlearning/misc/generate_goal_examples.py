@@ -34,6 +34,10 @@ def get_goal_example_from_variant(variant):
         goal_examples = generate_push_goal_examples(total_goal_examples, env)
     elif variant['task'] in PICK_TASKS:
         goal_examples = generate_pick_goal_examples(total_goal_examples, env, variant['task'])
+    elif variant['task'] == 'TurnImage-v0':
+        import pickle
+        with open('../../goal_classifier/dsuite_fixed_screw_180/positives.pkl', 'rb') as file:
+            goal_examples = pickle.load(file)
     else:
         raise NotImplementedError
 

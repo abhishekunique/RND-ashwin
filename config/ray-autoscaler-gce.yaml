@@ -12,7 +12,7 @@ max_workers: 100
 # The initial number of worker nodes to launch in addition to the head
 # node. When the cluster is first brought up (or when it is refreshed with a
 # subsequent `ray up`) this number of nodes will be started.
-initial_workers: 0
+initial_workers: 1
 
 # This executes all commands on all nodes in the docker container,
 # and opens all the necessary ports to support the Ray cluster.
@@ -36,8 +36,8 @@ idle_timeout_minutes: 5
 provider:
     type: gcp
     region: us-west1
-    availability_zone: us-west1-a
-    project_id: <TODO>
+    availability_zone: us-west1-b
+    project_id: abhishek-reset-free
 
 # How Ray will authenticate with newly launched nodes.
 auth:
@@ -52,7 +52,7 @@ auth:
 # For more documentation on available fields, see:
 # http://boto3.readthedocs.io/en/latest/reference/services/ec2.html#EC2.ServiceResource.create_instances
 head_node:
-    machineType: n1-standard-4 # n1-highcpu-16
+    machineType: n1-standard-2
     disks:
       - boot: true
         autoDelete: true
@@ -60,8 +60,13 @@ head_node:
         initializeParams:
           diskSizeGb: 50
           # See https://cloud.google.com/compute/docs/images for more images
-          sourceImage: projects/<TODO:projectId>/global/images/family/<TODO:familyId>
+          sourceImage: projects/abhishek-reset-free/global/images/family/softlearning-gpu
+    scheduling:
+        - preemptible: false
+          onHostMaintenance: TERMINATE
+          automaticRestart: false
 
+          
     # Additional options can be found in in the compute docs at
     # https://cloud.google.com/compute/docs/reference/rest/v1/instances/insert
 
@@ -70,7 +75,7 @@ head_node:
 # For more documentation on available fields, see:
 # http://boto3.readthedocs.io/en/latest/reference/services/ec2.html#EC2.ServiceResource.create_instances
 worker_nodes:
-    machineType: n1-standard-8 # n1-highcpu-8
+    machineType: n1-highcpu-8 # n1-highcpu-16
     disks:
       - boot: true
         autoDelete: true
@@ -78,13 +83,14 @@ worker_nodes:
         initializeParams:
           diskSizeGb: 50
           # See https://cloud.google.com/compute/docs/images for more images
-          sourceImage: projects/<TODO:projectId>/global/images/family/<TODO:familyId>
-    # Run workers on preemtible instance by default.
-    # Note that GCP preemptible instances automatically shut down after 24h.
-    # Comment this out to use on-demand.
+          sourceImage: projects/abhishek-reset-free/global/images/family/softlearning-gpu
+    guestAccelerators:
+      - acceleratorType: projects/abhishek-reset-free/zones/us-west1-b/acceleratorTypes/nvidia-tesla-p100
+        acceleratorCount: 1
     scheduling:
       - preemptible: true
-      - onHostMaintenance: TERMINATE
+        onHostMaintenance: TERMINATE
+        automaticRestart: false
 
     # Additional options can be found in in the compute docs at
     # https://cloud.google.com/compute/docs/reference/rest/v1/instances/insert
@@ -92,19 +98,18 @@ worker_nodes:
 # Files or directories to copy to the head and worker nodes. The format is a
 # dictionary from REMOTE_PATH: LOCAL_PATH, e.g.
 file_mounts: {
-    "/tmp/current_git_HEAD": "<TODO>/.git/HEAD",
+    "~/softlearning-vice": "~/Developer/softlearning-vice-updated",
+    "~/dsuite": "~/Developer/dsuite",
     "~/.mujoco/mjkey.txt": "~/.mujoco/mjkey.txt",
 }
 
 # List of shell commands to run to set up nodes.
 setup_commands:
     - >-
-        (test -e ~/softlearning
-        || git clone git@github.com:rail-berkeley/softlearning.git)
-        && cd ~/softlearning
-        && git fetch --all
-        && git_HEAD=`cat /tmp/current_git_HEAD | cut -d \  -f 2`
-        && git checkout ${git_HEAD#"refs/heads/"}
+        cd ~/softlearning-vice
+        && pip install -e .
+        && cd ~/dsuite
+        && pip install -e .
 
 # Custom commands that will be run on the head node after common setup.
 head_setup_commands: []
