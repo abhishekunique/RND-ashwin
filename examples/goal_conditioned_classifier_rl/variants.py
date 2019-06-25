@@ -1,8 +1,12 @@
+from copy import deepcopy
+
 from ray import tune
 import numpy as np
 
 from softlearning.misc.utils import get_git_rev, deep_update
-from softlearning.misc.generate_goal_examples import DOOR_TASKS, PUSH_TASKS, PICK_TASKS
+from softlearning.misc.generate_goal_examples import (
+    DOOR_TASKS, PUSH_TASKS, PICK_TASKS)
+
 
 M = 256
 REPARAMETERIZE = True
@@ -47,7 +51,9 @@ ALGORITHM_PARAMS_BASE = {
         'epoch_length': 1000,
         'train_every_n_steps': 1,
         'n_train_repeat': 1,
-        'eval_render_mode': None,
+        'eval_render_kwargs': {
+            'mode': None
+        },
         'eval_n_episodes': 5,
         'eval_deterministic': False,
 
@@ -57,8 +63,8 @@ ALGORITHM_PARAMS_BASE = {
     }
 }
 
-#TODO Avi Most of the algorithm params for classifier-style methods
-#are shared. Rewrite this part to reuse the params
+# TODO(Avi) Most of the algorithm params for classifier-style methods
+# are shared. Rewrite this part to reuse the params.
 ALGORITHM_PARAMS_ADDITIONAL = {
     'SAC': {
         'type': 'SAC',
@@ -68,7 +74,6 @@ ALGORITHM_PARAMS_ADDITIONAL = {
             'target_update_interval': 1,
             'tau': 5e-3,
             'target_entropy': 'auto',
-            'store_extra_policy_info': False,
             'action_prior': 'uniform',
             'n_initial_exploration_steps': int(1e3),
             'n_epochs': 200,
@@ -82,7 +87,6 @@ ALGORITHM_PARAMS_ADDITIONAL = {
             'target_update_interval': 1,
             'tau': 5e-3,
             'target_entropy': 'auto',
-            'store_extra_policy_info': False,
             'action_prior': 'uniform',
             'classifier_lr': 1e-4,
             'classifier_batch_size': 128,
@@ -101,7 +105,6 @@ ALGORITHM_PARAMS_ADDITIONAL = {
             'target_update_interval': 1,
             'tau': 5e-3,
             'target_entropy': 'auto',
-            'store_extra_policy_info': False,
             'action_prior': 'uniform',
             'classifier_lr': 1e-4,
             'classifier_batch_size': 128,
@@ -158,7 +161,7 @@ def get_variant_spec_base(universe, domain, task, task_evaluation, policy, algor
         'universe': universe,
         'git_sha': get_git_rev(),
 
-        #'env_params': ENV_PARAMS.get(domain, {}).get(task, {}),
+        # 'env_params': ENV_PARAMS.get(domain, {}).get(task, {}),
         'policy_params': deep_update(
             POLICY_PARAMS_BASE[policy],
             POLICY_PARAMS_FOR_DOMAIN[policy].get(domain, {})
@@ -172,11 +175,14 @@ def get_variant_spec_base(universe, domain, task, task_evaluation, policy, algor
         'algorithm_params': algorithm_params,
         'replay_pool_params': {
             # 'type': 'SimpleReplayPool',
-            #'type': 'RelabelReplayPool',
+            # 'type': 'RelabelReplayPool',
             'type': 'HindsightExperienceReplayPool',
             'kwargs': {
                 'max_size': 1e6,
-                'relabel_probability': 0.8,
+                'her_strategy': {
+                    'resampling_probability': 0.8,
+                    'type': 'future',
+                }
             }
         },
         'sampler_params': {
@@ -213,19 +219,20 @@ def get_variant_spec_classifier(universe,
         universe, domain, task, task_evaluation, policy, algorithm, *args, **kwargs)
 
     classifier_layer_size = L = 256
-    variant_spec['classifier_params'] = {
+    variant_spec['reward_classifier_params'] = {
         'type': 'feedforward_classifier',
         'kwargs': {
-            'hidden_layer_sizes': (L,L),
+            'hidden_layer_sizes': (L, L),
             }
         }
 
     return variant_spec
 
+
 def get_variant_spec(args):
     universe, domain = args.universe, args.domain
     # task, algorithm, n_epochs = args.task, args.algorithm, args.n_epochs
-    #task = args.task = 'Image48SawyerPushNIPSEasyXY'
+    # task = args.task = 'Image48SawyerPushNIPSEasyXY'
     task = args.task
     task_evaluation = args.task_evaluation
 
@@ -250,29 +257,27 @@ def get_variant_spec(args):
             'Image48SawyerPushMultiGoalThreeSmallPuckEnv-v0',
             'Image48SawyerPushMultiGoalCurriculumEnv-v0']
 
+    # if task in binary_reward_tasks:
+    #     relabel_reward = 1.0
+    # elif task in distance_reward_tasks:
+    #     relabel_reward = 0.0
+    # else:
+    #     raise NotImplementedError
 
-    if task in binary_reward_tasks:
-        relabel_reward = 1.0
-    elif task in distance_reward_tasks:
-        relabel_reward = 0.0
-    else:
-        raise NotImplementedError
-
-    variant_spec['replay_pool_params']['kwargs']['relabel_reward'] = relabel_reward
+    # variant_spec['replay_pool_params']['kwargs']['relabel_reward'] = relabel_reward
 
     # if args.algorithm in ['RAQ', 'VICERAQ']:
     #     variant_spec['algorithm_params']['kwargs']['active_query_frequency'] = \
     #         active_query_frequency
 
-    variant_spec['algorithm_params']['kwargs']['n_epochs'] = \
-            n_epochs
+    variant_spec['algorithm_params']['kwargs']['n_epochs'] = n_epochs
 
     if 'Image48' in task:
         preprocessor_params = {
             'type': 'hacky_two_image_convnet_preprocessor',
             # 'type': 'convnet_preprocessor',
             'kwargs': {
-                #'image_shape': variant_spec['env_params']['image_shape'],
+                # 'image_shape': variant_spec['env_params']['image_shape'],
                 'image_shape': (48, 48, 3),
                 'output_size': M,
                 'conv_filters': (8, 8),
@@ -283,18 +288,36 @@ def get_variant_spec(args):
                 'dense_hidden_layer_sizes': (),
             },
         }
-        variant_spec['policy_params']['kwargs']['preprocessor_params'] = (
-            preprocessor_params.copy())
-        variant_spec['Q_params']['kwargs']['preprocessor_params'] = (
-            preprocessor_params.copy())
-        variant_spec['replay_pool_params']['kwargs']['max_size'] = int(n_epochs*1000)
+        variant_spec['policy_params']['kwargs'][
+            'observation_preprocessors_params'] = {
+                'pixels': deepcopy(preprocessor_params)
+            }
+        variant_spec['Q_params']['kwargs'][
+            'observation_preprocessors_params'] = (
+                tune.sample_from(lambda spec: (deepcopy(
+                    spec.get('config', spec)
+                    ['policy_params']
+                    ['kwargs']
+                    ['observation_preprocessors_params']
+                )))
+            )
+        variant_spec['replay_pool_params']['kwargs']['max_size'] = (
+            int(n_epochs * 1000))
 
-        if args.algorithm in ['VICEGoalConditioned', 'VICEGANGoalConditioned']:
-            variant_spec['classifier_params']['kwargs']['preprocessor_params'] = (
-                preprocessor_params.copy())
+        if args.algorithm in ('VICEGoalConditioned', 'VICEGANGoalConditioned'):
+            variant_spec['reward_classifier_params']['kwargs'][
+                'preprocessor_params'] = (
+                    tune.sample_from(lambda spec: (deepcopy(
+                        spec.get('config', spec)
+                        ['policy_params']
+                        ['kwargs']
+                        ['observation_preprocessors_params']
+                    )))
+                )
 
     elif 'Image' in task:
-        raise NotImplementedError('Add convnet preprocessor for this image input')
+        raise NotImplementedError(
+            "Add convnet preprocessor for this image input.")
 
     if args.checkpoint_replay_pool is not None:
         variant_spec['run_params']['checkpoint_replay_pool'] = (
