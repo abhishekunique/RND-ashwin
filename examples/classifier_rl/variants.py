@@ -39,10 +39,8 @@ POLICY_PARAMS_FOR_DOMAIN.update({
     'gaussian': POLICY_PARAMS_FOR_DOMAIN['GaussianPolicy'],
 })
 
-DEFAULT_MAX_PATH_LENGTH = 100
-MAX_PATH_LENGTH_PER_DOMAIN = {
-    'Point2DEnv': 50,
-}
+DEFAULT_MAX_PATH_LENGTH = 200
+MAX_PATH_LENGTH_PER_DOMAIN = {}
 
 ALGORITHM_PARAMS_BASE = {
     'type': 'SAC',
@@ -195,6 +193,51 @@ ALGORITHM_PARAMS_ADDITIONAL = {
 DEFAULT_NUM_EPOCHS = 200
 NUM_CHECKPOINTS = 10
 
+"""
+Environment params
+"""
+
+ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK = {
+    'gym': {
+        'DClaw': {
+            # Add in tasks
+            'TurnImage-v0': {
+                'observation_keys': ('image',),
+                'image_shape': (32, 32, 3),
+                'camera_settings': {
+                    'azimuth': 90.18582,
+                    'distance': 0.32,
+                    'elevation': -32.42,
+                    'lookat': np.array([-0.00157929, 0.00336185, 0.10151641])
+                },
+                'init_angle_range': (0., 0.),
+                'target_angle_range': (np.pi, np.pi),
+            },
+        },
+    },
+}
+
+"""
+Helper methods for retrieving universe/domain/task specific params.
+"""
+
+def get_policy_params(universe, domain, task):
+    policy_params = GAUSSIAN_POLICY_PARAMS_BASE.copy()
+    return policy_params
+
+def get_max_path_length(universe, domain, task):
+    max_path_length = MAX_PATH_LENGTH_PER_DOMAIN.get(
+        task, DEFAULT_MAX_PATH_LENGTH)
+
+def get_environment_params(universe, domain, task):
+    environment_params = (
+        ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK
+        .get(universe, {}).get(domain, {}).get(task, {}))
+    return environment_params
+
+"""
+Configuring variant specs
+"""
 
 def get_variant_spec_base(universe, domain, task, policy, algorithm):
     # algorithm_params = deep_update(
@@ -212,16 +255,22 @@ def get_variant_spec_base(universe, domain, task, policy, algorithm):
         )
 
     variant_spec = {
-        'domain': domain,
-        'task': task,
-        'universe': universe,
-        'git_sha': get_git_rev(),
+        'git_sha': get_git_rev(__file__),
 
-        #'env_params': ENV_PARAMS.get(domain, {}).get(task, {}),
-        'policy_params': deep_update(
-            POLICY_PARAMS_BASE[policy],
-            POLICY_PARAMS_FOR_DOMAIN[policy].get(domain, {})
-        ),
+        'environment_params': {
+            'training': {
+                'domain': domain,
+                'task': task,
+                'universe': universe,
+                'kwargs': get_environment_params(universe, domain, task),
+            },
+            'evaluation': tune.sample_from(lambda spec: (
+                spec.get('config', spec)
+                ['environment_params']
+                ['training']
+            )),
+        },
+        'policy_params': get_policy_params(universe, domain, task),
         'exploration_policy_params': {
             'type': 'UniformPolicy',
             'kwargs': {
@@ -245,16 +294,14 @@ def get_variant_spec_base(universe, domain, task, policy, algorithm):
         'replay_pool_params': {
             'type': 'SimpleReplayPool',
             'kwargs': {
-                'max_size': 1e6,
+                'max_size': int(1e6)
             }
         },
         'sampler_params': {
             'type': 'SimpleSampler',
             'kwargs': {
-                'max_path_length': MAX_PATH_LENGTH_PER_DOMAIN.get(
-                    domain, DEFAULT_MAX_PATH_LENGTH),
-                'min_pool_size': MAX_PATH_LENGTH_PER_DOMAIN.get(
-                    domain, DEFAULT_MAX_PATH_LENGTH),
+                'max_path_length': get_max_path_length(universe, domain, task),
+                'min_pool_size': get_max_path_length(universe, domain, task),
                 'batch_size': 256,
             }
         },
@@ -262,7 +309,7 @@ def get_variant_spec_base(universe, domain, task, policy, algorithm):
             'seed': tune.sample_from(
                 lambda spec: np.random.randint(0, 10000)),
             'checkpoint_at_end': True,
-            'checkpoint_frequency':  DEFAULT_NUM_EPOCHS // NUM_CHECKPOINTS,
+            'checkpoint_frequency': tune.sample_from(get_checkpoint_frequency),
             'checkpoint_replay_pool': False,
         },
     }
@@ -306,7 +353,6 @@ def get_variant_spec_classifier(universe,
             raise NotImplementedError('Success metric not defined for task')
 
         variant_spec.update({
-
             'sampler_params': {
                 'type': 'ActiveSampler',
                 'kwargs': {
@@ -324,8 +370,7 @@ def get_variant_spec_classifier(universe,
                     'max_size': 1e6,
                 }
             },
-
-            })
+        })
 
     return variant_spec
 
@@ -348,7 +393,7 @@ def get_variant_spec(args):
 
     variant_spec['algorithm_params']['kwargs']['n_epochs'] = n_epochs
 
-    if 'Image48' in task:
+    if 'Image' in task:
         preprocessor_params = {
             'type': 'convnet_preprocessor',
             'kwargs': {
