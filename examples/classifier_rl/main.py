@@ -1,12 +1,9 @@
 import os
 import copy
-import glob
 import pickle
 import sys
 
 import tensorflow as tf
-import numpy as np
-from ray import tune
 
 from softlearning.environments.utils import (
     get_goal_example_environment_from_variant, get_environment_from_params)
@@ -17,9 +14,10 @@ from softlearning.replay_pools.utils import get_replay_pool_from_variant
 from softlearning.samplers.utils import get_sampler_from_variant
 from softlearning.value_functions.utils import get_Q_function_from_variant
 from softlearning.models.utils import get_reward_classifier_from_variant
-from softlearning.misc.generate_goal_examples import get_goal_example_from_variant
+from softlearning.misc.generate_goal_examples import (
+    get_goal_example_from_variant)
 
-from softlearning.misc.utils import set_seed, initialize_tf_variables
+from softlearning.misc.utils import initialize_tf_variables
 from examples.instrument import run_example_local
 from examples.development.main import ExperimentRunner
 
@@ -118,15 +116,17 @@ class ExperimentRunnerClassifierRL(ExperimentRunner):
             'session': self._session,
         }
 
-        if self._variant['algorithm_params']['type'] in ['SACClassifier', 'RAQ', 'VICE', 'VICEGAN', 'VICERAQ']:
-            reward_classifier = self.reward_classifier = picklable['reward_classifier']
+        if self._variant['algorithm_params']['type'] in (
+                'SACClassifier', 'RAQ', 'VICE', 'VICEGAN', 'VICERAQ'):
+            reward_classifier = self.reward_classifier = picklable[
+                'reward_classifier']
             algorithm_kwargs['classifier'] = reward_classifier
 
-            goal_examples_train, goal_examples_validation = \
-                get_goal_example_from_variant(variant)
+            goal_examples_train, goal_examples_validation = (
+                get_goal_example_from_variant(self._variant))
             algorithm_kwargs['goal_examples'] = goal_examples_train
-            algorithm_kwargs['goal_examples_validation'] = \
-                goal_examples_validation
+            algorithm_kwargs['goal_examples_validation'] = (
+                goal_examples_validation)
 
         self.algorithm = get_algorithm_from_variant(**algorithm_kwargs)
         self.algorithm.__setstate__(picklable['algorithm'].__getstate__())
@@ -160,6 +160,7 @@ class ExperimentRunnerClassifierRL(ExperimentRunner):
             picklables['reward_classifier'] = self.reward_classifier
 
         return picklables
+
 
 def main(argv=None):
     """Run ExperimentRunner locally on ray.

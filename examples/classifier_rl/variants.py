@@ -4,7 +4,8 @@ from ray import tune
 import numpy as np
 
 from softlearning.misc.utils import get_git_rev, deep_update
-from softlearning.misc.generate_goal_examples import DOOR_TASKS, PUSH_TASKS, PICK_TASKS
+from softlearning.misc.generate_goal_examples import (
+    DOOR_TASKS, PUSH_TASKS, PICK_TASKS)
 
 import dsuite
 
@@ -61,8 +62,8 @@ ALGORITHM_PARAMS_BASE = {
     }
 }
 
-#TODO Avi Most of the algorithm params for classifier-style methods
-#are shared. Rewrite this part to reuse the params
+# TODO(Avi): Most of the algorithm params for classifier-style methods
+# are shared. Rewrite this part to reuse the params
 ALGORITHM_PARAMS_ADDITIONAL = {
     'SAC': {
         'type': 'SAC',
@@ -412,12 +413,14 @@ def get_variant_spec_classifier(universe,
 
     return variant_spec
 
+
 def get_variant_spec(args):
     universe, domain = args.universe, args.domain
     task, algorithm, n_epochs = args.task, args.algorithm, args.n_epochs
     active_query_frequency = args.active_query_frequency
 
-    if args.algorithm in ['SACClassifier', 'RAQ', 'VICE', 'VICEGAN', 'VICERAQ']:
+    if args.algorithm in (
+            'SACClassifier', 'RAQ', 'VICE', 'VICEGAN', 'VICERAQ'):
         variant_spec = get_variant_spec_classifier(
             universe, domain, task, args.policy, args.algorithm,
             args.n_goal_examples)
@@ -425,9 +428,9 @@ def get_variant_spec(args):
         variant_spec = get_variant_spec_base(
             universe, domain, task, args.policy, args.algorithm)
 
-    if args.algorithm in ['RAQ', 'VICERAQ']:
-        variant_spec['algorithm_params']['kwargs']['active_query_frequency'] = \
-            active_query_frequency
+    if args.algorithm in ('RAQ', 'VICERAQ'):
+        variant_spec['algorithm_params']['kwargs'][
+            'active_query_frequency'] = active_query_frequency
 
     variant_spec['algorithm_params']['kwargs']['n_epochs'] = n_epochs
 
@@ -468,7 +471,8 @@ def get_variant_spec(args):
                 )))
             )
 
-        if args.algorithm in ['SACClassifier', 'RAQ', 'VICE', 'VICEGAN', 'VICERAQ']:
+        if args.algorithm in (
+                'SACClassifier', 'RAQ', 'VICE', 'VICEGAN', 'VICERAQ'):
             (variant_spec
              ['reward_classifier_params']
              ['kwargs']

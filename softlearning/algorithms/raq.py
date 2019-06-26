@@ -32,9 +32,14 @@ class RAQ(SACClassifier):
         if self._mixup_alpha > 0:
             observation_batch, labels_batch = mixup(
                 observation_batch, labels_batch, alpha=self._mixup_alpha)
+
         feed_dict = {
-            self._placeholders['observations']: observation_batch,
-            self._placeholders['label']: labels_batch,
+            **{
+                self._placeholders['observations'][name]:
+                observation_batch[name]
+                for name in self._classifier.observation_keys
+            },
+            self._placeholders['labels']: labels_batch,
         }
 
         return feed_dict
@@ -59,8 +64,9 @@ class RAQ(SACClassifier):
             rewards_of_interest = self._session.run(
                 self._reward_t,
                 feed_dict={
-                    self._placeholders['observations']:
-                    observations_of_interest
+                    self._placeholders['observations'][name]:
+                    observations_of_interest[name]
+                    for name in self._classifier.observation_keys
                 })
 
             max_ind = np.argmax(rewards_of_interest)
