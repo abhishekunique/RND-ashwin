@@ -478,14 +478,12 @@ def get_variant_spec(args):
              ['reward_classifier_params']
              ['kwargs']
              ['observation_preprocessors_params']) = (
-                tune.sample_from(lambda spec: (deepcopy(
+                tune.sample_from(lambda spec: (
                     spec.get('config', spec)
                     ['policy_params']
                     ['kwargs']
                     ['observation_preprocessors_params']
                 )))
-            )
-
 
     if args.checkpoint_replay_pool is not None:
         variant_spec['run_params']['checkpoint_replay_pool'] = (

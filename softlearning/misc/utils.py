@@ -171,13 +171,13 @@ def mixup(features, labels, alpha=0.2):
 
     def broadcast_multiply(lambda_, values):
         reshaped_lambda_ = lambda_.reshape(
-                (lambda_.shape[0], *((1, ) * len(values.shape[1:]))))
+            (lambda_.shape[0], *((1, ) * len(values.shape[1:]))))
         result = reshaped_lambda_ * values
         return result
 
     features_convex = type(features)((
         (key, (broadcast_multiply(lambda_, features[key])
-            + broadcast_multiply((1 - lambda_), shuffled_features[key])))
+               + broadcast_multiply((1 - lambda_), shuffled_features[key])))
         for key in features.keys()
     )) 
     labels_convex = lambda_ * labels + (1 - lambda_) * shuffled_labels
