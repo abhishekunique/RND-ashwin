@@ -250,6 +250,7 @@ def get_policy_params(universe, domain, task):
 def get_max_path_length(universe, domain, task):
     max_path_length = MAX_PATH_LENGTH_PER_DOMAIN.get(
         task, DEFAULT_MAX_PATH_LENGTH)
+    return max_path_length
 
 def get_environment_params(universe, domain, task):
     environment_params = (
@@ -477,7 +478,14 @@ def get_variant_spec(args):
              ['reward_classifier_params']
              ['kwargs']
              ['observation_preprocessors_params']) = (
-                 preprocessor_params.copy())
+                tune.sample_from(lambda spec: (deepcopy(
+                    spec.get('config', spec)
+                    ['policy_params']
+                    ['kwargs']
+                    ['observation_preprocessors_params']
+                )))
+            )
+
 
     if args.checkpoint_replay_pool is not None:
         variant_spec['run_params']['checkpoint_replay_pool'] = (
