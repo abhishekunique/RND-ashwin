@@ -29,11 +29,12 @@ class ExperimentRunnerClassifierRL(ExperimentRunner):
     def _build(self):
         variant = copy.deepcopy(self._variant)
 
-        env_params = variant['environment_params']
+        train_env_params = variant['environment_params']['training']
+        eval_env_params = variant['environment_params']['evaluation']
         training_environment = self.training_environment = (
-            get_environment_from_params(env_params))
+            get_environment_from_params(train_env_params))
         evaluation_environment = self.evaluation_environment = (
-            get_environment_from_params(env_params))
+            get_environment_from_params(eval_env_params))
         replay_pool = self.replay_pool = (
             get_replay_pool_from_variant(variant, training_environment))
         sampler = self.sampler = get_sampler_from_variant(variant)

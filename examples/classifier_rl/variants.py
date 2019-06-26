@@ -6,6 +6,8 @@ import numpy as np
 from softlearning.misc.utils import get_git_rev, deep_update
 from softlearning.misc.generate_goal_examples import DOOR_TASKS, PUSH_TASKS, PICK_TASKS
 
+import dsuite
+
 M = 256
 REPARAMETERIZE = True
 
@@ -200,6 +202,26 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK = {
     'gym': {
         'DClaw': {
             # Add in tasks
+            'TurnFixed-v0': {
+                'camera_settings': {
+                    'azimuth': 90.18582,
+                    'distance': 0.32,
+                    'elevation': -32.42,
+                    'lookat': np.array([-0.00157929, 0.00336185, 0.10151641])
+                },
+                # 'init_angle_range': (0., 0.),
+                # 'target_angle_range': (np.pi, np.pi),
+                'pixel_wrapper_kwargs': {
+                    'observation_key': 'pixels',
+                    'pixels_only': True,
+                    'render_kwargs': {
+                        'width': 32,
+                        'height': 32,
+                        'camera_id': -1
+                    },
+                },
+            },
+
             'TurnImage-v0': {
                 'observation_keys': ('image',),
                 'image_shape': (32, 32, 3),
@@ -233,6 +255,23 @@ def get_environment_params(universe, domain, task):
         ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK
         .get(universe, {}).get(domain, {}).get(task, {}))
     return environment_params
+
+def get_checkpoint_frequency(spec):
+    config = spec.get('config', spec)
+    checkpoint_frequency = (
+        config
+        ['algorithm_params']
+        ['kwargs']
+        ['n_epochs']
+    ) // NUM_CHECKPOINTS
+
+    return checkpoint_frequency
+
+def is_image_env(universe, domain, task, variant_spec):
+    return ('image' in task.lower()
+            or 'image' in domain.lower()
+            or 'pixel_wrapper_kwargs' in (
+            variant_spec['environment_params']['training']['kwargs']))
 
 """
 Configuring variant specs
@@ -392,7 +431,8 @@ def get_variant_spec(args):
 
     variant_spec['algorithm_params']['kwargs']['n_epochs'] = n_epochs
 
-    if 'Image' in task:
+    # if 'Image' in task:
+    if is_image_env(universe, domain, task, variant_spec):  
         preprocessor_params = {
             'type': 'convnet_preprocessor',
             'kwargs': {
@@ -434,9 +474,6 @@ def get_variant_spec(args):
              ['kwargs']
              ['observation_preprocessors_params']) = (
                  preprocessor_params.copy())
-
-    elif 'Image' in task:
-        raise NotImplementedError('Add convnet preprocessor for this image input')
 
     if args.checkpoint_replay_pool is not None:
         variant_spec['run_params']['checkpoint_replay_pool'] = (

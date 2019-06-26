@@ -17,6 +17,7 @@ class PixelObservationWrapper(ObservationWrapper):
                  env,
                  pixels_only=True,
                  render_kwargs=None,
+                 normalize=True,
                  observation_key='pixels'):
         """Initializes a new pixel Wrapper.
 
@@ -73,13 +74,16 @@ class PixelObservationWrapper(ObservationWrapper):
             self.observation_space = spaces.Dict()
             self.observation_space.spaces[STATE_KEY] = wrapped_observation_space
 
+        self.normalize = normalize
         # Extend observation space with pixels.
         pixels = self.env.get_pixels(**render_kwargs)
+        if normalize:
+            pixels = (2. / 255. * pixels) - 1.
 
         if np.issubdtype(pixels.dtype, np.integer):
             low, high = (0, 255)
         elif np.issubdtype(pixels.dtype, np.float):
-            low, high = (-float('inf'), float('inf'))
+            low, high = (-float('inf'), float('inf')) # Fix for normalized between [-1, 1]
         else:
             raise TypeError(pixels.dtype)
 
@@ -105,12 +109,15 @@ class PixelObservationWrapper(ObservationWrapper):
             observation = collections.OrderedDict()
             observation[STATE_KEY] = observation
 
-        pixels = self.env.get_pixels(**self._render_kwargs)
+        # pixels = self.env.get_pixels(**self._render_kwargs)
 
         try:
-            pixels = self.env.get_pixels(**self._render_kwargs)
+            pixels = self.env.get_pixels(**self._render_kwargs) 
         except AttributeError:
             pixels = self.env.render(**self._render_kwargs)
+        
+        if self.normalize:
+            pixels = (2. / 255. * pixels) - 1.
 
         observation[self._observation_key] = pixels
 

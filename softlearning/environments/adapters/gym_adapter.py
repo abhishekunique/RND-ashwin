@@ -50,9 +50,9 @@ class GymAdapter(SoftlearningEnv):
     """Adapter that implements the SoftlearningEnv for Gym envs."""
 
     def __init__(self,
+                 domain,
+                 task,
                  *args,
-                 domain=None,
-                 task=None,
                  env=None,
                  normalize=True,
                  observation_keys=(),

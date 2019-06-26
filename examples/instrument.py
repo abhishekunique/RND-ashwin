@@ -224,7 +224,7 @@ def run_example_local(example_module_name, example_argv, local_mode=False):
         trainable_class,
         **experiment_kwargs,
         with_server=example_args.with_server,
-        server_port=example_args.server_port,
+        # server_port=example_args.server_port,
         scheduler=None,
         reuse_actors=True)
 

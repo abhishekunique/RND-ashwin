@@ -1,6 +1,6 @@
 import numpy as np
 
-from softlearning.environments.utils import get_goal_example_environment_from_variant
+from softlearning.environments.utils import get_environment_from_params
 
 PICK_TASKS = [
     'StateSawyerPickAndPlaceEnv-v0',
@@ -23,20 +23,23 @@ PUSH_TASKS = [
 
 
 def get_goal_example_from_variant(variant):
+    train_env_params = variant['environment_params']['training']
 
-    env = get_goal_example_environment_from_variant(variant)
+    env = get_environment_from_params(train_env_params)
     total_goal_examples = variant['data_params']['n_goal_examples'] \
         + variant['data_params']['n_goal_examples_validation_max']
 
-    if variant['task'] in DOOR_TASKS:
+    task = train_env_params['task']
+
+    if task in DOOR_TASKS:
         goal_examples = generate_door_goal_examples(total_goal_examples, env)
-    elif variant['task'] in PUSH_TASKS:
+    elif task in PUSH_TASKS:
         goal_examples = generate_push_goal_examples(total_goal_examples, env)
-    elif variant['task'] in PICK_TASKS:
+    elif task in PICK_TASKS:
         goal_examples = generate_pick_goal_examples(total_goal_examples, env, variant['task'])
-    elif variant['task'] == 'TurnImage-v0':
+    elif task == 'TurnFixed-v0':
         import pickle
-        with open('../../goal_classifier/dsuite_fixed_screw_180/positives.pkl', 'rb') as file:
+        with open('/home/justinvyu/Developer/softlearning-vice-updated/goal_classifier/dsuite_fixed_screw_180/positives.pkl', 'rb') as file:
             goal_examples = pickle.load(file)
     else:
         raise NotImplementedError
