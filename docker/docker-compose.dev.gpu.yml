@@ -9,8 +9,8 @@
 version: "2.4"
 services:
   avi-softlearning-dev-gpu:
-    image: avi-softlearning:${SOFTLEARNING_DEV_GPU_TAG}
-    container_name: avi-softlearning-dev-gpu
+    image: ${USER}-softlearning:${SOFTLEARNING_DEV_GPU_TAG}
+    container_name: ${USER}-softlearning-dev-gpu
     runtime: nvidia
     build:
       context: ../.
@@ -27,12 +27,13 @@ services:
       - "6006"  # Tensorboard
       - "5000"  # Viskit
       - "8888"  # Jupyter
-    volumes:
+    volumes: # host : container
        - ~/.aws:/root/.aws  # If using aws, e.g. for s3
        - ~/.config/gcloud:/root/.config/gcloud  # If using gcp, e.g. for gs
        - ~/.mujoco/mjkey.txt:/root/.mujoco/mjkey.txt
        - ..:/root/softlearning
        - ~/ray_results/softlearning-dev-gpu:/root/ray_results
+       - ../../dsuite:/root/dsuite
     command:
       - bash
     stdin_open: true

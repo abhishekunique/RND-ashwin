@@ -1,26 +1,38 @@
 import numpy as np
 
 from softlearning.environments.utils import get_environment_from_params
+import pickle
+import os
+
+goal_directory = os.path.abspath(
+        os.path.join(os.path.dirname( __file__ ), '..', '..')) + '/goal_classifier/'
+print(goal_directory)
 
 PICK_TASKS = [
     'StateSawyerPickAndPlaceEnv-v0',
     'Image48SawyerPickAndPlaceEnv-v0',
     'StateSawyerPickAndPlace3DEnv-v0',
     'Image48SawyerPickAndPlace3DEnv-v0',
-    ]
+]
 
 DOOR_TASKS = [
     'StateSawyerDoorPullHookEnv-v0',
     'Image48SawyerDoorPullHookEnv-v0',
-    ]
+]
 
 PUSH_TASKS = [
     'StateSawyerPushSidewaysEnv-v0',
     'Image48SawyerPushSidewaysEnv-v0',
     'StateSawyerPushForwardEnv-v0',
     'Image48SawyerPushForwardEnv-v0',
-    ]
+]
 
+GOAL_IMAGE_PATH_PER_ENVIRONMENT = {
+    'ImageTurnFixed-v0': 'dsuite_fixed_screw/',
+    'TurnFreeValve3Image-v0': 'dsuite_free_screw_180/',
+    'TurnImageResetFree-v0': 'dsuite_fixed_screw_180/',
+    'TurnFixed-v0': 'dsuite_fixed_screw_180/',
+}
 
 def get_goal_example_from_variant(variant):
     train_env_params = variant['environment_params']['training']
@@ -37,9 +49,9 @@ def get_goal_example_from_variant(variant):
         goal_examples = generate_push_goal_examples(total_goal_examples, env)
     elif task in PICK_TASKS:
         goal_examples = generate_pick_goal_examples(total_goal_examples, env, variant['task'])
-    elif task == 'TurnFixed-v0':
-        import pickle
-        with open('/home/justinvyu/Developer/softlearning-vice-updated/goal_classifier/dsuite_fixed_screw_180/positives.pkl', 'rb') as file:
+    elif task in GOAL_IMAGE_PATH_PER_ENVIRONMENT.keys():
+        path = goal_directory + GOAL_IMAGE_PATH_PER_ENVIRONMENT[task] + 'positives.pkl'
+        with open(path, 'rb') as file:
             goal_examples = pickle.load(file)
     else:
         raise NotImplementedError
@@ -56,7 +68,6 @@ def get_goal_example_from_variant(variant):
     }
 
     return goal_examples_train, goal_examples_validation
-
 
 def generate_pick_goal_examples(total_goal_examples, env, task_name):
     max_attempt = 50

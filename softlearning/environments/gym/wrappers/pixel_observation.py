@@ -52,6 +52,11 @@ class PixelObservationWrapper(ObservationWrapper):
 
         wrapped_observation_space = env.observation_space
 
+        self._env = env
+        self._pixels_only = pixels_only
+        self._render_kwargs = render_kwargs
+        self._observation_key = observation_key
+
         if isinstance(wrapped_observation_space, spaces.Box):
             self._observation_is_dict = False
             invalid_keys = set([STATE_KEY])
@@ -75,8 +80,9 @@ class PixelObservationWrapper(ObservationWrapper):
             self.observation_space.spaces[STATE_KEY] = wrapped_observation_space
 
         self.normalize = normalize
+
         # Extend observation space with pixels.
-        pixels = self.env.get_pixels(**render_kwargs)
+        pixels = self._get_pixels()
         if normalize:
             pixels = (2. / 255. * pixels) - 1.
 
@@ -90,15 +96,18 @@ class PixelObservationWrapper(ObservationWrapper):
         pixels_space = spaces.Box(
             shape=pixels.shape, low=low, high=high, dtype=pixels.dtype)
         self.observation_space.spaces[observation_key] = pixels_space
-
-        self._env = env
-        self._pixels_only = pixels_only
-        self._render_kwargs = render_kwargs
-        self._observation_key = observation_key
-
+ 
     def observation(self, observation):
         pixel_observation = self._add_pixel_observation(observation)
         return pixel_observation
+
+    def _get_pixels(self):
+        try:
+            pixels = self.env.get_pixels(**self._render_kwargs) 
+        except AttributeError:
+            pixels = self.env.render(**self._render_kwargs)
+        return pixels
+
 
     def _add_pixel_observation(self, observation):
         if self._pixels_only:
@@ -109,13 +118,7 @@ class PixelObservationWrapper(ObservationWrapper):
             observation = collections.OrderedDict()
             observation[STATE_KEY] = observation
 
-        # pixels = self.env.get_pixels(**self._render_kwargs)
-
-        try:
-            pixels = self.env.get_pixels(**self._render_kwargs) 
-        except AttributeError:
-            pixels = self.env.render(**self._render_kwargs)
-        
+        pixels = self._get_pixels() 
         if self.normalize:
             pixels = (2. / 255. * pixels) - 1.
 
