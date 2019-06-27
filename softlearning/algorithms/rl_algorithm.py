@@ -79,7 +79,7 @@ class RLAlgorithm(Checkpointable):
 
         if self._video_save_frequency > 0:
             render_mode = self._eval_render_kwargs.pop('mode', 'rgb_array')
-            assert render_mode != 'human', (
+            assert render_mode == 'rgb_array', (
                 "RlAlgorithm cannot render and save videos at the same time")
             self._eval_render_kwargs['mode'] = render_mode
 

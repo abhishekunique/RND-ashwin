@@ -3,6 +3,8 @@ import numpy as np
 
 from softlearning.misc.utils import get_git_rev, deep_update
 from softlearning.misc.generate_goal_examples import DOOR_TASKS, PUSH_TASKS, PICK_TASKS
+from softlearning.replay_pools.hindsight_experience_replay_pool import REPLACE_FLAT_OBSERVATION
+from softlearning.algorithms.sac_classifier import SACClassifier 
 
 M = 256
 REPARAMETERIZE = True
@@ -47,7 +49,7 @@ ALGORITHM_PARAMS_BASE = {
         'epoch_length': 1000,
         'train_every_n_steps': 1,
         'n_train_repeat': 1,
-        'eval_render_mode': None,
+        'eval_render_kwargs': {'mode' : 'rgb_array'},
         'eval_n_episodes': 5,
         'eval_deterministic': False,
 
@@ -68,7 +70,6 @@ ALGORITHM_PARAMS_ADDITIONAL = {
             'target_update_interval': 1,
             'tau': 5e-3,
             'target_entropy': 'auto',
-            'store_extra_policy_info': False,
             'action_prior': 'uniform',
             'n_initial_exploration_steps': int(1e3),
             'n_epochs': 200,
@@ -82,7 +83,6 @@ ALGORITHM_PARAMS_ADDITIONAL = {
             'target_update_interval': 1,
             'tau': 5e-3,
             'target_entropy': 'auto',
-            'store_extra_policy_info': False,
             'action_prior': 'uniform',
             'classifier_lr': 1e-4,
             'classifier_batch_size': 128,
@@ -97,11 +97,11 @@ ALGORITHM_PARAMS_ADDITIONAL = {
         'type': 'VICEGANGoalConditioned',
         'kwargs': {
             'reparameterize': REPARAMETERIZE,
-            'lr': 3e-4,
+            #'lr': 3e-4,
+            'lr':  tune.grid_search([3e-4, 1e-3]),
             'target_update_interval': 1,
             'tau': 5e-3,
             'target_entropy': 'auto',
-            'store_extra_policy_info': False,
             'action_prior': 'uniform',
             'classifier_lr': 1e-4,
             'classifier_batch_size': 128,
@@ -110,6 +110,7 @@ ALGORITHM_PARAMS_ADDITIONAL = {
             'classifier_optim_name': 'adam',
             'n_epochs': 200,
             'mixup_alpha': 1.0,
+            'hindsight_goal_prob': tune.grid_search([0.5, 0.1]),
         }
     },
     'SQL': {
@@ -163,6 +164,17 @@ def get_variant_spec_base(universe, domain, task, task_evaluation, policy, algor
             POLICY_PARAMS_BASE[policy],
             POLICY_PARAMS_FOR_DOMAIN[policy].get(domain, {})
         ),
+        'exploration_policy_params': {
+            'type': 'UniformPolicy',
+            'kwargs': {
+                'observation_keys': tune.sample_from(lambda spec: (
+                    spec.get('config', spec)
+                    ['policy_params']
+                    ['kwargs']
+                    .get('observation_keys')
+                ))
+            },
+        },
         'Q_params': {
             'type': 'double_feedforward_Q_function',
             'kwargs': {
@@ -176,7 +188,16 @@ def get_variant_spec_base(universe, domain, task, task_evaluation, policy, algor
             'type': 'HindsightExperienceReplayPool',
             'kwargs': {
                 'max_size': 1e6,
-                'relabel_probability': 0.8,
+                # implement this
+                'update_batch_fn': tune.function(REPLACE_FLAT_OBSERVATION),
+                #'reward_fn': tune.function(SACClassifier._reward_relabeler),
+                'reward_fn': None,
+                'terminal_fn': None,
+
+                'her_strategy':{
+                    'resampling_probability': tune.grid_search([.5, 0.8]),
+                    'type': 'future',
+                }
             }
         },
         'sampler_params': {
@@ -213,13 +234,12 @@ def get_variant_spec_classifier(universe,
         universe, domain, task, task_evaluation, policy, algorithm, *args, **kwargs)
 
     classifier_layer_size = L = 256
-    variant_spec['classifier_params'] = {
+    variant_spec['reward_classifier_params'] = {
         'type': 'feedforward_classifier',
         'kwargs': {
             'hidden_layer_sizes': (L,L),
             }
         }
-
     return variant_spec
 
 def get_variant_spec(args):
@@ -258,7 +278,7 @@ def get_variant_spec(args):
     else:
         raise NotImplementedError
 
-    variant_spec['replay_pool_params']['kwargs']['relabel_reward'] = relabel_reward
+    #variant_spec['replay_pool_params']['kwargs']['relabel_reward'] = relabel_reward
 
     # if args.algorithm in ['RAQ', 'VICERAQ']:
     #     variant_spec['algorithm_params']['kwargs']['active_query_frequency'] = \
@@ -283,14 +303,14 @@ def get_variant_spec(args):
                 'dense_hidden_layer_sizes': (),
             },
         }
-        variant_spec['policy_params']['kwargs']['preprocessor_params'] = (
+        variant_spec['policy_params']['kwargs']['observation_preprocessors_params'] = (
             preprocessor_params.copy())
-        variant_spec['Q_params']['kwargs']['preprocessor_params'] = (
+        variant_spec['Q_params']['kwargs']['observation_preprocessors_params'] = (
             preprocessor_params.copy())
         variant_spec['replay_pool_params']['kwargs']['max_size'] = int(n_epochs*1000)
 
         if args.algorithm in ['VICEGoalConditioned', 'VICEGANGoalConditioned']:
-            variant_spec['classifier_params']['kwargs']['preprocessor_params'] = (
+            variant_spec['reward_classifier_params']['kwargs']['observation_preprocessors_params'] = (
                 preprocessor_params.copy())
 
     elif 'Image' in task:

@@ -18,6 +18,7 @@ class SACClassifier(SAC):
             n_classifier_train_steps=int(1e4),
             classifier_optim_name='adam',
             mixup_alpha=0.2,
+            hindsight_goal_prob=0.8,
             **kwargs,
     ):
 
@@ -30,6 +31,7 @@ class SACClassifier(SAC):
         self._classifier_optim_name = classifier_optim_name
         self._classifier_batch_size = classifier_batch_size
         self._mixup_alpha = mixup_alpha
+        self._hindsight_goal_prob = hindsight_goal_prob
         super(SACClassifier, self).__init__(**kwargs)
 
     def _build(self):
@@ -40,7 +42,7 @@ class SACClassifier(SAC):
         super(SACClassifier, self)._init_placeholders()
         self._placeholders['labels'] = tf.placeholder(
             tf.float32,
-            shape=(None, 2),
+            shape=(None, 1),
             name='labels',
         )
 
@@ -110,7 +112,12 @@ class SACClassifier(SAC):
         return classifier_training_op
 
     def _init_classifier_update(self):
-        logits = self._classifier([self._placeholders['observations']])
+        classifier_inputs = flatten_input_structure({
+            name: self._placeholders['observations'][name]
+            for name in self._classifier.observation_keys
+        })
+        logits = self._classifier(classifier_inputs)
+
         self._classifier_loss_t = tf.reduce_mean(
             tf.nn.sigmoid_cross_entropy_with_logits(
                 logits=logits, labels=self._placeholders['labels']))
@@ -155,6 +162,30 @@ class SACClassifier(SAC):
             self._classifier_training_op, self._classifier_loss_t
         ), feed_dict)
         return loss
+
+    """
+    @staticmethod
+    def _reward_relabeler(original_batch,
+                          resampled_batch,
+                          where_resampled,
+                          environment):
+        # Note: the following code assumes that original_batch is already relabelled 
+        batch_flat = flatten(original_batch)
+        resampled_batch_flat = flatten(resampled_batch)
+        reward_key = [
+            key for key in batch_flat.keys()
+            if key[0] == 'reward'
+        ]
+
+        classifier_inputs = flatten_input_structure({
+            name: self._placeholders['observations'][name]
+            for name in self._classifier.observation_keys
+        })
+        observation_logits = self._classifier(classifier_inputs)
+        self._reward_t = observation_logits
+
+        return unflatten(batch_flat)
+    """
 
     def _epoch_after_hook(self, *args, **kwargs):
         if self._epoch == 0:

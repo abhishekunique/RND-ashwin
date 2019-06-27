@@ -110,6 +110,22 @@ def REPLACE_FULL_OBSERVATION(original_batch,
 
     return unflatten(batch_flat)
 
+def REPLACE_FLAT_OBSERVATION(original_batch,
+                             resampled_batch,
+                             where_resampled,
+                             environment):
+    batch_flat = flatten(original_batch)
+    resampled_batch_flat = flatten(resampled_batch)
+    observation_keys = [
+        key for key in batch_flat.keys()
+        if key[0] == 'observations' or key[0] == 'next_observations' 
+    ]
+    for key in observation_keys:
+        state_size = int(batch_flat[key].shape[1] / 2)
+        batch_flat[key][where_resampled][state_size:] = (
+            resampled_batch_flat[key][state_size:])
+    return unflatten(batch_flat)
+
 
 class HindsightExperienceReplayPool(ResamplingReplayPool):
     def __init__(self,

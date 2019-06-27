@@ -10,7 +10,7 @@ from ray import tune
 
 from softlearning.environments.utils import get_goal_example_environment_from_variant
 from softlearning.algorithms.utils import get_algorithm_from_variant
-from softlearning.policies.utils import get_policy_from_variant, get_policy
+from softlearning.policies.utils import get_policy_from_variant, get_policy_from_params
 from softlearning.replay_pools.utils import get_replay_pool_from_variant
 from softlearning.samplers.utils import get_sampler_from_variant
 from softlearning.value_functions.utils import get_Q_function_from_variant
@@ -48,13 +48,15 @@ class ExperimentRunnerClassifierRL(ExperimentRunner):
         evaluation_environment = self.evaluation_environment = (
             flatten_multiworld_env(self.evaluation_environment))
 
+        # make sure this is her replay pool
         replay_pool = self.replay_pool = (
             get_replay_pool_from_variant(variant, training_environment))
         sampler = self.sampler = get_sampler_from_variant(variant)
         Qs = self.Qs = get_Q_function_from_variant(variant, training_environment)
-        policy = self.policy = get_policy_from_variant(variant, training_environment, Qs)
+        policy = self.policy = get_policy_from_variant(variant, training_environment)
         initial_exploration_policy = self.initial_exploration_policy = (
-            get_policy('UniformPolicy', training_environment))
+            get_policy_from_params(
+                variant['exploration_policy_params'], training_environment))
 
         algorithm_kwargs = {
             'variant': self._variant,
@@ -111,8 +113,10 @@ class ExperimentRunnerClassifierRL(ExperimentRunner):
         policy = self.policy = (
             get_policy_from_variant(self._variant, training_environment, Qs))
         self.policy.set_weights(picklable['policy_weights'])
+
         initial_exploration_policy = self.initial_exploration_policy = (
-            get_policy('UniformPolicy', training_environment))
+            get_policy_from_params(
+                variant['exploration_policy_params'], training_environment))
 
         algorithm_kwargs = {
             'variant': self._variant,

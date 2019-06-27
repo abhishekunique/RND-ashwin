@@ -26,9 +26,13 @@ class VICEGAN(SACClassifier):
         next_actions = self._policy.actions(policy_inputs)
         next_log_pis = self._policy.log_pis(policy_inputs, next_actions)
 
-        next_Qs_values = tuple(
-            Q([self._placeholders['next_observations'], next_actions])
-            for Q in self._Q_targets)
+        next_Q_observations = {
+            name: self._placeholders['next_observations'][name]
+            for name in self._Qs[0].observation_keys
+        }
+        next_Q_inputs = flatten_input_structure(
+            {**next_Q_observations, 'actions': next_actions})
+        next_Qs_values = tuple(Q(next_Q_inputs) for Q in self._Q_targets)
 
         min_next_Q = tf.reduce_min(next_Qs_values, axis=0)
         next_values = min_next_Q - self._alpha * next_log_pis
