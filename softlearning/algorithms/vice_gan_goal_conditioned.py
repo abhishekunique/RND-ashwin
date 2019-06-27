@@ -1,5 +1,4 @@
 import numpy as np
-import tensorflow as tf
 
 from .vice_gan import VICEGAN
 from .sac_classifier import SACClassifier
@@ -26,7 +25,7 @@ class VICEGANGoalConditioned(VICEGAN):
             for key in self._classifier.observation_keys
         }
 
-        labels_batch = np.zeros((2*self._classifier_batch_size,1))
+        labels_batch = np.zeros((2 * self._classifier_batch_size, 1))
         labels_batch[self._classifier_batch_size:] = 1.0
 
         observation_batch = {
@@ -68,10 +67,9 @@ class VICEGANGoalConditioned(VICEGAN):
                         batch,
                         training_paths,
                         evaluation_paths):
-        
-        # TODO Avi figure out some classifier diagnostics that 
-        # don't involve a pre-defined validation set 
-        
+        # TODO(Avi): figure out some classifier diagnostics that
+        # don't involve a pre-defined validation set.
+
         diagnostics = super(SACClassifier, self).get_diagnostics(
             iteration, batch, training_paths, evaluation_paths)
         return diagnostics

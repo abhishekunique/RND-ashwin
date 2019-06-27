@@ -276,7 +276,7 @@ class RLAlgorithm(Checkpointable):
             training_metrics = self._evaluate_rollouts(
                 training_paths, training_environment)
             gt.stamp('training_metrics')
-            
+
             should_save_path = (
                 self._path_save_frequency > 0
                 and self._epoch % self._path_save_frequency == 0)

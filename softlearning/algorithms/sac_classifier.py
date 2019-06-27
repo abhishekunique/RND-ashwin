@@ -117,7 +117,6 @@ class SACClassifier(SAC):
             for name in self._classifier.observation_keys
         })
         logits = self._classifier(classifier_inputs)
-
         self._classifier_loss_t = tf.reduce_mean(
             tf.nn.sigmoid_cross_entropy_with_logits(
                 logits=logits, labels=self._placeholders['labels']))
@@ -217,19 +216,17 @@ class SACClassifier(SAC):
         goal_observations_validation = (
             self._goal_examples_validation[goal_index_validation])
 
-        sample_goal_observations = {
-            key: np.concatenate((
-                sample_observations[key],
-                goal_observations[key],
-                goal_observations_validation[key]
-            ), axis=0)
-            for key in sample_observations.keys()
-        }
-
         reward_sample_goal_observations, classifier_loss = self._session.run(
             (self._reward_t, self._classifier_loss_t),
             feed_dict={
-                self._placeholders['observations']: sample_goal_observations,
+                **{
+                    self._placeholders['observations'][key]: np.concatenate((
+                        sample_observations[key],
+                        goal_observations[key],
+                        goal_observations_validation[key]
+                    ), axis=0)
+                    for key in self._classifier.observation_keys
+                },
                 self._placeholders['labels']: np.concatenate([
                     np.zeros((sample_observations.shape[0], 1)),
                     np.ones((goal_observations.shape[0], 1)),

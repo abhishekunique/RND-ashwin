@@ -167,26 +167,8 @@ def get_parser(allow_policy_list=False):
         '--universe', type=str, default='multiworld', choices=('multiworld', ))
     parser.add_argument(
         '--domain', type=str, default='mujoco', choices=('mujoco',))
-    parser.add_argument(
-        '--task', type=str, default=DEFAULT_TASK, 
-        choices=('Image48SawyerPushMultiGoalEnv-v0',
-                 'Image48SawyerDoorHookMultiGoalEnv-v0',
-                 'Image48SawyerPushMultiGoalTwoPuckEnv-v0',
-                 'Image48SawyerPushMultiGoalTwoSmallPuckEnv-v0',
-                 'Image48SawyerPushMultiGoalTwoSmallPuckEasyEnv-v0',
-                 'Image48SawyerPushMultiGoalCurriculumEnv-v0',
-                 'Image48SawyerPushMultiGoalThreeSmallPuckEnv-v0',
-                 'Image48SawyerDoorHookMultiGoalResetFreeEnv-v0'))
-    parser.add_argument(
-        '--task_evaluation', type=str, default=DEFAULT_TASK, 
-        choices=('Image48SawyerPushMultiGoalEnv-v0',
-                 'Image48SawyerDoorHookMultiGoalEnv-v0',
-                 'Image48SawyerPushMultiGoalTwoPuckEnv-v0',
-                 'Image48SawyerPushMultiGoalTwoPuckEnv-v0',
-                 'Image48SawyerPushMultiGoalTwoSmallPuckEnv-v0',
-                 'Image48SawyerPushMultiGoalTwoSmallPuckEasyEnv-v0',
-                 'Image48SawyerPushMultiGoalThreeSmallPuckEnv-v0',
-                 ))
+    parser.add_argument('--task', type=str, default=DEFAULT_TASK)
+    parser.add_argument('--task_evaluation', type=str, default=DEFAULT_TASK)
 
     # parser.add_argument(
     #     '--n_goal_examples', type=int, default=10)

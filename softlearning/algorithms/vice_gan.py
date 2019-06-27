@@ -1,6 +1,4 @@
-import numpy as np
 import tensorflow as tf
-from tensorflow.python.training import training_util
 
 from softlearning.models.utils import flatten_input_structure
 from .sac import td_target
