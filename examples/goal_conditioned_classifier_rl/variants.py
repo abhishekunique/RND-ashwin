@@ -323,7 +323,7 @@ def get_variant_spec(args):
 
         if args.algorithm in ('VICEGoalConditioned', 'VICEGANGoalConditioned'):
             variant_spec['reward_classifier_params']['kwargs'][
-                'preprocessor_params'] = (
+                'observation_preprocessors_params'] = (
                     tune.sample_from(lambda spec: (deepcopy(
                         spec.get('config', spec)
                         ['policy_params']
