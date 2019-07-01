@@ -393,7 +393,12 @@ def get_variant_spec(args):
              ['reward_classifier_params']
              ['kwargs']
              ['observation_preprocessors_params']) = (
-                 preprocessor_params.copy())
+                tune.sample_from(lambda spec: (
+                    spec.get('config', spec)
+                    ['policy_params']
+                    ['kwargs']
+                    ['observation_preprocessors_params']
+                )))
 
     elif 'Image' in task:
         raise NotImplementedError(
