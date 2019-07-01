@@ -44,8 +44,6 @@ class ExperimentRunnerClassifierRL(ExperimentRunner):
         #    get_goal_example_environment_from_variant(
         #        variant['task'], gym_adapter=False))
         
-        import ipdb; ipdb.set_trace()
-
         training_environment = self.training_environment = (
             GymAdapter(domain=variant['domain'], task=variant['task'], **variant['env_params']))
 

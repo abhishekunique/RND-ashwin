@@ -58,7 +58,7 @@ ALGORITHM_PARAMS_BASE = {
         'discount': 0.99,
         'tau': 5e-3,
         'reward_scale': 1.0,
-        'save_training_video': True,
+        'save_training_video': False,
     }
 }
 
@@ -146,16 +146,16 @@ ENV_PARAMS = {
     'DClaw': {
         'TurnImageMultiGoalResetFree-v0': {
             'initial_goal_index': 0, 
-            'goal_image_pools_path': '/home/justinvyu/Developer/goal-conditioned-vice/collect_positives/fixed_screw_multigoal_0_180_size_48/positives.pkl',
+            'goal_image_pools_path': '/home/ubuntu/softlearning-goal-conditioned/goal_pools/fixed_screw_multigoal_0_180/positives.pkl',
             'swap_goals_upon_completion': True,
             'pixel_wrapper_kwargs': {
                 'pixels_only': False,
                 # Free camera
                 'render_kwargs': {
-                    'width': 48, 'height': 48, 'camera_id': -1
+                    'width': 32, 'height': 32, 'camera_id': -1
                 }
             },
-            'observation_keys': ('pixels', 'claw_qpos', 'last_action')
+            'observation_keys': ('pixels',)# 'claw_qpos', 'last_action')
         }
     }
 }

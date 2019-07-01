@@ -10,18 +10,19 @@ class VICEGANGoalConditioned(VICEGAN):
         negatives = self.sampler.random_batch(self._classifier_batch_size)['observations']
         #rand_positive_ind = np.random.randint(self._goal_examples.shape[0], size=self._classifier_batch_size)
         #positives = self._goal_examples[rand_positive_ind]
+        
         state_goal_size = negatives[next(iter(negatives.keys()))].shape[1]
         
         #state_goal_size = negatives.shape[1]
-        assert state_goal_size%2 == 0, 'States and goals should be concatenated together, \
-            so the total space has to be even'
+        #assert state_goal_size%2 == 0, 'States and goals should be concatenated together, \
+        #    so the total space has to be even'
         
         state_size = int(state_goal_size/2)
         #positives = np.concatenate([neg_observations[:, state_size:], neg_observations[:, state_size:]], axis=1)
         # this concatenates the goal examples from the environment
         positives = {
             key : np.concatenate(
-                [negatives[key][:, state_size:], negatives[key][:, state_size:]], axis=1)
+                [negatives[key][:, :, :, 3:], negatives[key][:, :, :, 3:]], axis=3)
             for key in self._classifier.observation_keys
         }
 

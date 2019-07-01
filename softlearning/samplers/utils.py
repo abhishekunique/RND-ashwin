@@ -98,11 +98,16 @@ def rollout(env,
 
                 imsize_flat = imsize*imsize*3
                 #for goal conditioned stuff
-                if observation['observations'].shape[0] == 2*imsize_flat:
-                    image1 = observation['observations'][:imsize_flat].reshape(48,48,3)
-                    image2 = observation['observations'][imsize_flat:].reshape(48,48,3)
-                    image1 = (image1*255.0).astype(np.uint8)
-                    image2 = (image2*255.0).astype(np.uint8)
+                #if observation['observations'].shape[0] == 2*imsize_flat:
+                #    image1 = observation['observations'][:imsize_flat].reshape(48,48,3)
+                #    image2 = observation['observations'][imsize_flat:].reshape(48,48,3)
+                #    image1 = (image1*255.0).astype(np.uint8)
+                #    image2 = (image2*255.0).astype(np.uint8)
+                #    image = np.concatenate([image1, image2], axis=1)
+                if observation['pixels'].shape[-1] == 6:
+                    pixels = observation['pixels']
+                    image1 = pixels[:, :, :3]
+                    image2 = pixels[:, :, 3:]
                     image = np.concatenate([image1, image2], axis=1)
                 else:    
                     image = env.render(**render_kwargs)

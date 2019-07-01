@@ -1,4 +1,4 @@
-name: softlearning
+name: vice-multigoal
 channels:
 - defaults
 - conda-forge

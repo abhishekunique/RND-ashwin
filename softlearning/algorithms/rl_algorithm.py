@@ -359,8 +359,13 @@ class RLAlgorithm(Checkpointable):
         if self._save_training_video:
             fps = 1 // getattr(self._training_environment, 'dt', 1/30)
             for i, path in enumerate(paths):
-                video_frames = path['observations']['observations'].reshape((100, 48, 48 * 2, 3))
                 import ipdb; ipdb.set_trace()
+                pixels = path['observations']['pixels']
+                if pixels.shape[-1] == 6: # concatenated image by channel
+                    # change so that it's concatenated side to side
+                    img_obs, goal_obs = pixels[:, :, :, :3], pixels[:, :, :, 3:]
+                    print(img_obs.shape, goal_obs.shape)
+                    video_frames = np.concatenate([img_obs, goal_obs], axis=1)
                 video_frames = ((video_frames + 1) * 255. / 2.).astype(np.uint8)
                 # video_frames = path.pop('images')
                 video_file_name = f'training_path_{self._epoch}_{i}.avi'
@@ -390,6 +395,7 @@ class RLAlgorithm(Checkpointable):
         if should_save_video:
             fps = 1 // getattr(self._training_environment, 'dt', 1/30)
             for i, path in enumerate(paths):
+                import ipdb; ipdb.set_trace()
                 video_frames = path.pop('images')
                 video_file_name = f'evaluation_path_{self._epoch}_{i}.avi'
                 video_file_path = os.path.join(
