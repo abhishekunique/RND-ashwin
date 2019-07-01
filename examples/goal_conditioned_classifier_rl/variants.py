@@ -6,7 +6,7 @@ import numpy as np
 from softlearning.misc.utils import get_git_rev, deep_update
 from softlearning.misc.generate_goal_examples import DOOR_TASKS, PUSH_TASKS, PICK_TASKS
 from softlearning.replay_pools.hindsight_experience_replay_pool import REPLACE_FLAT_OBSERVATION
-from softlearning.algorithms.sac_classifier import SACClassifier 
+from softlearning.algorithms.sac_classifier import SACClassifier
 
 M = 256
 REPARAMETERIZE = True
@@ -312,8 +312,7 @@ def get_variant_spec(args):
 
     if 'Image' in task or 'Image48' in task:
         preprocessor_params = {
-            'type': 'hacky_two_image_convnet_preprocessor',
-            # 'type': 'convnet_preprocessor',
+            'type': 'convnet_preprocessor',
             'kwargs': {
                 # 'image_shape': variant_spec['env_params']['image_shape'],
                 'image_shape': (48, 48, 3),

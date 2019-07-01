@@ -1,27 +1,15 @@
 from copy import deepcopy
 
 
-def get_hacky_two_image_convnet_preprocessor(observation_shape,
-                             name='convnet_preprocessor',
-                             **kwargs):
-    from .convnet import hacky_two_image_convnet_preprocessor
-    preprocessor = hacky_two_image_convnet_preprocessor(
-        input_shapes=(observation_shape, ), name=name, **kwargs)
+def get_convnet_preprocessor(name='convnet_preprocessor', **kwargs):
+    from softlearning.models.convnet import convnet_model
+
+    preprocessor = convnet_model(name=name, **kwargs)
 
     return preprocessor
 
-def get_convnet_preprocessor(observation_shape,
-                             name='convnet_preprocessor',
-                             **kwargs):
-    from .convnet import convnet_preprocessor
-    preprocessor = convnet_preprocessor(
-        input_shapes=(observation_shape, ), name=name, **kwargs)
 
-    return preprocessor
-
-def get_feedforward_preprocessor(observation_shape,
-                                 name='feedforward_preprocessor',
-                                 **kwargs):
+def get_feedforward_preprocessor(name='feedforward_preprocessor', **kwargs):
     from softlearning.models.feedforward import feedforward_model
 
     preprocessor = feedforward_model(name=name, **kwargs)
@@ -31,7 +19,6 @@ def get_feedforward_preprocessor(observation_shape,
 
 PREPROCESSOR_FUNCTIONS = {
     'convnet_preprocessor': get_convnet_preprocessor,
-    'hacky_two_image_convnet_preprocessor': get_hacky_two_image_convnet_preprocessor,
     'feedforward_preprocessor': get_feedforward_preprocessor,
     None: lambda *args, **kwargs: None
 }
