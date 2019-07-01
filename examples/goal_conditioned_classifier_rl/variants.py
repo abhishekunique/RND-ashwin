@@ -155,7 +155,7 @@ ENV_PARAMS = {
                     'width': 48, 'height': 48, 'camera_id': -1
                 }
             },
-            'observation_keys': ('pixels',)#, 'claw_qpos')
+            'observation_keys': ('pixels', 'claw_qpos', 'last_action')
         }
     }
 }
@@ -314,15 +314,11 @@ def get_variant_spec(args):
         preprocessor_params = {
             'type': 'convnet_preprocessor',
             'kwargs': {
-                # 'image_shape': variant_spec['env_params']['image_shape'],
-                'image_shape': (48, 48, 3),
-                'output_size': M,
-                'conv_filters': (8, 8),
-                'conv_kernel_sizes': ((5, 5), (5, 5)),
-                'pool_type': 'MaxPool2D',
-                'pool_sizes': ((2, 2), (2, 2)),
-                'pool_strides': (2, 2),
-                'dense_hidden_layer_sizes': (),
+                'conv_filters': (64,) * 3,
+                'conv_kernel_sizes': (3,) * 3, 
+                'conv_strides': (2,) * 3,
+                'normalization_type': 'layer',
+                'downsampling_type': 'conv'
             },
         }
 
