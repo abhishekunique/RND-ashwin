@@ -46,6 +46,7 @@ def get_Q_function_from_variant(variant, env, *args, **kwargs):
         if not preprocessor_params:
             observation_preprocessors[name] = None
             continue
+
         observation_preprocessors[name] = get_preprocessor_from_params(
             env, preprocessor_params)
 

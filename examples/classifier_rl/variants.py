@@ -351,7 +351,7 @@ def get_variant_spec(args):
 
     variant_spec['algorithm_params']['kwargs']['n_epochs'] = n_epochs
 
-    if 'Image48' in task:
+    if 'Image' in task or 'Image48' in task:
         preprocessor_params = {
             'type': 'convnet_preprocessor',
             'kwargs': {

@@ -54,6 +54,7 @@ class SimpleSampler(BaseSampler):
         action = self.policy.actions_np(self._policy_input)[0]
 
         next_observation, reward, terminal, info = self.env.step(action)
+
         self._path_length += 1
         self._path_return += reward
         self._total_samples += 1

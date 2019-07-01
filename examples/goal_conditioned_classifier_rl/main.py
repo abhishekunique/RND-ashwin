@@ -7,7 +7,7 @@ import tensorflow as tf
 import numpy as np
 
 from softlearning.environments.utils import (
-    get_goal_example_environment_from_variant)
+    get_goal_example_environment_from_variant, get_environment_from_params)
 from softlearning.algorithms.utils import get_algorithm_from_variant
 from softlearning.policies.utils import get_policy_from_variant, get_policy_from_params
 from softlearning.replay_pools.utils import get_replay_pool_from_variant
@@ -21,11 +21,12 @@ from softlearning.misc.utils import initialize_tf_variables
 from examples.instrument import run_example_local
 from examples.development.main import ExperimentRunner
 
+from softlearning.environments.adapters.gym_adapter import GymAdapter
+import dsuite
 
 # TODO(Avi): This should happen either in multiworld or in environment/utils.py
 def flatten_multiworld_env(env):
     from multiworld.core.flat_goal_env import FlatGoalEnv
-    from softlearning.environments.adapters.gym_adapter import GymAdapter
     flat_env = FlatGoalEnv(env,
                            obs_keys=['image_observation'],
                            goal_keys=['image_desired_goal'],
@@ -39,17 +40,29 @@ class ExperimentRunnerClassifierRL(ExperimentRunner):
     def _build(self):
         variant = copy.deepcopy(self._variant)
 
-        training_environment = self.training_environment = (
-            get_goal_example_environment_from_variant(
-                variant['task'], gym_adapter=False))
-        evaluation_environment = self.evaluation_environment = (
-            get_goal_example_environment_from_variant(
-                variant['task_evaluation'], gym_adapter=False))
+        #training_environment = self.training_environment = (
+        #    get_goal_example_environment_from_variant(
+        #        variant['task'], gym_adapter=False))
+        
+        import ipdb; ipdb.set_trace()
 
         training_environment = self.training_environment = (
-            flatten_multiworld_env(self.training_environment))
+            GymAdapter(domain=variant['domain'], task=variant['task'], **variant['env_params']))
+
+        #evaluation_environment = self.evaluation_environment = (
+        #    get_goal_example_environment_from_variant(
+        #        variant['task_evaluation'], gym_adapter=False))
         evaluation_environment = self.evaluation_environment = (
-            flatten_multiworld_env(self.evaluation_environment))
+            GymAdapter(domain=variant['domain'], task=variant['task_evaluation'], **variant['env_params']))
+
+        # training_environment = self.training_environment = (
+        #     flatten_multiworld_env(self.training_environment))
+        # evaluation_environment = self.evaluation_environment = (
+        #     flatten_multiworld_env(self.evaluation_environment))
+        #training_environment = self.training_environment = (
+        #        GymAdapter(env=training_environment))
+        #evaluation_environment = self.evaluation_environment = (
+        #        GymAdapter(env=evaluation_environment))
 
         # make sure this is her replay pool
         replay_pool = self.replay_pool = (

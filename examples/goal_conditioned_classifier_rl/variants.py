@@ -52,12 +52,13 @@ ALGORITHM_PARAMS_BASE = {
         'train_every_n_steps': 1,
         'n_train_repeat': 1,
         'eval_render_kwargs': {'mode' : 'rgb_array'},
-        'eval_n_episodes': 5,
+        'eval_n_episodes': 3,
         'eval_deterministic': False,
 
         'discount': 0.99,
         'tau': 5e-3,
         'reward_scale': 1.0,
+        'save_training_video': True,
     }
 }
 
@@ -99,8 +100,8 @@ ALGORITHM_PARAMS_ADDITIONAL = {
         'type': 'VICEGANGoalConditioned',
         'kwargs': {
             'reparameterize': REPARAMETERIZE,
-            #'lr': 3e-4,
-            'lr':  tune.grid_search([3e-4, 1e-3]),
+            'lr': 3e-4,
+            # 'lr':  tune.grid_search([3e-4, 1e-3]),
             'target_update_interval': 1,
             'tau': 5e-3,
             'target_entropy': 'auto',
@@ -112,7 +113,7 @@ ALGORITHM_PARAMS_ADDITIONAL = {
             'classifier_optim_name': 'adam',
             'n_epochs': 200,
             'mixup_alpha': 1.0,
-            'hindsight_goal_prob': tune.grid_search([0.5, 0.1]),
+            'hindsight_goal_prob': tune.grid_search([0.]), # 0.5, 0.8
         }
     },
     'SQL': {
@@ -138,6 +139,26 @@ ALGORITHM_PARAMS_ADDITIONAL = {
 DEFAULT_NUM_EPOCHS = 200
 NUM_CHECKPOINTS = 10
 
+"""
+Additional environment params
+"""
+ENV_PARAMS = {
+    'DClaw': {
+        'TurnImageMultiGoalResetFree-v0': {
+            'initial_goal_index': 0, 
+            'goal_image_pools_path': '/home/justinvyu/Developer/goal-conditioned-vice/collect_positives/fixed_screw_multigoal_0_180_size_48/positives.pkl',
+            'swap_goals_upon_completion': True,
+            'pixel_wrapper_kwargs': {
+                'pixels_only': False,
+                # Free camera
+                'render_kwargs': {
+                    'width': 48, 'height': 48, 'camera_id': -1
+                }
+            },
+            'observation_keys': ('pixels',)#, 'claw_qpos')
+        }
+    }
+}
 
 def get_variant_spec_base(universe, domain, task, task_evaluation, policy, algorithm):
     # algorithm_params = deep_update(
@@ -161,7 +182,7 @@ def get_variant_spec_base(universe, domain, task, task_evaluation, policy, algor
         'universe': universe,
         'git_sha': get_git_rev(),
 
-        # 'env_params': ENV_PARAMS.get(domain, {}).get(task, {}),
+        'env_params': ENV_PARAMS.get(domain, {}).get(task, {}),
         'policy_params': deep_update(
             POLICY_PARAMS_BASE[policy],
             POLICY_PARAMS_FOR_DOMAIN[policy].get(domain, {})
@@ -189,7 +210,7 @@ def get_variant_spec_base(universe, domain, task, task_evaluation, policy, algor
             # 'type': 'RelabelReplayPool',
             'type': 'HindsightExperienceReplayPool',
             'kwargs': {
-                'max_size': 1e6,
+                'max_size': 200000,
                 # implement this
                 'update_batch_fn': tune.function(REPLACE_FLAT_OBSERVATION),
                 #'reward_fn': tune.function(SACClassifier._reward_relabeler),
@@ -197,7 +218,7 @@ def get_variant_spec_base(universe, domain, task, task_evaluation, policy, algor
                 'terminal_fn': None,
 
                 'her_strategy':{
-                    'resampling_probability': tune.grid_search([.5, 0.8]),
+                    'resampling_probability': 0., # tune.grid_search([.5, 0.8]),
                     'type': 'future',
                 }
             }
@@ -210,6 +231,7 @@ def get_variant_spec_base(universe, domain, task, task_evaluation, policy, algor
                 'min_pool_size': MAX_PATH_LENGTH_PER_DOMAIN.get(
                     domain, DEFAULT_MAX_PATH_LENGTH),
                 'batch_size': 256,
+                'store_last_n_paths': 20,
             }
         },
         'run_params': {
@@ -288,7 +310,7 @@ def get_variant_spec(args):
 
     variant_spec['algorithm_params']['kwargs']['n_epochs'] = n_epochs
 
-    if 'Image48' in task:
+    if 'Image' in task or 'Image48' in task:
         preprocessor_params = {
             'type': 'hacky_two_image_convnet_preprocessor',
             # 'type': 'convnet_preprocessor',
@@ -318,8 +340,8 @@ def get_variant_spec(args):
                     ['observation_preprocessors_params']
                 )))
             )
-        variant_spec['replay_pool_params']['kwargs']['max_size'] = (
-            int(n_epochs * 1000))
+        # variant_spec['replay_pool_params']['kwargs']['max_size'] = (
+        #     int(n_epochs * 1000))
 
         if args.algorithm in ('VICEGoalConditioned', 'VICEGANGoalConditioned'):
             variant_spec['reward_classifier_params']['kwargs'][

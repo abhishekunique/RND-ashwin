@@ -44,6 +44,7 @@ class RLAlgorithm(Checkpointable):
             video_save_frequency=0,
             path_save_frequency=0,
             session=None,
+            save_training_video=False,
     ):
         """
         Args:
@@ -69,6 +70,7 @@ class RLAlgorithm(Checkpointable):
         self._epoch_length = epoch_length
         self._n_initial_exploration_steps = n_initial_exploration_steps
         self._initial_exploration_policy = initial_exploration_policy
+        self._save_training_video = save_training_video
 
         self._eval_n_episodes = eval_n_episodes
         self._eval_deterministic = eval_deterministic
@@ -266,8 +268,9 @@ class RLAlgorithm(Checkpointable):
                 self._timestep_after_hook()
                 gt.stamp('timestep_after_hook')
 
-            training_paths = self.sampler.get_last_n_paths(
-                math.ceil(self._epoch_length / self.sampler._max_path_length))
+            training_paths = self._training_paths()
+            # training_paths = self.sampler.get_last_n_paths(
+            #     math.ceil(self._epoch_length / self.sampler._max_path_length))
             gt.stamp('training_paths')
             evaluation_paths = self._evaluation_paths(
                 policy, evaluation_environment)
@@ -349,6 +352,25 @@ class RLAlgorithm(Checkpointable):
 
         yield {'done': True, **diagnostics}
 
+    def _training_paths(self):
+        paths = self.sampler.get_last_n_paths(
+                math.ceil(self._epoch_length / self.sampler._max_path_length))
+
+        if self._save_training_video:
+            fps = 1 // getattr(self._training_environment, 'dt', 1/30)
+            for i, path in enumerate(paths):
+                video_frames = path['observations']['observations'].reshape((100, 48, 48 * 2, 3))
+                import ipdb; ipdb.set_trace()
+                video_frames = ((video_frames + 1) * 255. / 2.).astype(np.uint8)
+                # video_frames = path.pop('images')
+                video_file_name = f'training_path_{self._epoch}_{i}.avi'
+                video_file_path = os.path.join(
+                    os.getcwd(), 'videos', video_file_name)
+                save_video(video_frames, video_file_path, fps=fps)
+
+        return paths
+
+
     def _evaluation_paths(self, policy, evaluation_env):
         if self._eval_n_episodes < 1: return ()
 
@@ -369,7 +391,7 @@ class RLAlgorithm(Checkpointable):
             fps = 1 // getattr(self._training_environment, 'dt', 1/30)
             for i, path in enumerate(paths):
                 video_frames = path.pop('images')
-                video_file_name = f'evaluation_path_{self._epoch}_{i}.mp4'
+                video_file_name = f'evaluation_path_{self._epoch}_{i}.avi'
                 video_file_path = os.path.join(
                     os.getcwd(), 'videos', video_file_name)
                 save_video(video_frames, video_file_path, fps=fps)
