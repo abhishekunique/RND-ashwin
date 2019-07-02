@@ -21,7 +21,6 @@ PUSH_TASKS = [
     'Image48SawyerPushForwardEnv-v0',
     ]
 
-
 def get_goal_example_from_variant(variant):
 
     env = get_goal_example_environment_from_variant(variant)

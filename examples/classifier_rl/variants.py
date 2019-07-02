@@ -197,6 +197,28 @@ DEFAULT_NUM_EPOCHS = 200
 NUM_CHECKPOINTS = 10
 
 
+"""
+Additional environment params
+"""
+
+ENV_PARAMS = {
+    'DClaw': {
+        'TurnImageMultiGoalResetFree-v0': {
+            'initial_goal_index': 0,
+            'swap_goals_upon_completion': False, # True, # False if not concatenating the goal image
+            'use_concatenated_goal': False,
+            'pixel_wrapper_kwargs': {
+                'pixels_only': False,
+                # Free camera
+                'render_kwargs': {
+                    'width': 32, 'height': 32, 'camera_id': -1
+                }
+            },
+            'observation_keys': ('pixels',) #'claw_qpos', 'last_action')
+        }
+    }
+}
+
 def get_variant_spec_base(universe, domain, task, policy, algorithm):
     # algorithm_params = deep_update(
     #     ALGORITHM_PARAMS_BASE,
@@ -218,7 +240,7 @@ def get_variant_spec_base(universe, domain, task, policy, algorithm):
         'universe': universe,
         'git_sha': get_git_rev(),
 
-        # 'env_params': ENV_PARAMS.get(domain, {}).get(task, {}),
+        'env_params': ENV_PARAMS.get(domain, {}).get(task, {}),
         'policy_params': deep_update(
             POLICY_PARAMS_BASE[policy],
             POLICY_PARAMS_FOR_DOMAIN[policy].get(domain, {})

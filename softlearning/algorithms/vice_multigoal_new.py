@@ -14,7 +14,7 @@ class VICETwoGoal(SAC):
             goal_examples_0,
             goal_examples_1,
             goal_examples_validation_pool_0,
-            goal_examples_validation_pool_1
+            goal_examples_validation_pool_1,
             classifier_lr=1e-4,
             classifier_batch_size=128,
             reward_type = 'logits',
@@ -217,14 +217,15 @@ class VICETwoGoal(SAC):
             self._train_classifier_step(feed_dicts)
  
     def _train_classifier_step(self, feed_dicts):
-        # TODO: Get the classifier_training_op of the correct goal_index
-        losses = []
-        for feed_dict in feed_dicts:
-            _, loss = self._session.run((
-                self._classifier_training_ops, self._classifier_loss_t
-            ), feed_dict)
-            losses.append(loss)
-        return losses
+        feed_dict_0, feed_dict_1 = feed_dicts
+        classifier_training_op_0, classifier_training_op_1 = self._classifier_training_ops
+        _, loss_0 = self._session.run((
+                classifier_training_op_0, self._classifier_loss_t_0
+            ), feed_dict_0)
+        _, loss_1 = self._session.run((
+                classifier_training_op_1, self._classifier_loss_t_1
+            ), feed_dict_1)
+        return (loss_0, loss_1)
 
     def get_diagnostics(self,
                         iteration,

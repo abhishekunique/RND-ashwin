@@ -145,8 +145,8 @@ Additional environment params
 ENV_PARAMS = {
     'DClaw': {
         'TurnImageMultiGoalResetFree-v0': {
-            'initial_goal_index': 0, 
-            'goal_image_pools_path': '/home/justinvyu/Developer/goal-conditioned-vice/goal_pools/fixed_screw_multigoal_0_180/positives.pkl',
+            'initial_goal_index': 0,
+            'goal_image_pools_path': '/Users/justinvyu/Developer/summer-2019/goal-conditioned-vice/goal_pools/fixed_screw_multigoal_0_180/positives.pkl',
             'swap_goals_upon_completion': True,
             'pixel_wrapper_kwargs': {
                 'pixels_only': False,
@@ -315,7 +315,7 @@ def get_variant_spec(args):
             'type': 'convnet_preprocessor',
             'kwargs': {
                 'conv_filters': (64,) * 3,
-                'conv_kernel_sizes': (3,) * 3, 
+                'conv_kernel_sizes': (3,) * 3,
                 'conv_strides': (2,) * 3,
                 'normalization_type': 'layer',
                 'downsampling_type': 'conv'

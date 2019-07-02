@@ -55,6 +55,8 @@ class SimpleSampler(BaseSampler):
 
         next_observation, reward, terminal, info = self.env.step(action)
 
+        import ipdb; ipdb.set_trace()
+
         self._path_length += 1
         self._path_return += reward
         self._total_samples += 1
