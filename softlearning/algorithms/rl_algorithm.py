@@ -395,7 +395,6 @@ class RLAlgorithm(Checkpointable):
         if should_save_video:
             fps = 1 // getattr(self._training_environment, 'dt', 1/30)
             for i, path in enumerate(paths):
-                import ipdb; ipdb.set_trace()
                 video_frames = path.pop('images')
                 video_file_name = f'evaluation_path_{self._epoch}_{i}.avi'
                 video_file_path = os.path.join(

@@ -7,6 +7,8 @@ from softlearning.misc.utils import mixup
 
 class VICEGANGoalConditioned(VICEGAN):
     def _get_classifier_feed_dict(self):
+        import ipdb; ipdb.set_trace()
+        
         negatives = self.sampler.random_batch(self._classifier_batch_size)['observations']
         #rand_positive_ind = np.random.randint(self._goal_examples.shape[0], size=self._classifier_batch_size)
         #positives = self._goal_examples[rand_positive_ind]
