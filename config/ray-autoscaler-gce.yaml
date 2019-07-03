@@ -85,7 +85,7 @@ worker_nodes:
           # See https://cloud.google.com/compute/docs/images for more images
           sourceImage: projects/abhishek-reset-free/global/images/family/softlearning-gpu
     guestAccelerators:
-      - acceleratorType: projects/abhishek-reset-free/zones/us-west1-b/acceleratorTypes/nvidia-tesla-t4
+      - acceleratorType: projects/abhishek-reset-free/zones/us-west1-b/acceleratorTypes/nvidia-tesla-p100
         acceleratorCount: 1
     scheduling:
       - preemptible: true

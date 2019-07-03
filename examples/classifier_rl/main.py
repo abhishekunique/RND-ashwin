@@ -6,7 +6,7 @@ import sys
 import tensorflow as tf
 
 from softlearning.environments.utils import (
-    get_goal_example_environment_from_variant)
+    get_goal_example_environment_from_variant, get_environment_from_params)
 from softlearning.algorithms.utils import get_algorithm_from_variant
 from softlearning.policies.utils import (
     get_policy_from_variant, get_policy_from_params, get_policy)
@@ -27,10 +27,12 @@ class ExperimentRunnerClassifierRL(ExperimentRunner):
     def _build(self):
         variant = copy.deepcopy(self._variant)
 
+        train_env_params = variant['environment_params']['training']
+        eval_env_params = variant['environment_params']['evaluation']
         training_environment = self.training_environment = (
-            get_goal_example_environment_from_variant(variant))
+            get_environment_from_params(train_env_params))
         evaluation_environment = self.evaluation_environment = (
-            get_goal_example_environment_from_variant(variant))
+            get_environment_from_params(eval_env_params))
         replay_pool = self.replay_pool = (
             get_replay_pool_from_variant(variant, training_environment))
         sampler = self.sampler = get_sampler_from_variant(variant)

@@ -13,13 +13,11 @@ DEFAULT_ALGORITHM = 'VICE'
 AVAILABLE_ALGORITHMS = set(alg_utils.ALGORITHM_CLASSES.keys())
 
 import gym
-# from multiworld.envs.mujoco import register_goal_example_envs
-#
-# envs_before = set(env_spec.id for env_spec in gym.envs.registry.all())
-# register_goal_example_envs()
-# envs_after = set(env_spec.id for env_spec in gym.envs.registry.all())
-# register_dclaw_environments()
-goal_example_envs = () #tuple(sorted(envs_after - envs_before))
+from multiworld.envs.mujoco import register_goal_example_envs
+envs_before = set(env_spec.id for env_spec in gym.envs.registry.all())
+register_goal_example_envs()
+envs_after = set(env_spec.id for env_spec in gym.envs.registry.all())
+goal_example_envs = tuple(sorted(envs_after - envs_before))
 
 
 def add_ray_init_args(parser):
@@ -153,6 +151,11 @@ def add_ray_tune_args(parser):
         default=False,
         help=tune_help_string("Starts a background Tune server. Needed for"
                               " using the Client API."))
+    parser.add_argument(
+        '--server-port',
+        type=int,
+        default=4321,
+        help=tune_help_string("Port number for launching TuneServer."))
 
     return parser
 
@@ -161,17 +164,17 @@ def get_parser(allow_policy_list=False):
     parser = argparse.ArgumentParser()
 
     parser.add_argument(
-        '--universe', type=str, default='multiworld')
+        '--universe', type=str, default='multiworld', choices=('multiworld', 'gym'))
     parser.add_argument(
-        '--domain', type=str, default='mujoco')
+        '--domain', type=str, default='mujoco', choices=('mujoco','DClaw'))
     parser.add_argument(
         '--task', type=str, default=DEFAULT_TASK)
     parser.add_argument(
         '--n-goal-examples', type=int, default=10)
     parser.add_argument(
-        '--n-epochs', type=int, default=200)
+        '--n_epochs', type=int, default=200)
     parser.add_argument(
-        '--active-query-frequency', type=int, default=1)
+        '--active_query_frequency', type=int, default=1)
 
     parser.add_argument(
         '--checkpoint-replay-pool',

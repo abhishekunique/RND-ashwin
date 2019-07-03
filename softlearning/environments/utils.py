@@ -1,4 +1,6 @@
 from .adapters.gym_adapter import GymAdapter
+import dsuite
+from dsuite.dclaw.turn import DClawTurnImage
 
 ADAPTERS = {
     'gym': GymAdapter,
@@ -27,8 +29,11 @@ except ModuleNotFoundError as e:
 
 UNIVERSES = set(ADAPTERS.keys())
 
-def get_environment(universe, domain, task, environment_params):
-    return ADAPTERS[universe](domain, task, **environment_params)
+def get_environment(universe, domain, task, environment_kwargs):
+    return ADAPTERS[universe](
+            domain, 
+            task, 
+            **environment_kwargs)
 
 def get_environment_from_params(environment_params):
     universe = environment_params['universe']
@@ -36,7 +41,7 @@ def get_environment_from_params(environment_params):
     domain = environment_params['domain']
     environment_kwargs = environment_params.get('kwargs', {}).copy()
 
-    return get_environment(universe, domain, task, env_params)
+    return get_environment(universe, domain, task, environment_kwargs)
 
 def get_goal_example_environment_from_variant(environment_name, gym_adapter=True, eval=False):
     import gym
