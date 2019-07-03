@@ -90,7 +90,7 @@ class VICETwoGoal(SAC):
             name: self._placeholders['observations'][name]
             for name in self._classifier.observation_keys
         })
-        # TODO: the labels are definitely not right here: how to switch the labels for the different goals? 
+        # TODO: the labels are definitely not right here: how to switch the labels for the different goals?
         logits_0 = self._classifier_0(classifier_inputs)
         logits_1 = self._classifier_1(classifier_inputs)
         self._classifier_loss_t_0 = tf.reduce_mean(
@@ -159,9 +159,9 @@ class VICETwoGoal(SAC):
         }
 
         return feed_dict_0, feed_dict_1
-   
 
-    def _get_Q_target(self):  
+
+    def _get_Q_target(self):
         policy_inputs = flatten_input_structure({
             name: self._placeholders['next_observations'][name]
             for name in self._policy.observation_keys
@@ -215,7 +215,7 @@ class VICETwoGoal(SAC):
         for i in range(self._n_classifier_train_steps):
             feed_dicts = self._get_classifier_feed_dicts()
             self._train_classifier_step(feed_dicts)
- 
+
     def _train_classifier_step(self, feed_dicts):
         feed_dict_0, feed_dict_1 = feed_dicts
         classifier_training_op_0, classifier_training_op_1 = self._classifier_training_ops

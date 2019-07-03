@@ -9,16 +9,16 @@ import imageio
 import pickle
 
 cur_dir = os.path.dirname(os.path.realpath(__file__))
-directory = cur_dir + "/fixed_screw_180"
+directory = cur_dir + "/fixed_screw_multigoal_0"
 if not os.path.exists(directory):
     os.makedirs(directory)
 
 def main():
     num_positives = 0
     NUM_TOTAL_EXAMPLES, ROLLOUT_LENGTH, STEPS_PER_SAMPLE = 50, 25, 5
-    goal_angle = np.pi
+    goal_angle = 0. #np.pi
     observations = []
-    images = True 
+    images = False
     image_shape = (32, 32, 3)
 
     env_kwargs = {
@@ -56,13 +56,12 @@ def main():
             for _ in range(STEPS_PER_SAMPLE):
                 observation, _, _, _ = env.step(action)
 
-            print("OBSERVATION:", observation, observation.keys())
-            env.render()  # render on display
+            #env.render()  # render on display
             obs_dict = env.get_obs_dict()
             print("OBS DICT:", obs_dict)
 
             # For fixed screw
-            object_target_angle_dist = obs_dict['object_to_target_angle_dist'] 
+            object_target_angle_dist = obs_dict['object_to_target_angle_dist']
 
             ANGLE_THRESHOLD = 0.15
             if object_target_angle_dist < ANGLE_THRESHOLD:
@@ -75,7 +74,7 @@ def main():
                     imageio.imwrite(directory + '/img%i.jpg' % num_positives, print_image)
                 num_positives += 1
             t += 1
-   
+
     goal_examples = {
         key: np.concatenate([
             obs[key][None] for obs in observations
@@ -85,7 +84,7 @@ def main():
 
     with open(directory + '/positives.pkl', 'wb') as file:
         pickle.dump(goal_examples, file)
- 
+
 
 if __name__ == "__main__":
     main()

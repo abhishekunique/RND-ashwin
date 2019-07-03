@@ -20,19 +20,26 @@ from softlearning.misc.generate_goal_examples import (
 from softlearning.misc.utils import initialize_tf_variables
 from examples.instrument import run_example_local
 from examples.development.main import ExperimentRunner
-
+from softlearning.environments.adapters.gym_adapter import GymAdapter
 
 class ExperimentRunnerClassifierRL(ExperimentRunner):
 
     def _build(self):
         variant = copy.deepcopy(self._variant)
 
-        train_env_params = variant['environment_params']['training']
-        eval_env_params = variant['environment_params']['evaluation']
+        #training_environment = self.training_environment = (
+        #    get_goal_example_environment_from_variant(variant))
+        #evaluation_environment = self.evaluation_environment = (
+        #    get_goal_example_environment_from_variant(variant))
+
+        domain = variant['domain']
+        task = variant['task']
+        task_evaluation = variant['task_evaluation']
         training_environment = self.training_environment = (
-            get_environment_from_params(train_env_params))
+            GymAdapter(domain=domain, task=task, **variant['env_params']))
         evaluation_environment = self.evaluation_environment = (
-            get_environment_from_params(eval_env_params))
+            GymAdapter(domain=domain, task=task_evaluation, **variant['env_params']))
+
         replay_pool = self.replay_pool = (
             get_replay_pool_from_variant(variant, training_environment))
         sampler = self.sampler = get_sampler_from_variant(variant)
@@ -67,6 +74,27 @@ class ExperimentRunnerClassifierRL(ExperimentRunner):
             algorithm_kwargs['goal_examples'] = goal_examples_train
             algorithm_kwargs['goal_examples_validation'] = (
                 goal_examples_validation)
+
+        if self._variant['algorithm_params']['type'] in ['VICETwoGoal']:
+            reward_classifier_0 = self._reward_classifier_0 = (
+                get_reward_classifier_from_variant(
+                    self._variant, training_environment))
+            reward_classifier_1 = self._reward_classifier_1 = (
+                get_reward_classifier_from_variant(
+                    self._variant, training_environment))
+            algorithm_kwargs['classifier_0'] = reward_classifier_0
+            algorithm_kwargs['classifier_1'] = reward_classifier_1
+
+            goal_pools_train, goal_pools_validation = (
+                get_example_pools_from_variant(variant))
+            goal_examples_0, goal_examples_1 = goal_pools_train
+            goal_examples_validation_0, goal_examples_validation_1 = goal_pools_validation
+            algorithm_kwargs['goal_examples_0'] = goal_examples_0
+            algorithm_kwargs['goal_examples_1'] = goal_examples_1
+            algorithm_kwargs['goal_examples_validation_0'] = goal_examples_validation_0
+            algorithm_kwargs['goal_examples_validation_1'] = goal_examples_validation_1
+
+        import ipdb; ipdb.set_trace()
 
         self.algorithm = get_algorithm_from_variant(**algorithm_kwargs)
 

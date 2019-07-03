@@ -8,8 +8,8 @@ import softlearning.algorithms.utils as alg_utils
 import softlearning.environments.utils as env_utils
 from softlearning.misc.utils import datetimestamp
 
-DEFAULT_TASK = 'StateDoorPullEnv-v0'
-DEFAULT_ALGORITHM = 'VICE'
+DEFAULT_TASK = 'Image48SawyerPushMultiGoalEnv-v0'
+DEFAULT_ALGORITHM = 'VICEGoalConditioned'
 AVAILABLE_ALGORITHMS = set(alg_utils.ALGORITHM_CLASSES.keys())
 
 import gym
@@ -166,6 +166,8 @@ def get_parser(allow_policy_list=False):
         '--domain', type=str, default='mujoco')
     parser.add_argument(
         '--task', type=str, default=DEFAULT_TASK)
+    parser.add_argument(
+        '--task-evaluation', type=str, default=DEFAULT_TASK)
     parser.add_argument(
         '--n-goal-examples', type=int, default=10)
     parser.add_argument(

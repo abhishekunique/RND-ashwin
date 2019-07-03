@@ -3,6 +3,7 @@ from copy import deepcopy
 from ray import tune
 import numpy as np
 
+import dsuite
 from softlearning.misc.utils import get_git_rev, deep_update
 from softlearning.misc.generate_goal_examples import (
     DOOR_TASKS, PUSH_TASKS, PICK_TASKS)
@@ -285,23 +286,23 @@ Additional environment params
 
 ENV_PARAMS = {
     'DClaw': {
-        'TurnImageMultiGoalResetFree-v0': {
-            'initial_goal_index': 0,
-            'swap_goals_upon_completion': False, # True, # False if not concatenating the goal image
+        'TurnMultiGoalResetFree-v0': {
+            'goals': (np.pi, 0.),
+            'initial_goal_index': 0, # start with np.pi
+            'swap_goals_upon_completion': False, # True,
             'use_concatenated_goal': False,
             'pixel_wrapper_kwargs': {
                 'pixels_only': False,
-                # Free camera
                 'render_kwargs': {
-                    'width': 32, 'height': 32, 'camera_id': -1
+                    'width': 32, 'height': 32, 'camera_id': -1 # free camera
                 }
             },
-            'observation_keys': ('pixels',) #'claw_qpos', 'last_action')
+            'observation_keys': ('pixels', 'claw_qpos', 'last_action')
         }
     }
 }
 
-def get_variant_spec_base(universe, domain, task, policy, algorithm):
+def get_variant_spec_base(universe, domain, task, task_eval, policy, algorithm):
     # algorithm_params = deep_update(
     #     ALGORITHM_PARAMS_BASE,
     #     ALGORITHM_PARAMS_PER_DOMAIN.get(domain, {})
@@ -318,6 +319,7 @@ def get_variant_spec_base(universe, domain, task, policy, algorithm):
 
     variant_spec = {
         'task': task,
+        'task_evaluation': task_eval,
         'universe': universe,
         'git_sha': get_git_rev(),
 
@@ -375,13 +377,14 @@ def get_variant_spec_base(universe, domain, task, policy, algorithm):
 def get_variant_spec_classifier(universe,
                                 domain,
                                 task,
+                                task_eval,
                                 policy,
                                 algorithm,
                                 n_goal_examples,
                                 *args,
                                 **kwargs):
     variant_spec = get_variant_spec_base(
-        universe, domain, task, policy, algorithm, *args, **kwargs)
+        universe, domain, task, task_eval, policy, algorithm, *args, **kwargs)
 
     classifier_layer_size = L = 256
     variant_spec['reward_classifier_params'] = {
@@ -432,19 +435,19 @@ def get_variant_spec_classifier(universe,
 
 def get_variant_spec(args):
     universe, domain = args.universe, args.domain
-    task, algorithm, n_epochs = args.task, args.algorithm, args.n_epochs
-    active_query_frequency = args.active_query_frequency
+    task, task_eval, algorithm, n_epochs = args.task, args.task_evaluation, args.algorithm, args.n_epochs
 
     if args.algorithm in (
-            'SACClassifier', 'RAQ', 'VICE', 'VICEGAN', 'VICERAQ'):
+            'SACClassifier', 'RAQ', 'VICE', 'VICEGAN', 'VICERAQ', 'VICETwoGoal'):
         variant_spec = get_variant_spec_classifier(
-            universe, domain, task, args.policy, args.algorithm,
+            universe, domain, task, task_eval, args.policy, args.algorithm,
             args.n_goal_examples)
     else:
         variant_spec = get_variant_spec_base(
             universe, domain, task, args.policy, args.algorithm)
 
     if args.algorithm in ('RAQ', 'VICERAQ'):
+        active_query_frequency = args.active_query_frequency
         variant_spec['algorithm_params']['kwargs'][
             'active_query_frequency'] = active_query_frequency
 
