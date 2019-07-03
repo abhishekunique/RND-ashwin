@@ -27,7 +27,7 @@ def create_VICE_algorithm(variant, *args, **kwargs):
 
 def create_VICETwoGoal_algorithm(variant, *args, **kwargs):
     from .vice_multigoal import VICETwoGoal
-    algorithm = VICE(*args, **kwargs)
+    algorithm = VICETwoGoal(*args, **kwargs)
     return algorithm
 
 

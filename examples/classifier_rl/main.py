@@ -16,7 +16,8 @@ from softlearning.value_functions.utils import get_Q_function_from_variant
 from softlearning.models.utils import get_reward_classifier_from_variant
 from softlearning.misc.generate_goal_examples import (
     get_goal_example_from_variant)
-
+from softlearning.misc.get_multigoal_example_pools import (
+    get_example_pools_from_variant)
 from softlearning.misc.utils import initialize_tf_variables
 from examples.instrument import run_example_local
 from examples.development.main import ExperimentRunner
@@ -62,7 +63,6 @@ class ExperimentRunnerClassifierRL(ExperimentRunner):
             'sampler': sampler,
             'session': self._session,
         }
-
         if self._variant['algorithm_params']['type'] in ['SACClassifier', 'RAQ', 'VICE', 'VICEGAN', 'VICERAQ']:
             reward_classifier = self.reward_classifier = (
                 get_reward_classifier_from_variant(
@@ -87,6 +87,7 @@ class ExperimentRunnerClassifierRL(ExperimentRunner):
 
             goal_pools_train, goal_pools_validation = (
                 get_example_pools_from_variant(variant))
+
             goal_examples_0, goal_examples_1 = goal_pools_train
             goal_examples_validation_0, goal_examples_validation_1 = goal_pools_validation
             algorithm_kwargs['goal_examples_0'] = goal_examples_0
@@ -94,7 +95,6 @@ class ExperimentRunnerClassifierRL(ExperimentRunner):
             algorithm_kwargs['goal_examples_validation_0'] = goal_examples_validation_0
             algorithm_kwargs['goal_examples_validation_1'] = goal_examples_validation_1
 
-        import ipdb; ipdb.set_trace()
 
         self.algorithm = get_algorithm_from_variant(**algorithm_kwargs)
 

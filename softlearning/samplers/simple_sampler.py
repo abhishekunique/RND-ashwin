@@ -55,8 +55,6 @@ class SimpleSampler(BaseSampler):
 
         next_observation, reward, terminal, info = self.env.step(action)
 
-        import ipdb; ipdb.set_trace()
-
         self._path_length += 1
         self._path_return += reward
         self._total_samples += 1
@@ -78,11 +76,10 @@ class SimpleSampler(BaseSampler):
                 field_name: np.array(values)
                 for field_name, values in self._current_path.items()
             })
-            import ipdb; ipdb.set_trace()
             self.pool.add_path({
                 key: value
                 for key, value in last_path.items()
-                # if key != 'infos' # Include infos for now (as a way to pass goal)
+                if key != 'infos' # Include infos for now (as a way to pass goal)
             })
 
             self._last_n_paths.appendleft(last_path)

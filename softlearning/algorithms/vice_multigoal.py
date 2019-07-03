@@ -2,6 +2,7 @@ import numpy as np
 import tensorflow as tf
 
 from .sac import SAC, td_target
+from .vice import VICE
 from softlearning.misc.utils import mixup
 from softlearning.models.utils import flatten_input_structure
 
@@ -13,8 +14,8 @@ class VICETwoGoal(SAC):
             classifier_1,
             goal_examples_0,
             goal_examples_1,
-            goal_examples_validation_pool_0,
-            goal_examples_validation_pool_1,
+            goal_examples_validation_0,
+            goal_examples_validation_1,
             classifier_lr=1e-4,
             classifier_batch_size=128,
             reward_type = 'logits',
@@ -60,16 +61,19 @@ class VICETwoGoal(SAC):
         else:
             raise NotImplementedError
 
-        self._classifier_optimizer = opt_func(
+        self._classifier_optimizer_0 = opt_func(
             learning_rate=self._classifier_lr,
-            name='classifier_optimizer')
+            name='classifier_optimizer_0')
+        self._classifier_optimizer_1 = opt_func(
+            learning_rate=self._classifier_lr,
+            name='classifier_optimizer_1')
 
         classifier_training_ops = [
             tf.contrib.layers.optimize_loss(
                 self._classifier_loss_t_0,
                 self.global_step,
                 learning_rate=self._classifier_lr,
-                optimizer=self._classifier_optimizer,
+                optimizer=self._classifier_optimizer_0,
                 variables=self._classifier_0.trainable_variables,
                 increment_global_step=False,
             ),
@@ -77,7 +81,7 @@ class VICETwoGoal(SAC):
                 self._classifier_loss_t_1,
                 self.global_step,
                 learning_rate=self._classifier_lr,
-                optimizer=self._classifier_optimizer,
+                optimizer=self._classifier_optimizer_1,
                 variables=self._classifier_1.trainable_variables,
                 increment_global_step=False,
             ),
@@ -88,7 +92,7 @@ class VICETwoGoal(SAC):
     def _init_classifier_update(self):
         classifier_inputs = flatten_input_structure({
             name: self._placeholders['observations'][name]
-            for name in self._classifier.observation_keys
+            for name in self._classifier_0.observation_keys
         })
         # TODO: the labels are definitely not right here: how to switch the labels for the different goals?
         logits_0 = self._classifier_0(classifier_inputs)
@@ -101,7 +105,7 @@ class VICETwoGoal(SAC):
                 logits=logits_1, labels=self._placeholders['labels']))
         self._classifier_training_ops = self._get_classifier_training_ops()
 
-     def _get_classifier_feed_dict(self):
+    def _get_classifier_feed_dicts(self):
         negatives = self.sampler.random_batch(
             self._classifier_batch_size)['observations']
 
@@ -144,7 +148,7 @@ class VICETwoGoal(SAC):
             **{
                 self._placeholders['observations'][key]:
                 observations_batch_0[key]
-                for key in self._classifier.observation_keys()
+                for key in self._classifier_0.observation_keys
             },
             self._placeholders['labels']: labels_batch
         }
@@ -153,7 +157,7 @@ class VICETwoGoal(SAC):
             **{
                 self._placeholders['observations'][key]:
                 observations_batch_1[key]
-                for key in self._classifier_1.observation_keys()
+                for key in self._classifier_1.observation_keys
             },
             self._placeholders['labels']: labels_batch
         }
@@ -194,11 +198,14 @@ class VICETwoGoal(SAC):
         observation_logits_1 = self._classifier_1(classifier_1_inputs)
 
         # TODO: Merge the two outputs, based on the info/obs/current_goal
-        goal_index_mask = self._placeholders['infos']['obs/current_goal']
+        goal_index_mask = self._placeholders['observations']['goal_index']
         # Use above to merge the two.
-        import ipdb; ipdb.set_trace()
-        observation_logits_0[goal_index_mask] = observation_logits_1[goal_index_mask]
-        observation_logits = observation_logits_0
+
+        # Use observation_logits_1 where goal is 1, observation_logits_0 where goal is 0
+        observation_logits = tf.where(
+            tf.cast(goal_index_mask, dtype=tf.bool),
+            x=observation_logits_1,
+            y=observation_logits_0)
 
         self._reward_t = observation_logits
 
@@ -232,9 +239,12 @@ class VICETwoGoal(SAC):
                         batch,
                         training_paths,
                         evaluation_paths):
-        diagnostics = super(SACClassifier, self).get_diagnostics(
+        diagnostics = super(VICETwoGoal, self).get_diagnostics(
             iteration, batch, training_paths, evaluation_paths)
 
+        return diagnostics
+
+        # TODO: Fix diagnostics
         sample_observations = batch['observations']
         goal_index_0 = np.random.randint(
             self._goal_examples_0[next(iter(self._goal_examples_0))].shape[0],
@@ -251,47 +261,87 @@ class VICETwoGoal(SAC):
             for key in self._goal_examples_1.keys()
         }
 
+        import ipdb; ipdb.set_trace()
+
         goal_index_validation_0 = np.random.randint(
             self._goal_examples_validation_0[
                 next(iter(self._goal_examples_0))].shape[0],
             size=sample_observations[next(iter(sample_observations))].shape[0])
-        goal_observations_validation_0 = (
-            self._goal_examples_validation_0[goal_index_validation_0])
+        #goal_observations_validation_0 = (
+        #    self._goal_examples_validation_0[goal_index_validation_0])
+        goal_observations_validation_0 = {
+            key: self._goal_examples_validation_0[key][goal_index_validation_0]
+            for key in self._goal_examples_validation_0.keys()
+        }
+
         goal_index_validation_1 = np.random.randint(
             self._goal_examples_validation_1[
                 next(iter(self._goal_examples_1))].shape[0],
             size=sample_observations[next(iter(sample_observations))].shape[0])
-        goal_observations_validation_1 = (
-            self._goal_examples_validation_1[goal_index_validation_1])
+        # goal_observations_validation_1 = (
+        #     self._goal_examples_validation_1[goal_index_validation_1])
+        goal_observations_validation_1 = {
+            key: self._goal_examples_validation_1[key][goal_index_validation_1]
+            for key in self._goal_examples_validation_1.keys()
+        }
 
-        reward_sample_goal_observations, classifier_loss_0, classifier_loss_1 = self._session.run(
-            (self._reward_t, self._classifier_loss_t_0, self.classifier_loss_t_1),
+        reward_sample_goal_observations_0, classifier_loss_0 = self._session.run(
+            (self._reward_t, self._classifier_loss_t_0),
             feed_dict={
                 **{
                     self._placeholders['observations'][key]: np.concatenate((
                         sample_observations[key],
-                        goal_observations[key],
-                        goal_observations_validation[key]
+                        goal_observations_0[key],
+                        goal_observations_validation_0[key]
                     ), axis=0)
-                    for key in self._classifier.observation_keys
+                    for key in self._classifier_0.observation_keys
                 },
                 self._placeholders['labels']: np.concatenate([
                     np.zeros((sample_observations.shape[0], 1)),
-                    np.ones((goal_observations.shape[0], 1)),
-                    np.ones((goal_observations_validation.shape[0], 1)),
+                    np.ones((goal_observations_0.shape[0], 1)),
+                    np.ones((goal_observations_validation_0.shape[0], 1)),
+                ])
+            }
+        )
+
+        reward_sample_goal_observations_1, classifier_loss_1 = self._session.run(
+            (self._reward_t, self._classifier_loss_t_1),
+            feed_dict={
+                **{
+                    self._placeholders['observations'][key]: np.concatenate((
+                        sample_observations[key],
+                        goal_observations_1[key],
+                        goal_observations_validation_1[key]
+                    ), axis=0)
+                    for key in self._classifier_0.observation_keys
+                },
+                self._placeholders['labels']: np.concatenate([
+                    np.zeros((sample_observations.shape[0], 1)),
+                    np.ones((goal_observations_1.shape[0], 1)),
+                    np.ones((goal_observations_validation_1.shape[0], 1)),
                 ])
             }
         )
 
         # TODO(Avi): Make this clearer. Maybe just make all the vectors
         # the same size and specify number of splits
-        (reward_sample_observations,
-         reward_goal_observations,
-         reward_goal_observations_validation) = np.split(
+        (reward_sample_observations_0,
+         reward_goal_observations_0,
+         reward_goal_observations_validation_0) = np.split(
              reward_sample_goal_observations,
              (
                  sample_observations.shape[0],
-                 sample_observations.shape[0] + goal_observations.shape[0]
+                 sample_observations.shape[0] + goal_observations_0.shape[0]
+             ),
+             axis=0)
+
+        (reward_sample_observations_1,
+         reward_goal_observations_1,
+         reward_goal_observations_validation_1) = np.split(
+             reward_sample_goal_observations,
+             (
+                 sample_observations.shape[0],
+                 sample_observations.shape[0] + goal_observations_1.shape[0]
              ),
              axis=0)
 
@@ -310,19 +360,26 @@ class VICETwoGoal(SAC):
             'reward_learning/classifier_loss_0': classifier_loss_0,
             'reward_learning/classifier_loss_1': classifier_loss_1,
 
-            'reward_learning/reward_sample_obs_mean': np.mean(
-                reward_sample_observations),
-            'reward_learning/reward_goal_obs_mean': np.mean(
-                reward_goal_observations),
-            'reward_learning/reward_goal_obs_validation_mean': np.mean(
-                reward_goal_observations_validation),
+            'reward_learning/reward_sample_obs_mean_0': np.mean(
+                reward_sample_observations_0),
+            'reward_learning/reward_goal_obs_mean_0': np.mean(
+                reward_goal_observations_0),
+            'reward_learning/reward_goal_obs_validation_mean_0': np.mean(
+                reward_goal_observations_validation_0),
+
+            'reward_learning/reward_sample_obs_mean_1': np.mean(
+                reward_sample_observations_1),
+            'reward_learning/reward_goal_obs_mean_1': np.mean(
+                reward_goal_observations_1),
+            'reward_learning/reward_goal_obs_validation_mean_1': np.mean(
+                reward_goal_observations_validation_1),
         })
 
         return diagnostics
 
     def _evaluate_rollouts(self, episodes, env):
         """Compute evaluation metrics for the given rollouts."""
-        diagnostics = super(SACClassifier, self)._evaluate_rollouts(
+        diagnostics = super(VICETwoGoal, self)._evaluate_rollouts(
             episodes, env)
 
         learned_reward = self._session.run(
@@ -332,7 +389,7 @@ class VICETwoGoal(SAC):
                     episode['observations'][name]
                     for episode in episodes
                 ])
-                for name in self._classifier.observation_keys
+                for name in self._classifier_0.observation_keys
             })
 
         diagnostics[f'reward_learning/reward-mean'] = np.mean(learned_reward)
@@ -344,9 +401,10 @@ class VICETwoGoal(SAC):
 
     @property
     def tf_saveables(self):
-        saveables = super(SACClassifier, self).tf_saveables
+        saveables = super(VICETwoGoal, self).tf_saveables
         saveables.update({
-            '_classifier_optimizer': self._classifier_optimizer
+            '_classifier_optimizer_0': self._classifier_optimizer_0,
+            '_classifier_optimizer_1': self._classifier_optimizer_1,
         })
 
         return saveables

@@ -7,6 +7,8 @@ import dsuite
 from softlearning.misc.utils import get_git_rev, deep_update
 from softlearning.misc.generate_goal_examples import (
     DOOR_TASKS, PUSH_TASKS, PICK_TASKS)
+from softlearning.misc.get_multigoal_example_pools import (
+    get_example_pools_from_variant)
 
 import dsuite
 
@@ -20,7 +22,7 @@ GAUSSIAN_POLICY_PARAMS_BASE = {
     'kwargs': {
         'hidden_layer_sizes': (M, M),
         'squash': True,
-        'observation_keys': None,
+        'observation_keys': None, # can specify some keys to look at
         'observation_preprocessors_params': {}
     }
 }
@@ -136,6 +138,24 @@ ALGORITHM_PARAMS_ADDITIONAL = {
             'mixup_alpha': 1.0,
         }
     },
+    'VICETwoGoal': {
+        'type': 'VICETwoGoal',
+        'kwargs': {
+            'reparameterize': REPARAMETERIZE,
+            'lr': 3e-4,
+            'target_update_interval': 1,
+            'tau': 5e-3,
+            'target_entropy': 'auto',
+            'action_prior': 'uniform',
+            'classifier_lr': 1e-4,
+            'classifier_batch_size': 128,
+            'n_initial_exploration_steps': int(1e3),
+            'n_classifier_train_steps': 5,
+            'classifier_optim_name': 'adam',
+            'n_epochs': 500,
+            'mixup_alpha': 1.0,
+        }
+    },
     'VICEGAN': {
         'type': 'VICEGAN',
         'kwargs': {
@@ -203,40 +223,7 @@ Environment params
 ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK = {
     'gym': {
         'DClaw': {
-            # Add in tasks
-            'TurnFixed-v0': {
-                'camera_settings': {
-                    'azimuth': 90.18582,
-                    'distance': 0.32,
-                    'elevation': -32.42,
-                    'lookat': np.array([-0.00157929, 0.00336185, 0.10151641])
-                },
-                # 'init_angle_range': (0., 0.),
-                # 'target_angle_range': (np.pi, np.pi),
-                'pixel_wrapper_kwargs': {
-                    'observation_key': 'pixels',
-                    'pixels_only': True,
-                    'render_kwargs': {
-                        'width': 32,
-                        'height': 32,
-                        'camera_id': -1
-                    },
-                },
-            },
-
-            'TurnImage-v0': {
-                'observation_keys': ('image',),
-                'image_shape': (32, 32, 3),
-                'camera_settings': {
-                    'azimuth': 90.18582,
-                    'distance': 0.32,
-                    'elevation': -32.42,
-                    'lookat': np.array([-0.00157929, 0.00336185, 0.10151641])
-                },
-                'init_angle_range': (0., 0.),
-                'target_angle_range': (np.pi, np.pi),
-            },
-        },
+         },
     },
 }
 
@@ -274,7 +261,7 @@ def is_image_env(universe, domain, task, variant_spec):
     return ('image' in task.lower()
             or 'image' in domain.lower()
             or 'pixel_wrapper_kwargs' in (
-            variant_spec['environment_params']['training']['kwargs']))
+            variant_spec['env_params']))
 
 """
 Configuring variant specs
@@ -297,7 +284,7 @@ ENV_PARAMS = {
                     'width': 32, 'height': 32, 'camera_id': -1 # free camera
                 }
             },
-            'observation_keys': ('pixels', 'claw_qpos', 'last_action')
+            'observation_keys': ('pixels', 'claw_qpos', 'last_action', 'goal_index')
         }
     }
 }
@@ -318,6 +305,7 @@ def get_variant_spec_base(universe, domain, task, task_eval, policy, algorithm):
         )
 
     variant_spec = {
+        'domain': domain,
         'task': task,
         'task_evaluation': task_eval,
         'universe': universe,
@@ -343,7 +331,7 @@ def get_variant_spec_base(universe, domain, task, task_eval, policy, algorithm):
             'type': 'double_feedforward_Q_function',
             'kwargs': {
                 'hidden_layer_sizes': (M, M),
-                'observation_keys': None,
+                'observation_keys': None, # None means everything, pass in all keys but the goal_index
                 'observation_preprocessors_params': {}
             }
         },
@@ -490,7 +478,7 @@ def get_variant_spec(args):
             )
 
         if args.algorithm in (
-                'SACClassifier', 'RAQ', 'VICE', 'VICEGAN', 'VICERAQ'):
+                'SACClassifier', 'RAQ', 'VICE', 'VICEGAN', 'VICERAQ', 'VICETwoGoal'):
             (variant_spec
              ['reward_classifier_params']
              ['kwargs']
