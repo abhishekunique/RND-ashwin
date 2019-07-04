@@ -242,8 +242,6 @@ class VICETwoGoal(SAC):
         diagnostics = super(VICETwoGoal, self).get_diagnostics(
             iteration, batch, training_paths, evaluation_paths)
 
-        return diagnostics
-
         # TODO: Fix diagnostics
         sample_observations = batch['observations']
         goal_index_0 = np.random.randint(
@@ -297,9 +295,9 @@ class VICETwoGoal(SAC):
                     for key in self._classifier_0.observation_keys
                 },
                 self._placeholders['labels']: np.concatenate([
-                    np.zeros((sample_observations.shape[0], 1)),
-                    np.ones((goal_observations_0.shape[0], 1)),
-                    np.ones((goal_observations_validation_0.shape[0], 1)),
+                    np.zeros((sample_observations[next(iter(sample_observations))].shape[0], 1)),
+                    np.ones((goal_observations_0[next(iter(goal_observations_0))].shape[0], 1)),
+                    np.ones((goal_observations_validation_0[next(iter(goal_observations_validation_0))].shape[0], 1)),
                 ])
             }
         )
@@ -316,9 +314,9 @@ class VICETwoGoal(SAC):
                     for key in self._classifier_0.observation_keys
                 },
                 self._placeholders['labels']: np.concatenate([
-                    np.zeros((sample_observations.shape[0], 1)),
-                    np.ones((goal_observations_1.shape[0], 1)),
-                    np.ones((goal_observations_validation_1.shape[0], 1)),
+                    np.zeros((sample_observations[next(iter(sample_observations))].shape[0], 1)),
+                    np.ones((goal_observations_1[next(iter(goal_observations_1))].shape[0], 1)),
+                    np.ones((goal_observations_validation_1[next(iter(goal_observations_validation_1))].shape[0], 1)),
                 ])
             }
         )
@@ -328,20 +326,20 @@ class VICETwoGoal(SAC):
         (reward_sample_observations_0,
          reward_goal_observations_0,
          reward_goal_observations_validation_0) = np.split(
-             reward_sample_goal_observations,
+             reward_sample_goal_observations_0,
              (
-                 sample_observations.shape[0],
-                 sample_observations.shape[0] + goal_observations_0.shape[0]
+                 sample_observations[next(iter(sample_observations))].shape[0],
+                 sample_observations[next(iter(sample_observations))].shape[0] + goal_observations_0[next(iter(goal_observations_0))].shape[0]
              ),
              axis=0)
 
         (reward_sample_observations_1,
          reward_goal_observations_1,
          reward_goal_observations_validation_1) = np.split(
-             reward_sample_goal_observations,
+             reward_sample_goal_observations_1,
              (
-                 sample_observations.shape[0],
-                 sample_observations.shape[0] + goal_observations_1.shape[0]
+                 sample_observations[next(iter(sample_observations))].shape[0],
+                 sample_observations[next(iter(sample_observations))].shape[0] + goal_observations_1[next(iter(goal_observations_1))].shape[0]
              ),
              axis=0)
 
