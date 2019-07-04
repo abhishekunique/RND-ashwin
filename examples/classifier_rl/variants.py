@@ -274,6 +274,11 @@ Additional environment params
 
 ENV_PARAMS = {
     'DClaw': {
+        'TurnResetFree-v0': {
+            'init_object_pos_range': (0., 0.),
+            'target_pos_range': (-np.pi, np.pi),
+            'reward_keys': ('object_to_target_angle_dist_cost',)
+        },
         'TurnMultiGoalResetFree-v0': {
             'goals': (np.pi, 0.),
             'initial_goal_index': 0, # start with np.pi
@@ -442,7 +447,7 @@ def get_variant_spec(args):
             args.n_goal_examples)
     else:
         variant_spec = get_variant_spec_base(
-            universe, domain, task, args.policy, args.algorithm)
+            universe, domain, task, task_eval, args.policy, args.algorithm)
 
     if args.algorithm in ('RAQ', 'VICERAQ'):
         active_query_frequency = args.active_query_frequency

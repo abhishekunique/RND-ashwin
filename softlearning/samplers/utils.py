@@ -78,7 +78,6 @@ def rollout(env,
 
     images = []
     infos = defaultdict(list)
-
     t = 0
     for t in range(path_length):
         observation, reward, terminal, info = sampler.sample()
@@ -104,12 +103,13 @@ def rollout(env,
                 #    image1 = (image1*255.0).astype(np.uint8)
                 #    image2 = (image2*255.0).astype(np.uint8)
                 #    image = np.concatenate([image1, image2], axis=1)
-                if observation['pixels'].shape[-1] == 6:
+
+                if 'pixels' in observation.keys() and observation['pixels'].shape[-1] == 6:
                     pixels = observation['pixels']
                     image1 = pixels[:, :, :3]
                     image2 = pixels[:, :, 3:]
                     image = np.concatenate([image1, image2], axis=1)
-                else:    
+                else:
                     image = env.render(**render_kwargs)
                 images.append(image)
             else:

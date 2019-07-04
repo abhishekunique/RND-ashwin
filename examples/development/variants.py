@@ -31,7 +31,7 @@ ALGORITHM_PARAMS_BASE = {
         'train_every_n_steps': 1,
         'n_train_repeat': 1,
         'eval_render_kwargs': {},
-        'eval_n_episodes': 1,
+        'eval_n_episodes': 3,
         'eval_deterministic': True,
 
         'discount': 0.99,
@@ -162,6 +162,13 @@ NUM_EPOCHS_PER_UNIVERSE_DOMAIN_TASK = {
 
 ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK = {
     'gym': {
+        'DClaw': {
+            'TurnResetFree-v0': {
+                'initial_object_pos_range': (0., 0.),
+                'target_pos_range': (-np.pi, np.pi),
+                'reward_keys': ('object_to_target_angle_dist',),
+            }
+        },
         'Swimmer': {  # 2 DoF
         },
         'Hopper': {  # 3 DoF
