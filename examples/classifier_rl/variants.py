@@ -131,7 +131,7 @@ ALGORITHM_PARAMS_ADDITIONAL = {
             'action_prior': 'uniform',
             'classifier_lr': 1e-4,
             'classifier_batch_size': 128,
-            'n_initial_exploration_steps': int(1e3),
+            'n_initial_exploration_steps': 10, # int(1e3),
             'n_classifier_train_steps': 5,
             'classifier_optim_name': 'adam',
             'n_epochs': 200,
@@ -149,11 +149,12 @@ ALGORITHM_PARAMS_ADDITIONAL = {
             'action_prior': 'uniform',
             'classifier_lr': 1e-4,
             'classifier_batch_size': 128,
-            'n_initial_exploration_steps': int(1e3),
+            'n_initial_exploration_steps': 10, # int(1e3),
             'n_classifier_train_steps': 5,
             'classifier_optim_name': 'adam',
             'n_epochs': 500,
             'mixup_alpha': 1.0,
+            'save_training_video': True,
         }
     },
     'VICEGAN': {
@@ -276,15 +277,23 @@ ENV_PARAMS = {
         'TurnMultiGoalResetFree-v0': {
             'goals': (np.pi, 0.),
             'initial_goal_index': 0, # start with np.pi
-            'swap_goals_upon_completion': False, # True,
+            'swap_goals_upon_completion': True,
             'use_concatenated_goal': False,
             'pixel_wrapper_kwargs': {
                 'pixels_only': False,
                 'render_kwargs': {
-                    'width': 32, 'height': 32, 'camera_id': -1 # free camera
+                    'width': 32,
+                    'height': 32,
+                    'camera_id': -1 # free camera
                 }
             },
-            'observation_keys': ('pixels', 'claw_qpos', 'last_action', 'goal_index')
+            'camera_settings': {
+                'azimuth': 65.,
+                'distance': 0.32,
+                'elevation': -44.72107438016526,
+                'lookat': np.array([ 0.00815854, -0.00548645,  0.08652757])
+            },
+            'observation_keys': ('pixels', 'claw_qpos', 'last_action', 'goal_index'),
         }
     }
 }
@@ -348,6 +357,7 @@ def get_variant_spec_base(universe, domain, task, task_eval, policy, algorithm):
                 'max_path_length': get_max_path_length(universe, domain, task),
                 'min_pool_size': get_max_path_length(universe, domain, task),
                 'batch_size': 256,
+                'store_last_n_paths': 20,
             }
         },
         'run_params': {

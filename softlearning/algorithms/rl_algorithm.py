@@ -353,21 +353,19 @@ class RLAlgorithm(Checkpointable):
         yield {'done': True, **diagnostics}
 
     def _training_paths(self):
-        paths = self.sampler.get_last_n_paths(
-                math.ceil(self._epoch_length / self.sampler._max_path_length))
+        paths = self.sampler.get_last_n_paths()
+        #         math.ceil(self._epoch_length / self.sampler._max_path_length))
 
         if self._save_training_video:
             fps = 1 // getattr(self._training_environment, 'dt', 1/30)
             for i, path in enumerate(paths):
-                import ipdb; ipdb.set_trace()
-                pixels = path['observations']['pixels']
-                if pixels.shape[-1] == 6: # concatenated image by channel
+                video_frames = path['observations']['pixels']
+                if video_frames.shape[-1] == 6: # concatenated image by channel
                     # change so that it's concatenated side to side
-                    img_obs, goal_obs = pixels[:, :, :, :3], pixels[:, :, :, 3:]
+                    img_obs, goal_obs = video_frames[:, :, :, :3], video_frames[:, :, :, 3:]
                     print(img_obs.shape, goal_obs.shape)
                     video_frames = np.concatenate([img_obs, goal_obs], axis=1)
                 video_frames = ((video_frames + 1) * 255. / 2.).astype(np.uint8)
-                # video_frames = path.pop('images')
                 video_file_name = f'training_path_{self._epoch}_{i}.avi'
                 video_file_path = os.path.join(
                     os.getcwd(), 'videos', video_file_name)
@@ -396,6 +394,7 @@ class RLAlgorithm(Checkpointable):
             fps = 1 // getattr(self._training_environment, 'dt', 1/30)
             for i, path in enumerate(paths):
                 video_frames = path.pop('images')
+                video_frames = (255. / 2. * (video_frames + 1.)).astype(np.uint8)
                 video_file_name = f'evaluation_path_{self._epoch}_{i}.avi'
                 video_file_path = os.path.join(
                     os.getcwd(), 'videos', video_file_name)

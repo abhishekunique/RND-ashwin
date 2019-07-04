@@ -10,7 +10,7 @@ ALGORITHM_PARAMS_BASE = {
         'eval_render_kwargs': {
             'mode': 'human',
         },
-        'eval_n_episodes': 10,
+        'eval_n_episodes': 5,
         'eval_deterministic': True,
 
         'discount': 0.99,
