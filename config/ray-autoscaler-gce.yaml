@@ -52,7 +52,7 @@ auth:
 # For more documentation on available fields, see:
 # http://boto3.readthedocs.io/en/latest/reference/services/ec2.html#EC2.ServiceResource.create_instances
 head_node:
-    machineType: n1-standard-2
+    machineType: n1-highmem-2
     disks:
       - boot: true
         autoDelete: true
@@ -75,7 +75,7 @@ head_node:
 # For more documentation on available fields, see:
 # http://boto3.readthedocs.io/en/latest/reference/services/ec2.html#EC2.ServiceResource.create_instances
 worker_nodes:
-    machineType: n1-highcpu-8 # n1-highcpu-16
+    machineType: n1-standard-16 # n1-highcpu-16
     disks:
       - boot: true
         autoDelete: true
@@ -111,6 +111,7 @@ setup_commands:
         && pip install -e ~/softlearning-goal-conditioned
         && pip install -e ~/dsuite
         && pip install -e ~/multiworld
+        && pip install -U numpy
         && echo 'cd ~/softlearning-goal-conditioned/' >> ~/.bashrc
         && sudo mkdir /usr/lib/nvidia-000
         && echo 'export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/lib/nvidia-000' >> ~/.bashrc

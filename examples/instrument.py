@@ -283,7 +283,7 @@ def run_example_cluster(example_module_name, example_argv):
         trainable_class,
         **experiment_kwargs,
         with_server=example_args.with_server,
-        server_port=example_args.server_port,
+        # server_port=example_args.server_port,
         scheduler=None,
         queue_trials=True,
         reuse_actors=True)

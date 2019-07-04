@@ -259,8 +259,6 @@ class VICETwoGoal(SAC):
             for key in self._goal_examples_1.keys()
         }
 
-        import ipdb; ipdb.set_trace()
-
         goal_index_validation_0 = np.random.randint(
             self._goal_examples_validation_0[
                 next(iter(self._goal_examples_0))].shape[0],

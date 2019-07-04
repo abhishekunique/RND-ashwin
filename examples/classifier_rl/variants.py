@@ -131,7 +131,7 @@ ALGORITHM_PARAMS_ADDITIONAL = {
             'action_prior': 'uniform',
             'classifier_lr': 1e-4,
             'classifier_batch_size': 128,
-            'n_initial_exploration_steps': 10, # int(1e3),
+            'n_initial_exploration_steps': int(1e3),
             'n_classifier_train_steps': 5,
             'classifier_optim_name': 'adam',
             'n_epochs': 200,
@@ -154,7 +154,7 @@ ALGORITHM_PARAMS_ADDITIONAL = {
             'classifier_optim_name': 'adam',
             'n_epochs': 500,
             'mixup_alpha': 1.0,
-            'save_training_video': True,
+            'save_training_video': False,
         }
     },
     'VICEGAN': {
@@ -348,7 +348,7 @@ def get_variant_spec_base(universe, domain, task, task_eval, policy, algorithm):
         'replay_pool_params': {
             'type': 'SimpleReplayPool',
             'kwargs': {
-                'max_size': int(1e6)
+                'max_size': 2e5,#int(1e6)
             }
         },
         'sampler_params': {

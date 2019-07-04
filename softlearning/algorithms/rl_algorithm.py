@@ -376,7 +376,6 @@ class RLAlgorithm(Checkpointable):
 
     def _evaluation_paths(self, policy, evaluation_env):
         if self._eval_n_episodes < 1: return ()
-
         with policy.set_deterministic(self._eval_deterministic):
             paths = rollouts(
                 self._eval_n_episodes,
