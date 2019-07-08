@@ -8,7 +8,10 @@ goal_directory = os.path.abspath(
 # expects a list of paths for each of the goals
 GOAL_POOL_PATHS_PER_ENV = {
     # Needs to be 180, 0, since the first goal is 180
-    'TurnMultiGoalResetFree-v0': (f'fixed_screw_multigoal_{goal}/' for goal in [180, 0]),
+    # 'TurnMultiGoalResetFree-v0': (f'fixed_screw_multigoal_{goal}/' for goal in [180, 0]),
+    #'TurnMultiGoalResetFree-v0': (f'fixed_screw_multigoal_{goal}/' for goal in [120, 240, 0]),
+    # 'TurnMultiGoalResetFree-v0': (f'fixed_screw_5_goals_{goal}/' for goal in [72, 144, 216, 288, 0]),
+    'TurnMultiGoalResetFree-v0': (f'fixed_screw_4_goals_{goal}/' for goal in [0, 90, 180, 270]),
 }
 
 def get_example_pools_from_variant(variant):

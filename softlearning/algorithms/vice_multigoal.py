@@ -7,7 +7,7 @@ from softlearning.misc.utils import mixup
 from softlearning.models.utils import flatten_input_structure
 
 
-class VICEMultiGoal(SAC):
+class VICEGANMultiGoal(SAC):
     def __init__(
             self,
             classifiers,
@@ -21,7 +21,6 @@ class VICEMultiGoal(SAC):
             mixup_alpha=0.2,
             **kwargs,
     ):
-        # TODO: Pass in a list of classifiers, a list of goal examples/validations instead.
         self._classifiers = classifiers
         self._goal_example_pools = goal_example_pools
         self._goal_example_validation_pools = goal_example_validation_pools
@@ -39,14 +38,14 @@ class VICEMultiGoal(SAC):
         self._classifier_batch_size = classifier_batch_size
         self._mixup_alpha = mixup_alpha
 
-        super(VICEMultiGoal, self).__init__(**kwargs)
+        super(VICEGANMultiGoal, self).__init__(**kwargs)
 
     def _build(self):
-        super(VICEMultiGoal, self)._build()
+        super(VICEGANMultiGoal, self)._build()
         self._init_classifier_update()
 
     def _init_placeholders(self):
-        super(VICEMultiGoal, self)._init_placeholders()
+        super(VICEGANMultiGoal, self)._init_placeholders()
         self._placeholders['labels'] = tf.placeholder(
             tf.float32,
             shape=(None, 1),
@@ -98,7 +97,7 @@ class VICEMultiGoal(SAC):
         self._classifier_losses_t = [
             tf.reduce_mean(
                 tf.nn.sigmoid_cross_entropy_with_logits(
-                    logits=logits, label=self._placeholders['labels']))
+                    logits=logits, labels=self._placeholders['labels']))
             for logits in goal_logits
         ]
 
@@ -178,13 +177,12 @@ class VICEMultiGoal(SAC):
 
         classifier_inputs = flatten_input_structure({
             name: self._placeholders['observations'][name]
-            for name in self._classifier[0].observation_keys
+            for name in self._classifiers[0].observation_keys
         })
 
         observation_logits_per_classifier = [classifier(classifier_inputs)
             for classifier in self._classifiers]
 
-        # TODO: Merge the two outputs, based on the info/obs/current_goal
         goal_index_mask = self._placeholders['observations']['goal_index']
         goal_index_mask = tf.cast(goal_index_mask, dtype=tf.uint8)
 
@@ -233,7 +231,7 @@ class VICEMultiGoal(SAC):
                         batch,
                         training_paths,
                         evaluation_paths):
-        diagnostics = super(VICEMultiGoal, self).get_diagnostics(
+        diagnostics = super(VICEGANMultiGoal, self).get_diagnostics(
             iteration, batch, training_paths, evaluation_paths)
 
         return diagnostics
@@ -364,7 +362,7 @@ class VICEMultiGoal(SAC):
 
     def _evaluate_rollouts(self, episodes, env):
         """Compute evaluation metrics for the given rollouts."""
-        diagnostics = super(VICEMultiGoal, self)._evaluate_rollouts(
+        diagnostics = super(VICEGANMultiGoal, self)._evaluate_rollouts(
             episodes, env)
 
         learned_reward = self._session.run(
@@ -374,7 +372,7 @@ class VICEMultiGoal(SAC):
                     episode['observations'][name]
                     for episode in episodes
                 ])
-                for name in self._classifier_0.observation_keys
+                for name in self._classifiers[0].observation_keys
             })
 
         diagnostics[f'reward_learning/reward-mean'] = np.mean(learned_reward)
@@ -386,7 +384,7 @@ class VICEMultiGoal(SAC):
 
     @property
     def tf_saveables(self):
-        saveables = super(VICEMultiGoal, self).tf_saveables
+        saveables = super(VICEGANMultiGoal, self).tf_saveables
         saveables.update({
             '_classifier_optimizer_0': self._classifier_optimizer_0,
             '_classifier_optimizer_1': self._classifier_optimizer_1,
@@ -395,7 +393,7 @@ class VICEMultiGoal(SAC):
         return saveables
 
 
-class VICETwoGoal(SAC):
+class VICEGANTwoGoal(SAC):
     def __init__(
             self,
             classifier_0,
@@ -427,14 +425,14 @@ class VICETwoGoal(SAC):
         self._classifier_batch_size = classifier_batch_size
         self._mixup_alpha = mixup_alpha
 
-        super(VICETwoGoal, self).__init__(**kwargs)
+        super(VICEGANTwoGoal, self).__init__(**kwargs)
 
     def _build(self):
-        super(VICETwoGoal, self)._build()
+        super(VICEGANTwoGoal, self)._build()
         self._init_classifier_update()
 
     def _init_placeholders(self):
-        super(VICETwoGoal, self)._init_placeholders()
+        super(VICEGANTwoGoal, self)._init_placeholders()
         self._placeholders['labels'] = tf.placeholder(
             tf.float32,
             shape=(None, 1),
@@ -627,7 +625,7 @@ class VICETwoGoal(SAC):
                         batch,
                         training_paths,
                         evaluation_paths):
-        diagnostics = super(VICETwoGoal, self).get_diagnostics(
+        diagnostics = super(VICEGANTwoGoal, self).get_diagnostics(
             iteration, batch, training_paths, evaluation_paths)
 
         # TODO: Fix diagnostics
@@ -763,7 +761,7 @@ class VICETwoGoal(SAC):
 
     def _evaluate_rollouts(self, episodes, env):
         """Compute evaluation metrics for the given rollouts."""
-        diagnostics = super(VICETwoGoal, self)._evaluate_rollouts(
+        diagnostics = super(VICEGANTwoGoal, self)._evaluate_rollouts(
             episodes, env)
 
         learned_reward = self._session.run(
@@ -785,7 +783,7 @@ class VICETwoGoal(SAC):
 
     @property
     def tf_saveables(self):
-        saveables = super(VICETwoGoal, self).tf_saveables
+        saveables = super(VICEGANTwoGoal, self).tf_saveables
         saveables.update({
             '_classifier_optimizer_0': self._classifier_optimizer_0,
             '_classifier_optimizer_1': self._classifier_optimizer_1,

@@ -116,3 +116,6 @@ vendor/*
 .mujoco/
 .vscode/
 notebooks/
+
+goal_pools/
+!goal_pools/*.py

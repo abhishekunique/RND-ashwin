@@ -38,8 +38,10 @@ class ExperimentRunnerClassifierRL(ExperimentRunner):
         task_evaluation = variant['task_evaluation']
         training_environment = self.training_environment = (
             GymAdapter(domain=domain, task=task, **variant['env_params']))
+        eval_params = variant['env_params'].copy()
+        eval_params['swap_goals_upon_completion'] = False
         evaluation_environment = self.evaluation_environment = (
-            GymAdapter(domain=domain, task=task_evaluation, **variant['env_params']))
+            GymAdapter(domain=domain, task=task_evaluation, **eval_params))
 
         replay_pool = self.replay_pool = (
             get_replay_pool_from_variant(variant, training_environment))
@@ -95,6 +97,17 @@ class ExperimentRunnerClassifierRL(ExperimentRunner):
             algorithm_kwargs['goal_examples_validation_0'] = goal_examples_validation_0
             algorithm_kwargs['goal_examples_validation_1'] = goal_examples_validation_1
 
+        elif self._variant['algorithm_params']['type'] in ['VICEGANMultiGoal']:
+            goal_pools_train, goal_pools_validation = (
+                get_example_pools_from_variant(variant))
+            num_goals = len(goal_pools_train)
+
+            reward_classifiers = [get_reward_classifier_from_variant(
+                variant, training_environment) for _ in range(num_goals)]
+
+            algorithm_kwargs['classifiers'] = reward_classifiers
+            algorithm_kwargs['goal_example_pools'] = goal_pools_train
+            algorithm_kwargs['goal_example_validation_pools'] = goal_pools_validation
 
         self.algorithm = get_algorithm_from_variant(**algorithm_kwargs)
 

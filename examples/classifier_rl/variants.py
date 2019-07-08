@@ -138,8 +138,8 @@ ALGORITHM_PARAMS_ADDITIONAL = {
             'mixup_alpha': 1.0,
         }
     },
-    'VICETwoGoal': {
-        'type': 'VICETwoGoal',
+    'VICEGANTwoGoal': {
+        'type': 'VICEGANTwoGoal',
         'kwargs': {
             'reparameterize': REPARAMETERIZE,
             'lr': 3e-4,
@@ -149,13 +149,33 @@ ALGORITHM_PARAMS_ADDITIONAL = {
             'action_prior': 'uniform',
             'classifier_lr': 1e-4,
             'classifier_batch_size': 128,
-            'n_initial_exploration_steps': 10, # int(1e3),
+            'n_initial_exploration_steps': int(1e3),
             'n_classifier_train_steps': 5,
             'classifier_optim_name': 'adam',
             'n_epochs': 500,
             'mixup_alpha': 1.0,
             'save_training_video': False,
         }
+    },
+    'VICEGANMultiGoal': {
+        'type': 'VICEGANMultiGoal',
+        'kwargs': {
+            'reparameterize': REPARAMETERIZE,
+            'lr': 3e-4,
+            'target_update_interval': 1,
+            'tau': 5e-3,
+            'target_entropy': 'auto',
+            'action_prior': 'uniform',
+            'classifier_lr': 1e-4,
+            'classifier_batch_size': 128,
+            'n_initial_exploration_steps': int(1e3),
+            'n_classifier_train_steps': 10,
+            'classifier_optim_name': 'adam',
+            'n_epochs': 500,
+            'mixup_alpha': 1.0,
+            'save_training_video': True,
+        }
+
     },
     'VICEGAN': {
         'type': 'VICEGAN',
@@ -280,9 +300,11 @@ ENV_PARAMS = {
             'reward_keys': ('object_to_target_angle_dist_cost',)
         },
         'TurnMultiGoalResetFree-v0': {
-            'goals': (np.pi, 0.),
-            'initial_goal_index': 0, # start with np.pi
-            'swap_goals_upon_completion': True,
+            # 'goals': (np.pi, 0.), # Two goal setting
+            #'goals': (2 * np.pi / 3, 4 * np.pi / 3, 0.), #np.arange(0, 2 * np.pi, np.pi / 3),
+            'goals': np.arange(0, 2 * np.pi, np.pi / 2),
+            'initial_goal_index': 2, # start with np.pi
+            'swap_goals_upon_completion': True, # if false, will swap randomly
             'use_concatenated_goal': False,
             'pixel_wrapper_kwargs': {
                 'pixels_only': False,
@@ -436,12 +458,13 @@ def get_variant_spec_classifier(universe,
     return variant_spec
 
 
+CLASSIFIER_ALGS = ('SACClassifier', 'RAQ', 'VICE', 'VICEGAN', 'VICERAQ', 'VICEGANTwoGoal', 'VICEGANMultiGoal')
+
 def get_variant_spec(args):
     universe, domain = args.universe, args.domain
     task, task_eval, algorithm, n_epochs = args.task, args.task_evaluation, args.algorithm, args.n_epochs
 
-    if args.algorithm in (
-            'SACClassifier', 'RAQ', 'VICE', 'VICEGAN', 'VICERAQ', 'VICETwoGoal'):
+    if args.algorithm in CLASSIFIER_ALGS:
         variant_spec = get_variant_spec_classifier(
             universe, domain, task, task_eval, args.policy, args.algorithm,
             args.n_goal_examples)
@@ -492,8 +515,7 @@ def get_variant_spec(args):
                 )))
             )
 
-        if args.algorithm in (
-                'SACClassifier', 'RAQ', 'VICE', 'VICEGAN', 'VICERAQ', 'VICETwoGoal'):
+        if args.algorithm in CLASSIFIER_ALGS:
             (variant_spec
              ['reward_classifier_params']
              ['kwargs']
