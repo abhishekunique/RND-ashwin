@@ -28,20 +28,19 @@ class ExperimentRunnerClassifierRL(ExperimentRunner):
     def _build(self):
         variant = copy.deepcopy(self._variant)
 
-        #training_environment = self.training_environment = (
-        #    get_goal_example_environment_from_variant(variant))
-        #evaluation_environment = self.evaluation_environment = (
-        #    get_goal_example_environment_from_variant(variant))
-
-        domain = variant['domain']
-        task = variant['task']
-        task_evaluation = variant['task_evaluation']
+        train_env_params = variant['environment_params']['training']
+        eval_env_params = variant['environment_params']['evaluation']
         training_environment = self.training_environment = (
-            GymAdapter(domain=domain, task=task, **variant['env_params']))
-        eval_params = variant['env_params'].copy()
-        eval_params['swap_goals_upon_completion'] = False
+            get_environment_from_params(train_env_params))
         evaluation_environment = self.evaluation_environment = (
-            GymAdapter(domain=domain, task=task_evaluation, **eval_params))
+            get_environment_from_params(eval_env_params))
+
+        # training_environment = self.training_environment = (
+        #     GymAdapter(domain=domain, task=task, **variant['env_params']))
+        # eval_params = variant['env_params'].copy()
+        # eval_params['swap_goals_upon_completion'] = False
+        # evaluation_environment = self.evaluation_environment = (
+        #     GymAdapter(domain=domain, task=task_evaluation, **eval_params))
 
         replay_pool = self.replay_pool = (
             get_replay_pool_from_variant(variant, training_environment))
@@ -55,9 +54,9 @@ class ExperimentRunnerClassifierRL(ExperimentRunner):
                 variant['exploration_policy_params'], training_environment))
 
         algorithm_kwargs = {
-            'variant': self._variant,
-            'training_environment': self.training_environment,
-            'evaluation_environment': self.evaluation_environment,
+            'variant': variant,
+            'training_environment': training_environment,
+            'evaluation_environment': evaluation_environment,
             'policy': policy,
             'initial_exploration_policy': initial_exploration_policy,
             'Qs': Qs,
@@ -77,7 +76,8 @@ class ExperimentRunnerClassifierRL(ExperimentRunner):
             algorithm_kwargs['goal_examples_validation'] = (
                 goal_examples_validation)
 
-        if self._variant['algorithm_params']['type'] in ['VICETwoGoal']:
+        # TODO: Remove TwoGoal, generalize with the multigoal
+        if self._variant['algorithm_params']['type'] in ['VICEGANTwoGoal']:
             reward_classifier_0 = self._reward_classifier_0 = (
                 get_reward_classifier_from_variant(
                     self._variant, training_environment))

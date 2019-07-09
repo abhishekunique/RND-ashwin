@@ -1,21 +1,22 @@
 from copy import deepcopy
-
 from ray import tune
 import numpy as np
 
-import dsuite
 from softlearning.misc.utils import get_git_rev, deep_update
 from softlearning.misc.generate_goal_examples import (
     DOOR_TASKS, PUSH_TASKS, PICK_TASKS)
 from softlearning.misc.get_multigoal_example_pools import (
     get_example_pools_from_variant)
-
 import dsuite
 
 M = 256
 REPARAMETERIZE = True
 
 NUM_COUPLING_LAYERS = 2
+
+"""
+Policy params
+"""
 
 GAUSSIAN_POLICY_PARAMS_BASE = {
     'type': 'GaussianPolicy',
@@ -47,6 +48,10 @@ POLICY_PARAMS_FOR_DOMAIN.update({
 
 DEFAULT_MAX_PATH_LENGTH = 200
 MAX_PATH_LENGTH_PER_DOMAIN = {}
+
+"""
+Algorithm params
+"""
 
 ALGORITHM_PARAMS_BASE = {
     'type': 'SAC',
@@ -175,7 +180,6 @@ ALGORITHM_PARAMS_ADDITIONAL = {
             'mixup_alpha': 1.0,
             'save_training_video': True,
         }
-
     },
     'VICEGAN': {
         'type': 'VICEGAN',
@@ -244,6 +248,73 @@ Environment params
 ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK = {
     'gym': {
         'DClaw': {
+            'TurnResetFree-v0': {
+                'init_object_pos_range': (0., 0.),
+                'target_pos_range': (-np.pi, np.pi),
+                'reward_keys': ('object_to_target_angle_dist_cost', )
+            },
+            'TurnMultiGoalResetFree-v0': { # training environment
+                # 'goals': (np.pi, 0.), # Two goal setting
+                # 'goals': (2 * np.pi / 3, 4 * np.pi / 3, 0.), #np.arange(0, 2 * np.pi, np.pi / 3),
+                'goals': np.arange(0, 2 * np.pi, np.pi / 2), # 4 goal setting
+                'initial_goal_index': 2, # start with np.pi
+                'swap_goals_upon_completion': True, # if false, will swap randomly
+                'use_concatenated_goal': False,
+                'pixel_wrapper_kwargs': {
+                    'pixels_only': False,
+                    'render_kwargs': {
+                        'width': 32,
+                        'height': 32,
+                        'camera_id': -1,
+                    }
+                },
+                'camera_settings': {
+                    'azimuth': 65.,
+                    'distance': 0.32,
+                    'elevation': -44.72107438016526,
+                    'lookat': np.array([ 0.00815854, -0.00548645,  0.08652757])
+                },
+                'observation_keys': ('pixels', 'claw_qpos', 'last_action', 'goal_index'),
+            },
+            'TurnMultiGoal-v0': { # eval environment
+                'goals': np.arange(0, 2 * np.pi, np.pi / 2),
+                'initial_goal_index': 2,
+                'swap_goals_upon_completion': False,
+                'use_concatenated_goal': False,
+                'pixel_wrapper_kwargs': {
+                    'pixels_only': False,
+                    'render_kwargs': {
+                        'width': 32,
+                        'height': 32,
+                        'camera_id': -1
+                    }
+                },
+                'camera_settings': {
+                    'azimuth': 65.,
+                    'distance': 0.32,
+                    'elevation': -44.72107438016526,
+                    'lookat': np.array([ 0.00815854, -0.00548645,  0.08652757])
+                },
+                'observation_keys': ('pixels', 'claw_qpos', 'last_action', 'goal_index'),
+            },
+            'TurnFreeValve3ResetFree-v0': {
+                'pixel_wrapper_kwargs': {
+                    'pixels_only': False,
+                    'render_kwargs': {
+                        'width': 32,
+                        'height': 32,
+                        'camera_id': -1,
+                    }
+                },
+                'camera_settings': {
+                    'azimuth': 65.,
+                    'distance': 0.32,
+                    'elevation': -44.72107438016526,
+                    'lookat': np.array([ 0.00815854, -0.00548645,  0.08652757])
+                },
+                'init_angle_range': (0., 0.),
+                'target_angle_range': (np.pi, np.pi),
+            }
          },
     },
 }
@@ -282,58 +353,13 @@ def is_image_env(universe, domain, task, variant_spec):
     return ('image' in task.lower()
             or 'image' in domain.lower()
             or 'pixel_wrapper_kwargs' in (
-            variant_spec['env_params']))
+            variant_spec['environment_params']['training']['kwargs']))
 
 """
 Configuring variant specs
 """
 
-"""
-Additional environment params
-"""
-
-ENV_PARAMS = {
-    'DClaw': {
-        'TurnResetFree-v0': {
-            'init_object_pos_range': (0., 0.),
-            'target_pos_range': (-np.pi, np.pi),
-            'reward_keys': ('object_to_target_angle_dist_cost',)
-        },
-        'TurnMultiGoalResetFree-v0': {
-            # 'goals': (np.pi, 0.), # Two goal setting
-            #'goals': (2 * np.pi / 3, 4 * np.pi / 3, 0.), #np.arange(0, 2 * np.pi, np.pi / 3),
-            'goals': np.arange(0, 2 * np.pi, np.pi / 2),
-            'initial_goal_index': 2, # start with np.pi
-            'swap_goals_upon_completion': True, # if false, will swap randomly
-            'use_concatenated_goal': False,
-            'pixel_wrapper_kwargs': {
-                'pixels_only': False,
-                'render_kwargs': {
-                    'width': 32,
-                    'height': 32,
-                    'camera_id': -1 # free camera
-                }
-            },
-            'camera_settings': {
-                'azimuth': 65.,
-                'distance': 0.32,
-                'elevation': -44.72107438016526,
-                'lookat': np.array([ 0.00815854, -0.00548645,  0.08652757])
-            },
-            'observation_keys': ('pixels', 'claw_qpos', 'last_action', 'goal_index'),
-        }
-    }
-}
-
 def get_variant_spec_base(universe, domain, task, task_eval, policy, algorithm):
-    # algorithm_params = deep_update(
-    #     ALGORITHM_PARAMS_BASE,
-    #     ALGORITHM_PARAMS_PER_DOMAIN.get(domain, {})
-    # )
-    # algorithm_params = deep_update(
-    #     algorithm_params,
-    #     ALGORITHM_PARAMS_ADDITIONAL.get(algorithm, {})
-    # )
     algorithm_params = ALGORITHM_PARAMS_BASE
     algorithm_params = deep_update(
             algorithm_params,
@@ -341,13 +367,27 @@ def get_variant_spec_base(universe, domain, task, task_eval, policy, algorithm):
         )
 
     variant_spec = {
-        'domain': domain,
-        'task': task,
-        'task_evaluation': task_eval,
-        'universe': universe,
         'git_sha': get_git_rev(),
 
-        'env_params': ENV_PARAMS.get(domain, {}).get(task, {}),
+        'environment_params': {
+            'training': {
+                'domain': domain,
+                'task': task,
+                'universe': universe,
+                'kwargs': get_environment_params(universe, domain, task),
+            },
+            'evaluation': {
+                'domain': domain,
+                'task': task_eval,
+                'universe': universe,
+                'kwargs': get_environment_params(universe, domain, task_eval)
+            } if task is not task_eval else tune.sample_from(lambda spec: (
+                spec.get('config', spec)
+                ['environment_params']
+                ['training']
+            )),
+        },
+
         'policy_params': deep_update(
             POLICY_PARAMS_BASE[policy],
             POLICY_PARAMS_FOR_DOMAIN[policy].get(domain, {})
@@ -375,7 +415,7 @@ def get_variant_spec_base(universe, domain, task, task_eval, policy, algorithm):
         'replay_pool_params': {
             'type': 'SimpleReplayPool',
             'kwargs': {
-                'max_size': 2e5,#int(1e6)
+                'max_size': 2e5, #int(1e6)
             }
         },
         'sampler_params': {
@@ -415,7 +455,7 @@ def get_variant_spec_classifier(universe,
     variant_spec['reward_classifier_params'] = {
         'type': 'feedforward_classifier',
         'kwargs': {
-            'hidden_layer_sizes': (L,L),
+            'hidden_layer_sizes': (L, L),
             }
         }
 
@@ -440,10 +480,8 @@ def get_variant_spec_classifier(universe,
                 'type': 'ActiveSampler',
                 'kwargs': {
                     'is_goal_key': is_goal_key,
-                    'max_path_length': MAX_PATH_LENGTH_PER_DOMAIN.get(
-                        domain, DEFAULT_MAX_PATH_LENGTH),
-                    'min_pool_size': MAX_PATH_LENGTH_PER_DOMAIN.get(
-                        domain, DEFAULT_MAX_PATH_LENGTH),
+                    'max_path_length': get_max_path_length(universe, domain, task),
+                    'min_pool_size': get_max_path_length(universe, domain, task),
                     'batch_size': 256,
                 }
             },
@@ -466,11 +504,11 @@ def get_variant_spec(args):
 
     if args.algorithm in CLASSIFIER_ALGS:
         variant_spec = get_variant_spec_classifier(
-            universe, domain, task, task_eval, args.policy, args.algorithm,
+            universe, domain, task, task_eval, args.policy, algorithm,
             args.n_goal_examples)
     else:
         variant_spec = get_variant_spec_base(
-            universe, domain, task, task_eval, args.policy, args.algorithm)
+            universe, domain, task, task_eval, args.policy, algorithm)
 
     if args.algorithm in ('RAQ', 'VICERAQ'):
         active_query_frequency = args.active_query_frequency

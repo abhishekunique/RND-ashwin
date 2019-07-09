@@ -79,12 +79,10 @@ class PixelObservationWrapper(ObservationWrapper):
             self.observation_space = spaces.Dict()
             self.observation_space.spaces[STATE_KEY] = wrapped_observation_space
 
-        self.normalize = normalize
+        self._normalize = normalize
 
         # Extend observation space with pixels.
         pixels = self._get_pixels()
-        # if normalize:
-        #    pixels = (2. / 255. * pixels) - 1.
 
         if np.issubdtype(pixels.dtype, np.integer):
             low, high = (0, 255)
@@ -106,6 +104,9 @@ class PixelObservationWrapper(ObservationWrapper):
             pixels = self.env.get_pixels(**self._render_kwargs)
         except AttributeError:
             pixels = self.env.render(**self._render_kwargs)
+
+        if self._normalize:
+            pixels = (2. / 255. * pixels) - 1.
         return pixels
 
 
@@ -119,9 +120,6 @@ class PixelObservationWrapper(ObservationWrapper):
             observation[STATE_KEY] = observation
 
         pixels = self._get_pixels()
-        # if self.normalize:
-        #     pixels = (2. / 255. * pixels) - 1.
-
         observation[self._observation_key] = pixels
 
         return observation
