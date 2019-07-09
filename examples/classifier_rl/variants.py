@@ -301,19 +301,41 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK = {
                 'pixel_wrapper_kwargs': {
                     'pixels_only': False,
                     'render_kwargs': {
-                        'width': 32,
-                        'height': 32,
+                        'width': 48
+                        'height': 48,
                         'camera_id': -1,
                     }
                 },
                 'camera_settings': {
-                    'azimuth': 65.,
-                    'distance': 0.32,
-                    'elevation': -44.72107438016526,
-                    'lookat': np.array([ 0.00815854, -0.00548645,  0.08652757])
+                    'azimuth': 90.,
+                    'distance': 0.4601742725094858,
+                    'elevation': -38.17570837642188,
+                    'lookat': np.array([0.00046945, -0.00049496, 0.05389398]),
+                },  
+                'init_angle_range': (0., 0.),
+                'target_angle_range': (np.pi, np.pi),
+                'swap_goal_upon_completion': False,
+                'observation_keys': ('pixels', 'claw_qpos', 'last_action'),
+            },
+            'TurnFreeValve3Fixed-v0': {
+                'pixel_wrapper_kwargs': {
+                    'pixels_only': False,
+                    'render_kwargs': {
+                        'width': 48,
+                        'height': 48,
+                        'camera_id': -1,
+                    }
+                },
+                'camera_settings': {
+                    'azimuth': 90.,
+                    'distance': 0.4601742725094858,
+                    'elevation': -38.17570837642188,
+                    'lookat': np.array([0.00046945, -0.00049496, 0.05389398]),
                 },
                 'init_angle_range': (0., 0.),
                 'target_angle_range': (np.pi, np.pi),
+                'swap_goal_upon_completion': False,
+                'observation_keys': ('pixels', 'claw_qpos', 'last_action'),
             }
          },
     },
