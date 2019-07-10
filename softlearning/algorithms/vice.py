@@ -92,6 +92,14 @@ class VICE(SACClassifier):
 
         return feed_dict
 
+    def _init_placeholders(self):
+        super()._init_placeholders()
+        self._placeholders['labels'] = tf.placeholder(
+            tf.int32,
+            shape=(None, 2),
+            name='labels',
+        )
+
     def _init_classifier_update(self):
         classifier_inputs = flatten_input_structure({
             name: self._placeholders['observations'][name]
@@ -107,7 +115,7 @@ class VICE(SACClassifier):
         log_pi_log_p_concat = tf.concat([log_pi, log_p], axis=1)
 
         self._classifier_loss_t = tf.reduce_mean(
-            tf.losses.softmax_cross_entropy(
+            tf.compat.v1.losses.softmax_cross_entropy(
                 self._placeholders['labels'],
                 log_pi_log_p_concat,
             )

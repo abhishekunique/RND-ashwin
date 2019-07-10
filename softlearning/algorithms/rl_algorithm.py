@@ -353,9 +353,8 @@ class RLAlgorithm(Checkpointable):
         yield {'done': True, **diagnostics}
 
     def _training_paths(self):
-        paths = self.sampler.get_last_n_paths()
+        paths = self.sampler.get_last_n_paths(n=3) # get last 3 paths
         #         math.ceil(self._epoch_length / self.sampler._max_path_length))
-
         if self._save_training_video:
             fps = 1 // getattr(self._training_environment, 'dt', 1/30)
             for i, path in enumerate(paths):
@@ -393,7 +392,6 @@ class RLAlgorithm(Checkpointable):
             fps = 1 // getattr(self._training_environment, 'dt', 1/30)
             for i, path in enumerate(paths):
                 video_frames = path.pop('images')
-                video_frames = (255. / 2. * (video_frames + 1.)).astype(np.uint8)
                 video_file_name = f'evaluation_path_{self._epoch}_{i}.avi'
                 video_file_path = os.path.join(
                     os.getcwd(), 'videos', video_file_name)

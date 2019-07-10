@@ -86,7 +86,7 @@ worker_nodes:
           sourceImage: projects/abhishek-reset-free/global/images/family/softlearning-gpu
     guestAccelerators:
       - acceleratorType: projects/abhishek-reset-free/zones/us-west1-b/acceleratorTypes/nvidia-tesla-p100
-        acceleratorCount: 1
+        acceleratorCount: 2
     scheduling:
       - preemptible: true
         onHostMaintenance: TERMINATE

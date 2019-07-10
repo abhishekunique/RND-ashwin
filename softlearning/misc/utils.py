@@ -194,7 +194,7 @@ def mixup(features, labels, alpha=0.2):
         (key, (broadcast_multiply(lambda_, features[key])
                + broadcast_multiply((1 - lambda_), shuffled_features[key])))
         for key in features.keys()
-    )) 
+    ))
     labels_convex = lambda_ * labels + (1 - lambda_) * shuffled_labels
 
     return features_convex, labels_convex

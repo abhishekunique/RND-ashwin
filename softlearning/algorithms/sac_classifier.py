@@ -40,7 +40,7 @@ class SACClassifier(SAC):
 
     def _init_placeholders(self):
         super(SACClassifier, self)._init_placeholders()
-        self._placeholders['labels'] = tf.placeholder(
+        self._placeholders['labels'] = tf.compat.v1.placeholder(
             tf.float32,
             shape=(None, 1),
             name='labels',
@@ -90,9 +90,9 @@ class SACClassifier(SAC):
 
     def _get_classifier_training_op(self):
         if self._classifier_optim_name == 'adam':
-            opt_func = tf.train.AdamOptimizer
+            opt_func = tf.compat.v1.train.AdamOptimizer
         elif self._classifier_optim_name == 'sgd':
-            opt_func = tf.train.GradientDescentOptimizer
+            opt_func = tf.compat.v1.train.GradientDescentOptimizer
         else:
             raise NotImplementedError
 
@@ -168,7 +168,7 @@ class SACClassifier(SAC):
                           resampled_batch,
                           where_resampled,
                           environment):
-        # Note: the following code assumes that original_batch is already relabelled 
+        # Note: the following code assumes that original_batch is already relabelled
         batch_flat = flatten(original_batch)
         resampled_batch_flat = flatten(resampled_batch)
         reward_key = [

@@ -28,10 +28,7 @@ PUSH_TASKS = [
 ]
 
 GOAL_IMAGE_PATH_PER_ENVIRONMENT = {
-    'ImageTurnFixed-v0': 'dsuite_fixed_screw/',
-    'TurnFreeValve3Image-v0': 'dsuite_free_screw_180/',
-    'TurnImageResetFree-v0': 'dsuite_fixed_screw_180/',
-    'TurnFixed-v0': 'dsuite_fixed_screw_180/',
+    'TurnFreeValve3ResetFree-v0': 'free_screw_180_small_box/',
 }
 
 def get_goal_example_from_variant(variant):

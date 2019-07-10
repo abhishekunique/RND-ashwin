@@ -61,7 +61,7 @@ ALGORITHM_PARAMS_BASE = {
         'train_every_n_steps': 1,
         'n_train_repeat': 1,
         'eval_render_kwargs': {},
-        'eval_n_episodes': 5,
+        'eval_n_episodes': 3,
         'eval_deterministic': True,
 
         'discount': 0.99,
@@ -141,6 +141,7 @@ ALGORITHM_PARAMS_ADDITIONAL = {
             'classifier_optim_name': 'adam',
             'n_epochs': 200,
             'mixup_alpha': 1.0,
+            'save_training_video': True,
         }
     },
     'VICEGANTwoGoal': {
@@ -301,8 +302,8 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK = {
                 'pixel_wrapper_kwargs': {
                     'pixels_only': False,
                     'render_kwargs': {
-                        'width': 48
-                        'height': 48,
+                        'width': 64,
+                        'height': 64,
                         'camera_id': -1,
                     }
                 },
@@ -311,7 +312,7 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK = {
                     'distance': 0.4601742725094858,
                     'elevation': -38.17570837642188,
                     'lookat': np.array([0.00046945, -0.00049496, 0.05389398]),
-                },  
+                },
                 'init_angle_range': (0., 0.),
                 'target_angle_range': (np.pi, np.pi),
                 'swap_goal_upon_completion': False,
@@ -321,8 +322,8 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK = {
                 'pixel_wrapper_kwargs': {
                     'pixels_only': False,
                     'render_kwargs': {
-                        'width': 48,
-                        'height': 48,
+                        'width': 64,
+                        'height': 64,
                         'camera_id': -1,
                     }
                 },
@@ -334,7 +335,6 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK = {
                 },
                 'init_angle_range': (0., 0.),
                 'target_angle_range': (np.pi, np.pi),
-                'swap_goal_upon_completion': False,
                 'observation_keys': ('pixels', 'claw_qpos', 'last_action'),
             }
          },
@@ -402,12 +402,8 @@ def get_variant_spec_base(universe, domain, task, task_eval, policy, algorithm):
                 'domain': domain,
                 'task': task_eval,
                 'universe': universe,
-                'kwargs': get_environment_params(universe, domain, task_eval)
-            } if task is not task_eval else tune.sample_from(lambda spec: (
-                spec.get('config', spec)
-                ['environment_params']
-                ['training']
-            )),
+                'kwargs': get_environment_params(universe, domain, task_eval),
+            },
         },
 
         'policy_params': deep_update(
@@ -516,7 +512,6 @@ def get_variant_spec_classifier(universe,
         })
 
     return variant_spec
-
 
 CLASSIFIER_ALGS = ('SACClassifier', 'RAQ', 'VICE', 'VICEGAN', 'VICERAQ', 'VICEGANTwoGoal', 'VICEGANMultiGoal')
 
