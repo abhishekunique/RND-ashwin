@@ -9,7 +9,7 @@ import imageio
 import pickle
 
 cur_dir = os.path.dirname(os.path.realpath(__file__))
-directory = cur_dir + "/free_screw_180_small_box"
+directory = cur_dir + "/free_screw_180_small_box_48"
 if not os.path.exists(directory):
     os.makedirs(directory)
 
@@ -19,20 +19,21 @@ def main():
     goal_angle = np.pi
     observations = []
     images = True
-    image_shape = (64, 64, 3)
+    image_shape = (48, 48, 3)
 
     env_kwargs = {
         'pixel_wrapper_kwargs': {
             'pixels_only': False,
             'render_kwargs': {
-                'width': 64,
-                'height': 64,
+                'width': image_shape[0],
+                'height': image_shape[1],
                 'camera_id': -1,
-            }
+            },
+            'normalize': False,
         },
         'camera_settings': {
-            'azimuth': 90.,
-            'distance': 0.4601742725094858,
+            'azimuth': 0.,
+            'distance': 0.35,
             'elevation': -38.17570837642188,
             'lookat': np.array([ 0.00046945, -0.00049496,  0.05389398]),
         },
@@ -75,8 +76,8 @@ def main():
                 if images:
                     img_obs = observation['pixels']
                     image = img_obs[:np.prod(image_shape)].reshape(image_shape)
-                    print_image = (image + 1.) * 255. / 2.
-                    imageio.imwrite(directory + '/img%i.jpg' % num_positives, print_image)
+                    # print_image = (image + 1.) * 255. / 2.
+                    imageio.imwrite(directory + '/img%i.jpg' % num_positives, image)
                 num_positives += 1
             t += 1
 

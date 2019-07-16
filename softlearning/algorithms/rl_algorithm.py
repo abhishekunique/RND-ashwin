@@ -44,7 +44,8 @@ class RLAlgorithm(Checkpointable):
             video_save_frequency=0,
             path_save_frequency=0,
             session=None,
-            save_training_video=False,
+            save_training_videos=False,
+            n_training_videos_to_save=None,
     ):
         """
         Args:
@@ -70,7 +71,8 @@ class RLAlgorithm(Checkpointable):
         self._epoch_length = epoch_length
         self._n_initial_exploration_steps = n_initial_exploration_steps
         self._initial_exploration_policy = initial_exploration_policy
-        self._save_training_video = save_training_video
+        self._save_training_videos = save_training_videos
+        self._n_training_videos_to_save = n_training_videos_to_save
 
         self._eval_n_episodes = eval_n_episodes
         self._eval_deterministic = eval_deterministic
@@ -353,9 +355,12 @@ class RLAlgorithm(Checkpointable):
         yield {'done': True, **diagnostics}
 
     def _training_paths(self):
-        paths = self.sampler.get_last_n_paths(n=3) # get last 3 paths
+        if self._n_training_videos_to_save is not None: 
+            paths = self.sampler.get_last_n_paths(n=self._n_training_videos_to_save)
         #         math.ceil(self._epoch_length / self.sampler._max_path_length))
-        if self._save_training_video:
+        else:
+            paths = self.sampler.get_last_n_paths()
+        if self._save_training_videos:
             fps = 1 // getattr(self._training_environment, 'dt', 1/30)
             for i, path in enumerate(paths):
                 video_frames = path['observations']['pixels']
@@ -364,7 +369,7 @@ class RLAlgorithm(Checkpointable):
                     img_obs, goal_obs = video_frames[:, :, :, :3], video_frames[:, :, :, 3:]
                     print(img_obs.shape, goal_obs.shape)
                     video_frames = np.concatenate([img_obs, goal_obs], axis=1)
-                video_frames = ((video_frames + 1) * 255. / 2.).astype(np.uint8)
+                # video_frames = ((video_frames + 1) * 255. / 2.).astype(np.uint8)
                 video_file_name = f'training_path_{self._epoch}_{i}.avi'
                 video_file_path = os.path.join(
                     os.getcwd(), 'videos', video_file_name)

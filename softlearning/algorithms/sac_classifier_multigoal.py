@@ -351,8 +351,3 @@ class SACClassifierMultiGoal(SAC):
 
         return saveables
 
-class VICEGANMultiGoal(SACClassifierMultiGoal):
-    def _epoch_after_hook(self, *args, **kwargs):
-        for i in range(self._n_classifier_train_steps):
-            feed_dicts = self._get_classifier_feed_dicts()
-            self._train_classifier_step(feed_dicts)

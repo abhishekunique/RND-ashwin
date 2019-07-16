@@ -29,6 +29,7 @@ PUSH_TASKS = [
 
 GOAL_IMAGE_PATH_PER_ENVIRONMENT = {
     'TurnFreeValve3ResetFree-v0': 'free_screw_180_small_box/',
+    'TurnFreeValve3Fixed-v0': 'free_screw_180_small_box_48/',
 }
 
 def get_goal_example_from_variant(variant):

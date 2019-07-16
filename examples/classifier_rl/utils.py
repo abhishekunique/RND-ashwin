@@ -225,6 +225,20 @@ def get_parser(allow_policy_list=False):
         default=0,
         help="Save frequency for videos.")
     parser.add_argument(
+        '--save-training-videos',
+        type=lambda x: bool(strtobool(x)),
+        nargs='?',
+        const=True,
+        default=False,
+        help="Whether or not to save training videos.")
+    parser.add_argument(
+        '--n-training-videos-to-save',
+        type=int,
+        nargs='?',
+        default=3,
+        help="Number of training videos to save per epoch.")
+
+    parser.add_argument(
         '--path-save-frequency',
         type=int,
         default=0,

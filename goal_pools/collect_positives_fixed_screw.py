@@ -16,14 +16,14 @@ if not os.path.exists(directory):
 def main():
     num_positives = 0
     NUM_TOTAL_EXAMPLES, ROLLOUT_LENGTH, STEPS_PER_SAMPLE = 50, 25, 5
-    goal_angle = 0.
+    goal_angle = np.pi
     observations = []
     images = True
     image_shape = (32, 32, 3)
 
     env_kwargs = {
         'camera_settings': {
-            'azimuth': 65.,
+            'azimuth': 0.,
             'distance': 0.32,
             'elevation': -44.72107438016526,
             'lookat': np.array([ 0.00815854, -0.00548645,  0.08652757])
