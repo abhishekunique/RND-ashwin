@@ -78,7 +78,6 @@ class FlexibleReplayPool(ReplayPool):
         """
         self._pointer = (self._pointer + count) % self._max_size
         self._size = min(self._size + count, self._max_size)
-
         if self.data[('episode_index_forwards', )][self._pointer] != 0:
             episode_tail_length = int(self.data[
                 ('episode_index_backwards', )

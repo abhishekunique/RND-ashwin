@@ -160,6 +160,7 @@ class SACClassifier(SAC):
         _, loss = self._session.run((
             self._classifier_training_op, self._classifier_loss_t
         ), feed_dict)
+        self._training_loss = loss 
         return loss
 
     """
@@ -259,6 +260,8 @@ class SACClassifier(SAC):
             # np.mean(classifier_loss_train),
             # 'reward_learning/classifier_loss_validation':
             # np.mean(classifier_loss_validation),
+            'reward_learning/classifier_training_loss': np.mean(
+                self._training_loss),
             'reward_learning/classifier_loss': classifier_loss,
             'reward_learning/reward_sample_obs_mean': np.mean(
                 reward_sample_observations),

@@ -367,9 +367,9 @@ class RLAlgorithm(Checkpointable):
                 if video_frames.shape[-1] == 6: # concatenated image by channel
                     # change so that it's concatenated side to side
                     img_obs, goal_obs = video_frames[:, :, :, :3], video_frames[:, :, :, 3:]
-                    print(img_obs.shape, goal_obs.shape)
                     video_frames = np.concatenate([img_obs, goal_obs], axis=1)
-                # video_frames = ((video_frames + 1) * 255. / 2.).astype(np.uint8)
+                if video_frames.dtype != np.uint8:
+                    video_frames = ((video_frames + 1) * 255. / 2.).astype(np.uint8)
                 video_file_name = f'training_path_{self._epoch}_{i}.avi'
                 video_file_path = os.path.join(
                     os.getcwd(), 'videos', video_file_name)

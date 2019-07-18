@@ -17,7 +17,7 @@ class PixelObservationWrapper(ObservationWrapper):
                  env,
                  pixels_only=True,
                  render_kwargs=None,
-                 normalize=True,
+                 normalize=False,
                  observation_key='pixels'):
         """Initializes a new pixel Wrapper.
 

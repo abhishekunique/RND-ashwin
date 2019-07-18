@@ -75,11 +75,9 @@ def create_input(name, input_shape):
     input_ = tf.keras.layers.Input(
         shape=input_shape,
         name=name,
-        dtype=tf.float32
-        # TODO: CHECK IF THIS IS OKAY
-        #dtype=(tf.uint8 # Image observation
-        #       if len(input_shape) == 3 and input_shape[-1] in (1, 3)
-        #       else tf.float32) # Non-image
+        dtype=(tf.uint8 # Image observation
+               if len(input_shape) == 3 and input_shape[-1] in (1, 3)
+               else tf.float32) # Non-image
     )
     return input_
 

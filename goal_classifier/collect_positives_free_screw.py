@@ -9,7 +9,7 @@ import imageio
 import pickle
 
 cur_dir = os.path.dirname(os.path.realpath(__file__))
-directory = cur_dir + "/free_screw_180_small_box_48"
+directory = cur_dir + "/free_screw_180_less_tiny_box_48"
 if not os.path.exists(directory):
     os.makedirs(directory)
 
@@ -24,12 +24,12 @@ def main():
     env_kwargs = {
         'pixel_wrapper_kwargs': {
             'pixels_only': False,
+            'normalize': False,
             'render_kwargs': {
                 'width': image_shape[0],
                 'height': image_shape[1],
                 'camera_id': -1,
             },
-            'normalize': False,
         },
         'camera_settings': {
             'azimuth': 0.,
@@ -40,7 +40,7 @@ def main():
         'init_angle_range': (goal_angle - 0.05, goal_angle + 0.05),
         'target_angle_range': (goal_angle, goal_angle),
         # 'swap_goal_upon_completion': False,
-        'observation_keys': ('pixels', 'claw_qpos', 'last_action'), # save goal index to mask in the classifier
+        'observation_keys': ('pixels', 'claw_qpos', 'last_action'), 
     }
     env = GymAdapter(
         domain='DClaw',
@@ -75,9 +75,9 @@ def main():
                 print(observation)
                 if images:
                     img_obs = observation['pixels']
-                    image = img_obs[:np.prod(image_shape)].reshape(image_shape)
+                    # image = img_obs[:np.prod(image_shape)].reshape(image_shape)
                     # print_image = (image + 1.) * 255. / 2.
-                    imageio.imwrite(directory + '/img%i.jpg' % num_positives, image)
+                    imageio.imwrite(directory + '/img%i.jpg' % num_positives, img_obs)
                 num_positives += 1
             t += 1
 

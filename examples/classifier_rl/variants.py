@@ -248,6 +248,26 @@ Environment params
 ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK = {
     'gym': {
         'DClaw': {
+            'TurnFixed-v0': {
+                'init_object_pos_range': (0., 0.),
+                'target_pos_range': (np.pi, np.pi),
+                'pixel_wrapper_kwargs': {
+                    'pixels_only': False,
+                    'normalize': False, # maybe this is causing the issue?
+                    'render_kwargs': {
+                        'width': 32,
+                        'height': 32,
+                        'camera_id': -1,
+                    }
+                },
+                'camera_settings': {
+                    'azimuth': 0.,
+                    'distance': 0.35,
+                    'elevation': -38.17570837642188,
+                    'lookat': np.array([0.00046945, -0.00049496, 0.05389398]),
+                },
+                'observation_keys': ('pixels', 'claw_qpos', 'last_action'),
+            },
             'TurnResetFree-v0': {
                 'init_object_pos_range': (0., 0.),
                 'target_pos_range': (-np.pi, np.pi),
@@ -300,62 +320,62 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK = {
                 },
                 'observation_keys': ('pixels', 'claw_qpos', 'last_action', 'goal_index'),
             },
-#            'TurnFreeValve3ResetFree-v0': {
-#                'reward_keys': (
-#                    'object_to_target_position_distance_cost',
-#                    'object_to_target_orientation_distance_cost',
-#                ),
-#                'reset_fingers': True,
-#                'swap_goal_upon_completion': False,
-#            }, 
+            # 'TurnFreeValve3ResetFree-v0': {
+            #     'reward_keys': (
+            #         'object_to_target_position_distance_cost',
+            #         'object_to_target_orientation_distance_cost',
+            #     ),
+            #     'reset_fingers': True,
+            #     'swap_goal_upon_completion': False,
+            # }, 
             'TurnFreeValve3ResetFree-v0': {
                 'pixel_wrapper_kwargs': {
-                    'pixels_only': False,
-                    'normalize': False,
-                    'render_kwargs': {
-                        'width': 48,
-                        'height': 48,
-                        'camera_id': -1,
-                    }
+                   'pixels_only': False,
+                   'normalize': False,
+                   'render_kwargs': {
+                       'width': 48,
+                       'height': 48,
+                       'camera_id': -1,
+                   }
                 },
                 'camera_settings': {
-                    'azimuth': 90.,
-                    'distance': 0.4601742725094858,
-                    'elevation': -38.17570837642188,
-                    'lookat': np.array([0.00046945, -0.00049496, 0.05389398]),
+                   'azimuth': 0.,
+                   'distance': 0.35,
+                   'elevation': -38.17570837642188,
+                   'lookat': np.array([0.00046945, -0.00049496, 0.05389398]),
                 },
                 'init_angle_range': (0., 0.),
                 'target_angle_range': (np.pi, np.pi),
                 'swap_goal_upon_completion': False,
                 'observation_keys': ('pixels', 'claw_qpos', 'last_action'),
             },
-#            'TurnFreeValve3Fixed-v0': {
-#                'init_angle_range': (-np.pi, np.pi),
-#                'target_angle_range': (np.pi, np.pi),
-#                'reward_keys': (
-#                    'object_to_target_position_distance_cost',
-#                    'object_to_target_orientation_distance_cost',
-#                ),
-#            },
+            # 'TurnFreeValve3Fixed-v0': {
+            #     'init_angle_range': (-np.pi, np.pi),
+            #     'target_angle_range': (np.pi, np.pi),
+            #     'reward_keys': (
+            #         'object_to_target_position_distance_cost',
+            #         'object_to_target_orientation_distance_cost',
+            #     ),
+            # },
             'TurnFreeValve3Fixed-v0': {
-                'pixel_wrapper_kwargs': {
-                    'pixels_only': False,
-                    'normalize': False, # Preprocessor handles this already
-                    'render_kwargs': {
-                        'width': 48,
-                        'height': 48,
-                        'camera_id': -1,
-                    }
-                },
-                'camera_settings': {
-                    'azimuth': 0.,
-                    'distance': 0.35,
-                    'elevation': -38.17570837642188,
-                    'lookat': np.array([ 0.00046945, -0.00049496,  0.05389398]),
-                },
-                'init_angle_range': (0., 0.),
-                'target_angle_range': (np.pi, np.pi),
-                'observation_keys': ('pixels', 'claw_qpos', 'last_action'),
+               'pixel_wrapper_kwargs': {
+                   'pixels_only': False,
+                   'normalize': False, 
+                   'render_kwargs': {
+                       'width': 48,
+                       'height': 48,
+                       'camera_id': -1,
+                   }
+               },
+               'camera_settings': {
+                   'azimuth': 0.,
+                   'distance': 0.35,
+                   'elevation': -38.17570837642188,
+                   'lookat': np.array([ 0.00046945, -0.00049496,  0.05389398]),
+               },
+               'init_angle_range': (0., 0.),
+               'target_angle_range': (np.pi, np.pi),
+               'observation_keys': ('pixels', 'claw_qpos', 'last_action'),
             },
             'TurnFreeValve3MultiGoalResetFree-v0': {
                 'goals': ((0, 0, 0, 0, 0, np.pi), (0, 0, 0, 0, 0, 0)),
@@ -495,7 +515,7 @@ def get_variant_spec_base(universe, domain, task, task_eval, policy, algorithm):
         'replay_pool_params': {
             'type': 'SimpleReplayPool',
             'kwargs': {
-                'max_size': 2e5, #int(1e6)
+                'max_size': int(2e5), #int(1e6)
             }
         },
         'sampler_params': {

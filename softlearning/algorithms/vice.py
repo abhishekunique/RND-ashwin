@@ -58,7 +58,12 @@ class VICE(SACClassifier):
     def _get_classifier_feed_dict(self):
         negatives = self.sampler.random_batch(
             self._classifier_batch_size
-        )['observations']
+        )['observations'] 
+        # DEBUG: Testing with the same negatives pool for each training iteration
+        # negatives = type(self._pool.data)(
+        #     (key[1], value[:self._classifier_batch_size]) 
+        #     for key, value in self._pool.data.items() 
+        #     if key[0] == 'observations')
         rand_positive_ind = np.random.randint(
             self._goal_examples[next(iter(self._goal_examples))].shape[0],
             size=self._classifier_batch_size)
@@ -66,7 +71,6 @@ class VICE(SACClassifier):
             key: values[rand_positive_ind]
             for key, values in self._goal_examples.items()
         }
-
         labels_batch = np.zeros(
             (2 * self._classifier_batch_size, 2),
             dtype=np.int32)
@@ -214,6 +218,7 @@ class VICE(SACClassifier):
         diagnostics.update({
             # 'reward_learning/classifier_loss_train': np.mean(classifier_loss_train),
             # 'reward_learning/classifier_loss_validation': np.mean(classifier_loss_validation),
+            'reward_learning/classifier_training_loss': np.mean(self._training_loss),
             'reward_learning/classifier_loss': classifier_loss,
             'reward_learning/reward_sample_obs_mean': np.mean(
                 reward_sample_observations),
