@@ -15,7 +15,7 @@ if not os.path.exists(directory):
 
 def main():
     num_positives = 0
-    NUM_TOTAL_EXAMPLES, ROLLOUT_LENGTH, STEPS_PER_SAMPLE = 50, 25, 4
+    NUM_TOTAL_EXAMPLES, ROLLOUT_LENGTH, STEPS_PER_SAMPLE = 200, 25, 4
     goal_angle = np.pi
     observations = []
     images = True
@@ -35,11 +35,10 @@ def main():
             'azimuth': 0.,
             'distance': 0.35,
             'elevation': -38.17570837642188,
-            'lookat': np.array([ 0.00046945, -0.00049496,  0.05389398]),
+            'lookat': np.array([0.00046945, -0.00049496, 0.05389398]),
         },
         'init_angle_range': (goal_angle - 0.05, goal_angle + 0.05),
         'target_angle_range': (goal_angle, goal_angle),
-        # 'swap_goal_upon_completion': False,
         'observation_keys': ('pixels', 'claw_qpos', 'last_action'), 
     }
     env = GymAdapter(

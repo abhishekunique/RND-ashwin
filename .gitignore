@@ -119,3 +119,6 @@ notebooks/
 
 goal_pools/
 !goal_pools/*.py
+goal_classifier/
+!goal_classifier/*.py
+videos*/

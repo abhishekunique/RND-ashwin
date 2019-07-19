@@ -29,7 +29,7 @@ PUSH_TASKS = [
 
 GOAL_IMAGE_PATH_PER_ENVIRONMENT = {
     'TurnFreeValve3ResetFree-v0': 'free_screw_180_less_tiny_box_48/',
-    'TurnFreeValve3Fixed-v0': 'free_screw_180_small_box_48/',
+    'TurnFreeValve3Fixed-v0': 'free_screw_180_less_tiny_box_48/',
     'TurnFixed-v0': 'fixed_screw_180_no_normalization/',
 }
 
@@ -56,13 +56,19 @@ def get_goal_example_from_variant(variant):
         raise NotImplementedError
 
     n_goal_examples = variant['data_params']['n_goal_examples']
+    total_samples = len(goal_examples[next(iter(goal_examples))])
+
+    # Shuffle the goal images before assigning training/validation
+    shuffle = np.random.permutation(total_samples)
+    positive_indices = shuffle[:n_goal_examples]
+    negative_indices = shuffle[n_goal_examples:]
 
     goal_examples_train = {
-        key: goal_examples[key][:n_goal_examples]
+        key: goal_examples[key][positive_indices]
         for key in goal_examples.keys()
     }
     goal_examples_validation = {
-        key: goal_examples[key][n_goal_examples:]
+        key: goal_examples[key][negative_indices]
         for key in goal_examples.keys()
     }
 

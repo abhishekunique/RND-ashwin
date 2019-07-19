@@ -623,7 +623,7 @@ def get_variant_spec(args):
                 'conv_filters': (64, ) * 3,
                 'conv_kernel_sizes': (3, ) * 3,
                 'conv_strides': (2, ) * 3,
-                'normalization_type': 'layer',
+                'normalization_type': None, # 'layer',
                 'downsampling_type': 'conv',
             },
         }
