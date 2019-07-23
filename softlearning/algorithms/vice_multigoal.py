@@ -254,8 +254,7 @@ class VICEGANTwoGoal(SAC):
                         evaluation_paths):
         diagnostics = super(VICEGANTwoGoal, self).get_diagnostics(
             iteration, batch, training_paths, evaluation_paths)
-
-        # TODO: Fix diagnostics
+        
         sample_observations = batch['observations']
         goal_index_0 = np.random.randint(
             self._goal_examples_0[next(iter(self._goal_examples_0))].shape[0],

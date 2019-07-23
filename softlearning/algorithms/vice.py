@@ -58,11 +58,11 @@ class VICE(SACClassifier):
     def _get_classifier_feed_dict(self):
         negatives = self.sampler.random_batch(
             self._classifier_batch_size
-        )['observations'] 
+        )['observations']
         # DEBUG: Testing with the same negatives pool for each training iteration
         # negatives = type(self._pool.data)(
-        #     (key[1], value[:self._classifier_batch_size]) 
-        #     for key, value in self._pool.data.items() 
+        #     (key[1], value[:self._classifier_batch_size])
+        #     for key, value in self._pool.data.items()
         #     if key[0] == 'observations')
         rand_positive_ind = np.random.randint(
             self._goal_examples[next(iter(self._goal_examples))].shape[0],
@@ -156,15 +156,6 @@ class VICE(SACClassifier):
             for key, values in self._goal_examples_validation.items()
         }
 
-        sample_goal_observations = {
-            key: np.concatenate((
-                sample_observations[key],
-                goal_observations[key],
-                goal_observations_validation[key]
-            ), axis=0)
-            for key in sample_observations.keys()
-        }
-
         num_sample_observations = sample_observations[
             next(iter(sample_observations))].shape[0]
         sample_labels = np.repeat(((1, 0), ), num_sample_observations, axis=0)
@@ -178,54 +169,63 @@ class VICE(SACClassifier):
         goal_validation_labels = np.repeat(
             ((0, 1), ), num_goal_observations_validation, axis=0)
 
-        reward_sample_goal_observations, classifier_loss = self._session.run(
+        reward_negative_observations, negative_classifier_loss = self._session.run(
             (self._reward_t, self._classifier_loss_t),
             feed_dict={
                 **{
                     self._placeholders['observations'][key]: values
-                    for key, values in sample_goal_observations.items()
+                    for key, values in sample_observations.items()
                 },
-                self._placeholders['labels']: np.concatenate((
-                    sample_labels, goal_labels, goal_validation_labels,
-                ), axis=0)
+                self._placeholders['labels']: sample_labels
             }
         )
 
-        assert (reward_sample_goal_observations.shape[0]
-                == (num_sample_observations
-                    + num_goal_observations
-                    + num_goal_observations_validation))
+        reward_goal_observations_training, goal_classifier_training_loss = self._session.run(
+            (self._reward_t, self._classifier_loss_t),
+            feed_dict={
+                **{
+                    self._placeholders['observations'][key]: values
+                    for key, values in goal_observations.items()
+                },
+                self._placeholders['labels']: goal_labels
+            }
+        )
 
-        # TODO(Avi): Make this clearer. Maybe just make all the vectors
-        # the same size and specify number of splits
-        (reward_sample_observations,
-         reward_goal_observations,
-         reward_goal_observations_validation) = np.split(
-             reward_sample_goal_observations,
-             (
-                 num_sample_observations,
-                 num_sample_observations + num_goal_observations
-             ),
-             axis=0)
-
-        # TODO(Avi): fix this so that classifier loss is split into train and val
-        # currently the classifier loss printed is the mean
-        # classifier_loss_train, classifier_loss_validation = np.split(
-        #     classifier_loss,
-        #     (sample_observations.shape[0]+goal_observations.shape[0],),
-        #     axis=0)
+        reward_goal_observations_validation, goal_classifier_validation_loss = self._session.run(
+            (self._reward_t, self._classifier_loss_t),
+            feed_dict={
+                **{
+                    self._placeholders['observations'][key]: values
+                    for key, values in goal_observations_validation.items()
+                },
+                self._placeholders['labels']: goal_validation_labels
+            }
+        )
 
         diagnostics.update({
-            # 'reward_learning/classifier_loss_train': np.mean(classifier_loss_train),
-            # 'reward_learning/classifier_loss_validation': np.mean(classifier_loss_validation),
-            'reward_learning/classifier_training_loss': np.mean(self._training_loss),
-            'reward_learning/classifier_loss': classifier_loss,
-            'reward_learning/reward_sample_obs_mean': np.mean(
-                reward_sample_observations),
-            'reward_learning/reward_goal_obs_mean': np.mean(
-                reward_goal_observations),
-            'reward_learning/reward_goal_obs_validation_mean': np.mean(
+            # classifier loss averaged across the actual training batches
+            'reward_learning/classifier_training_loss': np.mean(
+                self._training_loss), 
+            # classifier loss sampling from the goal image pool
+            'reward_learning/classifier_loss_sample_goal_obs_training': np.mean(
+                goal_classifier_training_loss), 
+            'reward_learning/classifier_loss_sample_goal_obs_validation': np.mean(
+                goal_classifier_validation_loss),
+            'reward_learning/classifier_loss_sample_negative_obs': np.mean(
+                negative_classifier_loss),
+            'reward_learning/classifier_negative_obs_logits_mean': np.mean(
+                reward_negative_observations),
+            'reward_learning/classifier_goal_obs_training_logits_mean': np.mean(
+                reward_goal_observations_training),
+            'reward_learning/classifier_goal_obs_validation_logits_mean': np.mean(
                 reward_goal_observations_validation),
+            # TODO: Figure out why converting to probabilities isn't working
+            # 'reward_learning/classifier_negative_obs_prob_mean': np.mean(
+            #     tf.nn.sigmoid(reward_negative_observations)),
+            # 'reward_learning/classifier_goal_obs_training_prob_mean': np.mean(
+            #     tf.nn.sigmoid(reward_goal_observations_training)),
+            # 'reward_learning/classifier_goal_obs_validation_prob_mean': np.mean(
+            #     tf.nn.sigmoid(reward_goal_observations_validation)),
         })
 
         return diagnostics

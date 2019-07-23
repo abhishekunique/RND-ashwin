@@ -31,14 +31,22 @@ def get_example_pools_from_variant(variant):
         directories = GOAL_POOL_PATHS_PER_ENV_PER_NUM_GOALS[task][f'{num_goals}']
         file_paths = [goal_directory + path + 'positives.pkl' for path in directories]
         for file_path in file_paths:
-            with open(file_path, 'rb') as file:
+            with open(file_path, 'rb') as file: 
                 goal_examples = pickle.load(file)
+                
+                total_samples = len(goal_examples[next(iter(goal_examples))])
+
+                # Shuffle the goal images before assigning training/validation
+                shuffle = np.random.permutation(total_samples)
+                training_indices = shuffle[:n_goal_examples]
+                validation_indices = shuffle[n_goal_examples:]
+
                 goal_example_pools_train.append({
-                    key: goal_examples[key][:n_goal_examples]
+                    key: goal_examples[key][training_indices]
                     for key in goal_examples.keys()
                 })
                 goal_example_pools_validation.append({
-                    key: goal_examples[key][n_goal_examples:]
+                    key: goal_examples[key][validation_indices]
                     for key in goal_examples.keys()
                 })
     else:
