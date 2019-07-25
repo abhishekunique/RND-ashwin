@@ -95,19 +95,19 @@ def generate_experiment_kwargs(variant_spec, command_line_args):
         variant_spec['algorithm_params']['kwargs']['video_save_frequency'] = (
             command_line_args.video_save_frequency)
 
-    if command_line_args.n_training_videos_to_save is not None:
-        variant_spec['algorithm_params']['kwargs']['n_training_videos_to_save'] = (
-            command_line_args.n_training_videos_to_save)
+    # if command_line_args.n_training_videos_to_save is not None:
+    #     variant_spec['algorithm_params']['kwargs']['n_training_videos_to_save'] = (
+    #         command_line_args.n_training_videos_to_save)
 
-    if command_line_args.training_video_save_frequency is not None:
-        assert 'algorithm_params' in variant_spec
-        variant_spec['algorithm_params']['kwargs']['training_video_save_frequency'] = (
-            command_line_args.training_video_save_frequency)
+    # if command_line_args.training_video_save_frequency is not None:
+    #     assert 'algorithm_params' in variant_spec
+    #     variant_spec['algorithm_params']['kwargs']['training_video_save_frequency'] = (
+    #         command_line_args.training_video_save_frequency)
 
-    if command_line_args.path_save_frequency is not None:
-        assert 'algorithm_params' in variant_spec
-        variant_spec['algorithm_params']['kwargs']['path_save_frequency'] = (
-            command_line_args.path_save_frequency)
+    # if command_line_args.path_save_frequency is not None:
+    #     assert 'algorithm_params' in variant_spec
+    #     variant_spec['algorithm_params']['kwargs']['path_save_frequency'] = (
+    #         command_line_args.path_save_frequency)
 
     def create_trial_name_creator(trial_name_template=None):
         if not trial_name_template:

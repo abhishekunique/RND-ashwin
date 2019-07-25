@@ -289,20 +289,20 @@ class RLAlgorithm(Checkpointable):
                 training_paths, training_environment)
             gt.stamp('training_metrics')
 
-            should_save_path = (
-                self._path_save_frequency > 0
-                and self._epoch % self._path_save_frequency == 0)
-            if should_save_path:
-                import pickle
-                for i, path in enumerate(training_paths):
-                    #path.pop('images')
-                    path_file_name = f'training_path_{self._epoch}_{i}.pkl'
-                    path_file_path = os.path.join(
-                        os.getcwd(), 'paths', path_file_name)
-                    if not os.path.exists(os.path.dirname(path_file_path)):
-                        os.makedirs(os.path.dirname(path_file_path))
-                    with open(path_file_path, 'wb' ) as f:
-                        pickle.dump(path, f)
+            #should_save_path = (
+            #    self._path_save_frequency > 0
+            #    and self._epoch % self._path_save_frequency == 0)
+            #if should_save_path:
+            #    import pickle
+            #    for i, path in enumerate(training_paths):
+            #        #path.pop('images')
+            #        path_file_name = f'training_path_{self._epoch}_{i}.pkl'
+            #        path_file_path = os.path.join(
+            #            os.getcwd(), 'paths', path_file_name)
+            #        if not os.path.exists(os.path.dirname(path_file_path)):
+            #            os.makedirs(os.path.dirname(path_file_path))
+            #        with open(path_file_path, 'wb' ) as f:
+            #            pickle.dump(path, f)
 
             if evaluation_paths:
                 evaluation_metrics = self._evaluate_rollouts(

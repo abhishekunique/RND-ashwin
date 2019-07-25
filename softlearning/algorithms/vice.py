@@ -59,13 +59,13 @@ class VICE(SACClassifier):
         self._classifier_output_t = observation_log_p
         self._reward_t = observation_log_p - curr_log_pis
 
-        log_pi_log_p_concat = tf.concat([log_pi, log_p], axis=1)
+        log_pi_log_p_concat = tf.concat([curr_log_pis, observation_log_p], axis=1)
         self._discriminator_output_t = tf.compat.v1.math.softmax(log_pi_log_p_concat)
 
         terminals = tf.cast(self._placeholders['terminals'], next_values.dtype)
 
         Q_target = td_target(
-            reward=self._reward_scale * observation_logits,
+            reward=self._reward_scale * self._reward_t,
             discount=self._discount,
             next_value=(1 - terminals) * next_values)
 
