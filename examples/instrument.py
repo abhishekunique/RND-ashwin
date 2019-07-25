@@ -73,7 +73,7 @@ def add_command_line_args_to_variant_spec(variant_spec, command_line_args):
 def generate_experiment_kwargs(variant_spec, command_line_args):
     # TODO(hartikainen): Allow local dir to be modified through cli args
     local_dir = os.path.join(
-        '~/ray_results',
+        '/nfs/kun1/users/justinvyu/ray_results',
         command_line_args.universe,
         command_line_args.domain,
         command_line_args.task)
@@ -94,14 +94,15 @@ def generate_experiment_kwargs(variant_spec, command_line_args):
         assert 'algorithm_params' in variant_spec
         variant_spec['algorithm_params']['kwargs']['video_save_frequency'] = (
             command_line_args.video_save_frequency)
-        if command_line_args.n_training_videos_to_save is not None:
-            variant_spec['algorithm_params']['kwargs']['n_training_videos_to_save'] = (
-                command_line_args.n_training_videos_to_save)
+    
+    if command_line_args.n_training_videos_to_save is not None:
+        variant_spec['algorithm_params']['kwargs']['n_training_videos_to_save'] = (
+            command_line_args.n_training_videos_to_save)
 
-    if command_line_args.save_training_videos is not None:
+    if command_line_args.training_video_save_frequency is not None:
         assert 'algorithm_params' in variant_spec
-        variant_spec['algorithm_params']['kwargs']['save_training_videos'] = (
-            command_line_args.save_training_videos)
+        variant_spec['algorithm_params']['kwargs']['training_video_save_frequency'] = (
+            command_line_args.training_video_save_frequency)
 
     if command_line_args.path_save_frequency is not None:
         assert 'algorithm_params' in variant_spec

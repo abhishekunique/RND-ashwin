@@ -44,7 +44,7 @@ class RLAlgorithm(Checkpointable):
             video_save_frequency=0,
             path_save_frequency=0,
             session=None,
-            save_training_videos=False,
+            training_video_save_frequency=0,
             n_training_videos_to_save=None,
     ):
         """
@@ -71,8 +71,11 @@ class RLAlgorithm(Checkpointable):
         self._epoch_length = epoch_length
         self._n_initial_exploration_steps = n_initial_exploration_steps
         self._initial_exploration_policy = initial_exploration_policy
-        self._save_training_videos = save_training_videos
+
+        self._training_video_save_frequency = training_video_save_frequency
         self._n_training_videos_to_save = n_training_videos_to_save
+        if self._training_video_save_frequency > 0:
+            self.sampler.set_save_training_videos_flag(True)
 
         self._eval_n_episodes = eval_n_episodes
         self._eval_deterministic = eval_deterministic
@@ -360,20 +363,25 @@ class RLAlgorithm(Checkpointable):
         #         math.ceil(self._epoch_length / self.sampler._max_path_length))
         else:
             paths = self.sampler.get_last_n_paths()
-        if self._save_training_videos:
+        
+        if self._training_video_save_frequency > 0:
             fps = 1 // getattr(self._training_environment, 'dt', 1/30)
-            for i, path in enumerate(paths):
-                video_frames = path['observations']['pixels']
-                if video_frames.shape[-1] == 6: # concatenated image by channel
-                    # change so that it's concatenated side to side
-                    img_obs, goal_obs = video_frames[:, :, :, :3], video_frames[:, :, :, 3:]
-                    video_frames = np.concatenate([img_obs, goal_obs], axis=1)
-                if video_frames.dtype != np.uint8:
-                    video_frames = ((video_frames + 1) * 255. / 2.).astype(np.uint8)
-                video_file_name = f'training_path_{self._epoch}_{i}.avi'
-                video_file_path = os.path.join(
-                    os.getcwd(), 'videos', video_file_name)
-                save_video(video_frames, video_file_path, fps=fps)
+            for i, path in enumerate(reversed(paths)):
+                if i % self._training_video_save_frequency == 0:
+                    # Use pixel observations
+                    # video_frames = path['observations']['pixels']
+                    # Use images appended by SimpleSampler
+                    video_frames = path.pop('images')
+                    if video_frames.shape[-1] == 6: # concatenated image by channel
+                        # change so that it's concatenated side to side
+                        img_obs, goal_obs = video_frames[:, :, :, :3], video_frames[:, :, :, 3:]
+                        video_frames = np.concatenate([img_obs, goal_obs], axis=1)
+                    if video_frames.dtype != np.uint8:
+                        video_frames = ((video_frames + 1) * 255. / 2.).astype(np.uint8)
+                    video_file_name = f'training_path_{self._epoch}_{i}.avi'
+                    video_file_path = os.path.join(
+                        os.getcwd(), 'videos', video_file_name)
+                    save_video(video_frames, video_file_path, fps=fps)
 
         return paths
 

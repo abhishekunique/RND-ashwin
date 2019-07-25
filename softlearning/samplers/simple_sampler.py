@@ -8,7 +8,8 @@ from .base_sampler import BaseSampler
 
 
 class SimpleSampler(BaseSampler):
-    def __init__(self, **kwargs):
+    def __init__(self,
+                 **kwargs):
         super(SimpleSampler, self).__init__(**kwargs)
 
         self._path_length = 0
@@ -19,6 +20,12 @@ class SimpleSampler(BaseSampler):
         self._n_episodes = 0
         self._current_observation = None
         self._total_samples = 0
+        self._save_training_videos = False
+        self._images = []
+
+    def set_save_training_videos_flag(self, flag):
+        assert type(flag) == bool
+        self._save_training_videos = flag
 
     @property
     def _policy_input(self):
@@ -51,6 +58,10 @@ class SimpleSampler(BaseSampler):
         if self._current_observation is None:
             self._current_observation = self.env.reset()
 
+        if self._save_training_videos:
+            self._images.append(
+                self.env.render(mode='rgb_array', width=32, height=32))
+
         action = self.policy.actions_np(self._policy_input)[0]
 
         next_observation, reward, terminal, info = self.env.step(action)
@@ -79,10 +90,16 @@ class SimpleSampler(BaseSampler):
             self.pool.add_path({
                 key: value
                 for key, value in last_path.items()
-                if key != 'infos' # Include infos for now (as a way to pass goal)
+                if key != 'infos'
             })
 
-            self._last_n_paths.appendleft(last_path)
+            if self._save_training_videos:
+                self._last_n_paths.appendleft({
+                    'images': np.array(self._images),
+                    **last_path,
+                })
+            else:
+                self._last_n_paths.appendleft(last_path)
 
             self._max_path_return = max(self._max_path_return,
                                         self._path_return)
@@ -94,6 +111,7 @@ class SimpleSampler(BaseSampler):
             self._path_length = 0
             self._path_return = 0
             self._current_path = defaultdict(list)
+            self._images = []
 
             self._n_episodes += 1
         else:

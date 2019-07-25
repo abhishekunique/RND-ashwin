@@ -13,7 +13,11 @@ GOAL_POOL_PATHS_PER_ENV_PER_NUM_GOALS = {
     },
     'TurnFreeValve3MultiGoalResetFree-v0': {
         '2': (f'free_screw_2_goals_{goal}/' for goal in (180, 0)),
-    }
+    },
+    'TurnFreeValve3MultiGoal-v0': {
+        '2': (f'free_screw_2_goals_tiny_box_{goal}/' for goal in (180, 0)),
+    },
+
     # 'TurnMultiGoalResetFree-v0': (f'fixed_screw_multigoal_{goal}/' for goal in [180, 0]),
     # 'TurnMultiGoalResetFree-v0': (f'fixed_screw_multigoal_{goal}/' for goal in [120, 240, 0]),
     # 'TurnMultiGoalResetFree-v0': (f'fixed_screw_5_goals_{goal}/' for goal in [72, 144, 216, 288, 0]),
