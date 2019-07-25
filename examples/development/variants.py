@@ -480,7 +480,7 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK = {
                     'object_to_target_orientation_distance_cost',
                 ),
                 'reset_fingers': True,
-                'position_reward_weight': tune.sample_from([2, 5, 10]),
+                'position_reward_weight': 2, # tune.sample_from([2, 5, 10]),
             },
             'TurnFreeValve3ResetFreeCurriculum-v0': {
                 'reward_keys': (
@@ -859,10 +859,11 @@ def get_variant_spec_base(universe, domain, task, policy, algorithm):
         #     'object_to_target_relative_position',
         # )
     if task == 'TurnFreeValve3ResetFreeSwapGoal-v0':
-        # pass
+        pass
         # variant_spec['replay_pool_params']['type'] = 'MultiGoalReplayPool'
-        variant_spec['replay_pool_params']['kwargs']['mode'] = 'Bellman_Error'
-        variant_spec['replay_pool_params']['kwargs']['per_alpha'] = tune.grid_search([0.25, 0.5, 0.75])
+        # variant_spec['replay_pool_params']['type'] = 'PrioritizedExperienceReplayPool' 
+        # variant_spec['replay_pool_params']['kwargs']['mode'] = 'Bellman_Error'
+        # variant_spec['replay_pool_params']['kwargs']['per_alpha'] = tune.grid_search([0.25, 0.5, 0.75])
         # DEFAULT_OBSERVATION_KEYS = (
         #     'claw_qpos',
         #     'object_position',

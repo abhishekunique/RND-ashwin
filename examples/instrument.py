@@ -73,7 +73,7 @@ def add_command_line_args_to_variant_spec(variant_spec, command_line_args):
 def generate_experiment_kwargs(variant_spec, command_line_args):
     # TODO(hartikainen): Allow local dir to be modified through cli args
     local_dir = os.path.join(
-        '/mnt/sda/ray_results',
+        '/nfs/kun1/users/justinvyu/ray_results',
         command_line_args.universe,
         command_line_args.domain,
         command_line_args.task)
@@ -228,7 +228,7 @@ def run_example_local(example_module_name, example_argv, local_mode=False):
         resources=example_args.resources or {},
         local_mode=local_mode,
         include_webui=example_args.include_webui,
-        temp_dir=os.path.join('/tmp/ray-henry', datetime_string))
+        temp_dir=os.path.join('/tmp/ray-justin', datetime_string))
 
     tune.run(
         trainable_class,

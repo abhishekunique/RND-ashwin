@@ -400,7 +400,7 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK = {
                     },
                 },
                 'swap_goals_upon_completion': False,
-                'observation_keys': ('pixels', 'claw_qpos', 'last_action', 'goal_index'),
+                'observation_keys': ('pixels', 'claw_qpos', 'last_action', 'goal_index', 'object_position', 'object_orientation_sin', 'object_orientation_sin'),
             },
             'TurnFreeValve3MultiGoal-v0': {
                 'goals': ((0, 0, 0, 0, 0, np.pi), (0, 0, 0, 0, 0, 0)),
