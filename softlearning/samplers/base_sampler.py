@@ -69,3 +69,6 @@ class BaseSampler(object):
         self.env = None
         self.policy = None
         self.pool = None
+
+    def set_save_training_video_frequency(self, flag):
+        pass

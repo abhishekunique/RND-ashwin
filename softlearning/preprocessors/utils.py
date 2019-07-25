@@ -18,8 +18,8 @@ def get_feedforward_preprocessor(name='feedforward_preprocessor', **kwargs):
 
 
 PREPROCESSOR_FUNCTIONS = {
-    'convnet_preprocessor': get_convnet_preprocessor,
-    'feedforward_preprocessor': get_feedforward_preprocessor,
+    'ConvnetPreprocessor': get_convnet_preprocessor,
+    'FeedforwardPreprocessor': get_feedforward_preprocessor,
     None: lambda *args, **kwargs: None
 }
 

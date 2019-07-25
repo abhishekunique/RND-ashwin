@@ -116,6 +116,7 @@ class _RemoteEnv(object):
 
     def rollout(self, policy_weights, path_length):
         self._policy.set_weights(policy_weights)
+        del policy_weights
         path = rollout(self._env, self._policy, path_length)
 
         return path

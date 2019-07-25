@@ -1,6 +1,9 @@
+import os
+import uuid
 from collections import OrderedDict
 from numbers import Number
 
+import skimage
 import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
@@ -8,6 +11,9 @@ from flatten_dict import flatten
 
 from softlearning.models.utils import flatten_input_structure
 from .rl_algorithm import RLAlgorithm
+from softlearning.replay_pools.prioritized_experience_replay_pool import PrioritizedExperienceReplayPool
+
+tfd = tfp.distributions
 
 
 def td_target(reward, discount, next_value):
@@ -42,8 +48,11 @@ class SAC(RLAlgorithm):
             target_update_interval=1,
             action_prior='uniform',
             reparameterize=False,
-
+            her_iters=0,
+            goal_classifier_params_directory=None,
             save_full_state=False,
+            save_eval_paths=False,
+            per_alpha=1,
             **kwargs,
     ):
         """
@@ -78,6 +87,13 @@ class SAC(RLAlgorithm):
         self._Q_targets = tuple(tf.keras.models.clone_model(Q) for Q in Qs)
 
         self._pool = pool
+        if isinstance(self._pool, PrioritizedExperienceReplayPool) and \
+           self._pool._mode == 'Bellman_Error':
+            self._per = True
+            self._per_alpha = per_alpha
+        else:
+            self._per = False
+
         self._plotter = plotter
 
         self._policy_lr = lr
@@ -96,16 +112,47 @@ class SAC(RLAlgorithm):
 
         self._reparameterize = reparameterize
 
-        self._save_full_state = save_full_state
+        self._her_iters = her_iters
+        self._base_env = training_environment.unwrapped
 
+        self._save_full_state = save_full_state
+        self._save_eval_paths = save_eval_paths
+        self._goal_classifier_params_directory = goal_classifier_params_directory
         self._build()
 
     def _build(self):
         super(SAC, self)._build()
+        if self._goal_classifier_params_directory:
+            self._load_goal_classifier(self._goal_classifier_params_directory)
+        else:
+            self._goal_classifier = None
 
         self._init_actor_update()
         self._init_critic_update()
         self._init_diagnostics_ops()
+
+    def _load_goal_classifier(self, goal_classifier_params_directory):
+        import sys
+        from goal_classifier.conv import CNN
+        from tensorflow.python.tools.inspect_checkpoint import print_tensors_in_checkpoint_file
+
+        # print_tensors_in_checkpoint_file(goal_classifier_params_directory, all_tensors=False, tensor_name='')
+        self._goal_classifier = CNN(goal_cond=True)
+        variables = self._goal_classifier.get_variables()
+        cnn_vars = [v for v in tf.trainable_variables() if v.name.split('/')[0] == 'goal_classifier']
+        saver = tf.train.Saver(cnn_vars)
+        saver.restore(self._session, goal_classifier_params_directory)
+
+    def _classify_as_goals(self, images, goals):
+        # NOTE: we can choose any goals we want.
+        # Things to try:
+        # - random goal
+        # - single goal
+        feed_dict = {self._goal_classifier.images: images,
+            self._goal_classifier.goals: goals}
+        # lid_pos = observations[:, -2]
+        goal_probs = self._session.run(self._goal_classifier.pred_probs, feed_dict=feed_dict)[:, 1].reshape((-1, 1))
+        return goal_probs
 
     def _get_Q_target(self):
         policy_inputs = flatten_input_structure({
@@ -160,6 +207,10 @@ class SAC(RLAlgorithm):
             tf.compat.v1.losses.mean_squared_error(
                 labels=Q_target, predictions=Q_value, weights=0.5)
             for Q_value in Q_values)
+
+        self._bellman_errors = tf.reduce_min(tuple(
+            tf.math.squared_difference(Q_target, Q_value)
+            for Q_value in Q_values), axis=0)
 
         self._Q_optimizers = tuple(
             tf.compat.v1.train.AdamOptimizer(
@@ -290,13 +341,30 @@ class SAC(RLAlgorithm):
 
     def _do_training(self, iteration, batch):
         """Runs the operations for updating training and target ops."""
-
         feed_dict = self._get_feed_dict(iteration, batch)
         self._session.run(self._training_ops, feed_dict)
+
+        if self._her_iters:
+            # Q: Is it better to build a large batch and take one grad step, or
+            # resample many mini batches and take many grad steps?
+            new_batches = {}
+            for _ in range(self._her_iters):
+                new_batch = self._get_goal_resamp_batch(batch)
+                new_feed_dict = self._get_feed_dict(iteration, new_batch)
+                self._session.run(self._training_ops, new_feed_dict)
 
         if iteration % self._target_update_interval == 0:
             # Run target ops here.
             self._update_target()
+
+    def get_bellman_error(self, batch):
+        feed_dict = self._get_feed_dict(None, batch)
+
+        ## TO TRY: weight by bellman error without entropy
+        ## - sweep over per_alpha
+
+        ## Question: why the min over the Q's?
+        return self._session.run(self._bellman_errors, feed_dict)
 
     def _get_feed_dict(self, iteration, batch):
         """Construct a TensorFlow feed dictionary from a sample batch."""
@@ -304,16 +372,86 @@ class SAC(RLAlgorithm):
         batch_flat = flatten(batch)
         placeholders_flat = flatten(self._placeholders)
 
+        if np.random.rand() < 1e-4 and 'pixels' in batch['observations']:
+            import os
+            from skimage import io
+            random_idx = np.random.randint(
+                batch['observations']['pixels'].shape[0])
+            image_save_dir = os.path.join(os.getcwd(), 'pixels')
+            image_save_path = os.path.join(
+                image_save_dir, f'observation_{iteration}_batch.png')
+            if not os.path.exists(image_save_dir):
+                os.makedirs(image_save_dir)
+            io.imsave(image_save_path,
+                      batch['observations']['pixels'][random_idx].copy())
+
         feed_dict = {
             placeholders_flat[key]: batch_flat[key]
             for key in placeholders_flat.keys()
             if key in batch_flat.keys()
         }
+        if self._goal_classifier:
+            if 'images' in batch.keys():
+                images = batch['images']
+                goal_sin = batch['observations'][:, -2].reshape((-1, 1))
+                goal_cos = batch['observations'][:, -1].reshape((-1, 1))
+                goals = np.arctan2(goal_sin, goal_cos)
+            else:
+                images = batch['observations'][:, :32*32*3].reshape((-1, 32, 32, 3))
+            feed_dict[self._placeholders['rewards']] = self._classify_as_goals(images, goals)
+        else:
+            feed_dict[self._placeholders['rewards']] = batch['rewards']
 
         if iteration is not None:
             feed_dict[self._placeholders['iteration']] = iteration
 
         return feed_dict
+
+    def _get_goal_resamp_batch(self, batch):
+        new_goal = self._base_env.sample_goal()
+        old_goal = self._base_env.get_goal()
+        batch_obs = batch['observations']
+        batch_act = batch['actions']
+        batch_next_obs = batch['next_observations']
+
+        new_batch_obs = self._base_env.relabel_obs_w_goal(batch_obs, new_goal)
+        new_batch_next_obs = self._base_env.relabel_obs_w_goal(batch_next_obs, new_goal)
+
+        if self._base_env.use_super_state_reward():
+            batch_super_obs = batch['super_observations']
+            new_batch_super_obs = super(self._base_env).relabel_obs_w_goal(batch_super_obs, new_goal)
+            new_batch_rew = np.expand_dims(self._base_env.compute_rewards(new_batch_super_obs, batch_act)[0], 1)
+        else:
+            new_batch_rew = np.expand_dims(self._base_env.compute_rewards(new_batch_obs, batch_act)[0], 1)
+
+        new_batch = {
+            'rewards': new_batch_rew,
+            'observations': new_batch_obs,
+            'actions': batch['actions'],
+            'next_observations': new_batch_next_obs,
+            'terminals': batch['terminals'],
+        }
+        # (TODO) Implement relabeling of terminal flags
+        return new_batch
+
+    def _init_diagnostics_ops(self):
+        self._diagnostics_ops = {
+            **{
+                f'{key}-{metric_name}': metric_fn(values)
+                for key, values in (
+                        ('Q_values', self._Q_values),
+                        ('Q_losses', self._Q_losses),
+                        ('policy_losses', self._policy_losses))
+                for metric_name, metric_fn in (
+                        ('mean', tf.reduce_mean),
+                        ('std', lambda x: tfp.stats.stddev(
+                            x, sample_axis=None)))
+            },
+            'alpha': self._alpha,
+            'global_step': self.global_step,
+        }
+
+        return self._diagnostics_ops
 
     def get_diagnostics(self,
                         iteration,
@@ -337,6 +475,15 @@ class SAC(RLAlgorithm):
                 for name in self._policy.observation_keys
             })).items()
         ]))
+
+        if self._goal_classifier:
+            diagnostics.update({'goal_classifier/avg_reward': np.mean(feed_dict[self._rewards_ph])})
+
+        if self._save_eval_paths:
+            import pickle
+            file_name = f'eval_paths_{iteration // self.epoch_length}.pkl'
+            with open(os.path.join(os.getcwd(), file_name)) as f:
+                pickle.dump(evaluation_paths, f)
 
         if self._plotter:
             self._plotter.draw()

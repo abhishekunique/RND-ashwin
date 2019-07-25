@@ -71,13 +71,11 @@ def plot_angle_distribution(angles, save_path):
     support_metric = [np.sum(bins >= i) / bins.shape[0] for i in thresholds]
     return support_metric, thresholds
 
-import ipdb; ipdb.set_trace()
+
 experiment_dir = sys.argv[1]
 xy_max = float(sys.argv[2])
 for experiment_root in sorted(glob.iglob(
-        os.path.join(experiment_dir, '*'))):
-    if not os.path.isdir(experiment_root):
-        continue
+        os.path.join(experiment_dir, 'id=*'))):
     print(experiment_root)
     experience_paths = [
         replay_pool_pickle_path(checkpoint_dir)

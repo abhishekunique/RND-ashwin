@@ -80,6 +80,9 @@ class RobosuiteAdapter(SoftlearningEnv):
                 (-1.0, 1.0),
                 "Ensure spaces are normalized.")
 
+        # if self.normalize:
+        #     from softlearning.environments.gym.wrappers import NormalizeActionWrapper
+        #     env = NormalizeActionWrapper(env)
         self._env = env
 
         observation_space = convert_robosuite_to_gym_obs_space(

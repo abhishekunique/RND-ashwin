@@ -1,8 +1,10 @@
+
 import os
 import copy
 import glob
 import pickle
 import sys
+
 
 import tensorflow as tf
 from ray import tune
@@ -17,6 +19,9 @@ from softlearning.value_functions.utils import get_Q_function_from_variant
 
 from softlearning.misc.utils import set_seed, initialize_tf_variables
 from examples.instrument import run_example_local
+
+from softlearning.replay_pools.prioritized_experience_replay_pool import PrioritizedExperienceReplayPool
+from softlearning.samplers.nn_sampler import NNSampler
 
 tf.compat.v1.disable_eager_execution()
 
@@ -58,6 +63,22 @@ class ExperimentRunner(tune.Trainable):
         policy = self.policy = get_policy_from_variant(
             variant, training_environment)
 
+        last_checkpoint_dir = variant['replay_pool_params']['last_checkpoint_dir']
+        if last_checkpoint_dir:
+            print('restoring')
+            self._restore_replay_pool(last_checkpoint_dir)
+
+        if isinstance(sampler, NNSampler):
+            print('restoring nn_pool')
+            nn_pool_dir = variant['sampler_params']['nn_pool_dir']
+            nn_pool = (get_replay_pool_from_variant(variant, training_environment))
+
+            replay_pool = self.replay_pool
+            self.replay_pool = nn_pool
+            self._restore_replay_pool(nn_pool_dir)
+            self.replay_pool = replay_pool
+            self.sampler.initialize_nn_pool(nn_pool)
+
         initial_exploration_policy = self.initial_exploration_policy = (
             get_policy_from_params(
                 variant['exploration_policy_params'], training_environment))
@@ -72,6 +93,10 @@ class ExperimentRunner(tune.Trainable):
             pool=replay_pool,
             sampler=sampler,
             session=self._session)
+
+        if isinstance(replay_pool, PrioritizedExperienceReplayPool) and \
+           replay_pool._mode == 'Bellman_Error':
+            replay_pool.initialize(self.algorithm)
 
         initialize_tf_variables(self._session, only_uninitialized=True)
 

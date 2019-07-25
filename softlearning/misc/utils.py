@@ -83,24 +83,12 @@ def _make_dir(filename):
         os.makedirs(folder)
 
 
-def save_video(video_frames, filename, fps=60): 
-    # assert fps == int(fps), fps
-    # import skvideo.io
-    # _make_dir(filename)
-    # skvideo.io.vwrite(filename, video_frames, inputdict={'-r': str(int(fps))})
-    import cv2
+def save_video(video_frames, filename, fps=60):
+    assert fps == int(fps), fps
+    import skvideo.io
     _make_dir(filename)
+    skvideo.io.vwrite(filename, video_frames, inputdict={'-r': str(int(fps))})
 
-    video_frames = np.flip(video_frames, axis=-1)
-
-    # Define the codec and create VideoWriter object
-    fourcc = cv2.VideoWriter_fourcc(*'MJPG')
-    fps = 30.0
-    (height, width, _) = video_frames[0].shape
-    writer = cv2.VideoWriter(filename, fourcc, fps, (width, height))
-    for video_frame in video_frames:
-        writer.write(video_frame)
-    writer.release()
 
 def deep_update(d, *us):
     d = d.copy()

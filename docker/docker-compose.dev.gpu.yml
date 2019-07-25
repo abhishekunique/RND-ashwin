@@ -8,8 +8,8 @@
 
 version: "2.4"
 services:
-  avi-softlearning-dev-gpu:
-    image: ${USER}-softlearning:${SOFTLEARNING_DEV_GPU_TAG}
+  softlearning-dev-gpu:
+    image: ${USER}-${IMAGE_NAME:-softlearning}:${IMAGE_TAG:-latest}-gpu
     container_name: ${USER}-softlearning-dev-gpu
     runtime: nvidia
     build:
@@ -31,6 +31,8 @@ services:
        - ~/.aws:/root/.aws  # If using aws, e.g. for s3
        - ~/.config/gcloud:/root/.config/gcloud  # If using gcp, e.g. for gs
        - ~/.mujoco/mjkey.txt:/root/.mujoco/mjkey.txt
+       - ~/github/vikashplus/sac_envs:/root/sac_envs
+       - ~/github/StanfordVL/robosuite:/root/robosuite
        - ..:/root/softlearning
        - ~/ray_results/softlearning-dev-gpu:/root/ray_results
        - ../../dsuite:/root/dsuite

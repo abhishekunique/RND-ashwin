@@ -58,6 +58,18 @@ def simulate_policy(args):
         variant['environment_params']['evaluation']
         if 'evaluation' in variant['environment_params']
         else variant['environment_params']['training'])
+    # if args.render_mode == 'human':
+    #     if 'has_renderer' in environment_params['kwargs'].keys():
+    #         environment_params['kwargs']['has_renderer'] = True
+
+    # variant['environment_params']['evaluation']['task'] = 'TurnFreeValve3ResetFree-v0'
+    # variant['environment_params']['evaluation']['kwargs']['reset_from_corners'] = True
+    #     'reward_keys': (
+    #         'object_to_target_position_distance_cost',
+    #         'object_to_target_orientation_distance_cost',
+    #     ),
+    #     'swap_goal_upon_completion': False,
+    # }
     evaluation_environment = get_environment_from_params(environment_params)
 
     policy = (
@@ -76,7 +88,8 @@ def simulate_policy(args):
     if args.render_kwargs.get('mode') == 'rgb_array':
         fps = 1 // getattr(evaluation_environment, 'dt', 1/30)
         for i, path in enumerate(paths):
-            video_save_dir = os.path.expanduser('/tmp/simulate_policy/')
+            video_save_dir = args.checkpoint_path
+            # video_save_dir = os.path.expanduser('/tmp/simulate_policy/')
             video_save_path = os.path.join(video_save_dir, f'episode_{i}.mp4')
             save_video(path['images'], video_save_path, fps=fps)
 

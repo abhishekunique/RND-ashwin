@@ -6,6 +6,7 @@ implementing a mujoco env, you would implement it under gym.mujoco submodule.
 """
 
 import gym
+# from sac_envs.envs import dclaw
 
 
 CUSTOM_GYM_ENVIRONMENTS_PATH = __package__
@@ -80,6 +81,10 @@ MULTIWORLD_ENVIRONMENT_SPECS = (
         'id': 'Point2DEnv-Wall-v0',
         'entry_point': 'multiworld.envs.pygame.point2d:Point2DWallEnv'
     },
+    {
+        'id': 'Sawyer-PusherXY-v0',
+        'entry_point': 'multiworld.envs.mujoco.sawyer_xyz.sawyer_push_and_reach_env:SawyerPushAndReachXYEnv'
+    }
 )
 
 MUJOCO_ENVIRONMENTS = tuple(
@@ -140,10 +145,14 @@ def register_multiworld_environments():
 
 
 def register_environments():
+    # from sac_envs.envs.dclaw import (
+    #     register_environments as register_dclaw_environments)
+
     registered_mujoco_environments = register_mujoco_environments()
     registered_general_environments = register_general_environments()
     registered_multiworld_environments = register_multiworld_environments()
-
+    # register_dclaw_environments()
+    import dsuite
     return (
         *registered_mujoco_environments,
         *registered_general_environments,

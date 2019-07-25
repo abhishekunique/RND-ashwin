@@ -9,7 +9,9 @@ from . import (
     base_sampler,
     simple_sampler,
     active_sampler,
-    goal_sampler)
+    goal_sampler,
+    pool_sampler,
+    nn_sampler)
 
 
 def get_sampler_from_variant(variant, *args, **kwargs):
@@ -20,6 +22,8 @@ def get_sampler_from_variant(variant, *args, **kwargs):
         'SimpleSampler': simple_sampler.SimpleSampler,
         'ActiveSampler': active_sampler.ActiveSampler,
         'GoalSampler': goal_sampler.GoalSampler,
+        'PoolSampler': pool_sampler.PoolSampler,
+        'NNSampler': nn_sampler.NNSampler,
     }
 
     sampler_params = variant['sampler_params']
@@ -36,8 +40,8 @@ def get_sampler_from_variant(variant, *args, **kwargs):
 
 DEFAULT_PIXEL_RENDER_KWARGS = {
     'mode': 'rgb_array',
-    'width': 100,
-    'height': 100,
+    'width': 256,
+    'height': 256,
 }
 
 DEFAULT_HUMAN_RENDER_KWARGS = {

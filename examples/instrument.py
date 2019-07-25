@@ -73,7 +73,7 @@ def add_command_line_args_to_variant_spec(variant_spec, command_line_args):
 def generate_experiment_kwargs(variant_spec, command_line_args):
     # TODO(hartikainen): Allow local dir to be modified through cli args
     local_dir = os.path.join(
-        '/nfs/kun1/users/justinvyu/ray_results',
+        '/mnt/sda/ray_results',
         command_line_args.universe,
         command_line_args.domain,
         command_line_args.task)
@@ -94,7 +94,7 @@ def generate_experiment_kwargs(variant_spec, command_line_args):
         assert 'algorithm_params' in variant_spec
         variant_spec['algorithm_params']['kwargs']['video_save_frequency'] = (
             command_line_args.video_save_frequency)
-    
+
     if command_line_args.n_training_videos_to_save is not None:
         variant_spec['algorithm_params']['kwargs']['n_training_videos_to_save'] = (
             command_line_args.n_training_videos_to_save)
@@ -220,20 +220,21 @@ def run_example_local(example_module_name, example_argv, local_mode=False):
     trainable_class = example_module.get_trainable_class(example_args)
 
     experiment_kwargs = generate_experiment_kwargs(variant_spec, example_args)
-
+    from datetime import datetime
+    datetime_string = datetime.now().isoformat()
     ray.init(
         num_cpus=example_args.cpus,
         num_gpus=example_args.gpus,
         resources=example_args.resources or {},
         local_mode=local_mode,
         include_webui=example_args.include_webui,
-        temp_dir=example_args.temp_dir)
+        temp_dir=os.path.join('/tmp/ray-henry', datetime_string))
 
     tune.run(
         trainable_class,
         **experiment_kwargs,
-        with_server=example_args.with_server,
-        # server_port=example_args.server_port,
+#        with_server=example_args.with_server,
+        server_port=example_args.server_port,
         scheduler=None,
         reuse_actors=True)
 

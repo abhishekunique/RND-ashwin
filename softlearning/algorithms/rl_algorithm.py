@@ -34,7 +34,7 @@ class RLAlgorithm(Checkpointable):
             n_epochs=1000,
             train_every_n_steps=1,
             n_train_repeat=1,
-            max_train_repeat_per_timestep=5,
+            max_train_repeat_per_timestep=5, # number of gradient steps per env step
             n_initial_exploration_steps=0,
             initial_exploration_policy=None,
             epoch_length=1000,
@@ -42,7 +42,7 @@ class RLAlgorithm(Checkpointable):
             eval_deterministic=True,
             eval_render_kwargs=None,
             video_save_frequency=0,
-            path_save_frequency=0,
+            save_training_video_frequency=0,
             session=None,
             training_video_save_frequency=0,
             n_training_videos_to_save=None,
@@ -61,7 +61,9 @@ class RLAlgorithm(Checkpointable):
             eval_render_kwargs (`None`, `dict`): Arguments to be passed for
                 rendering evaluation rollouts. `None` to disable rendering.
         """
+        self._save_training_video_frequency = save_training_video_frequency
         self.sampler = sampler
+        self.sampler.set_save_training_video_frequency(save_training_video_frequency)
 
         self._n_epochs = n_epochs
         self._n_train_repeat = n_train_repeat
@@ -90,6 +92,10 @@ class RLAlgorithm(Checkpointable):
                 "RlAlgorithm cannot render and save videos at the same time")
             self._eval_render_kwargs['mode'] = render_mode
 
+        # gpu_options = tf.GPUOptions(allow_growth=True)
+        # gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.2)
+        # session = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options))
+        # tf.keras.backend.set_session(session)
         self._session = session or tf.keras.backend.get_session()
 
         self._epoch = 0
@@ -250,7 +256,6 @@ class RLAlgorithm(Checkpointable):
         for self._epoch in gt.timed_for(range(self._epoch, self._n_epochs)):
             self._epoch_before_hook()
             gt.stamp('epoch_before_hook')
-
             start_samples = self.sampler._total_samples
             for i in count():
                 samples_now = self.sampler._total_samples
@@ -265,7 +270,6 @@ class RLAlgorithm(Checkpointable):
 
                 self._do_sampling(timestep=self._total_timestep)
                 gt.stamp('sample')
-
                 if self.ready_to_train:
                     self._do_training_repeats(timestep=self._total_timestep)
                 gt.stamp('train')
@@ -274,7 +278,7 @@ class RLAlgorithm(Checkpointable):
                 gt.stamp('timestep_after_hook')
 
             training_paths = self._training_paths()
-            # training_paths = self.sampler.get_last_n_paths(
+            # self.sampler.get_last_n_paths(
             #     math.ceil(self._epoch_length / self.sampler._max_path_length))
             gt.stamp('training_paths')
             evaluation_paths = self._evaluation_paths(
@@ -355,61 +359,50 @@ class RLAlgorithm(Checkpointable):
 
         self._training_after_hook()
 
+        del evaluation_paths
+
         yield {'done': True, **diagnostics}
 
     def _training_paths(self):
-        if self._n_training_videos_to_save is not None: 
-            paths = self.sampler.get_last_n_paths(n=self._n_training_videos_to_save)
-        #         math.ceil(self._epoch_length / self.sampler._max_path_length))
-        else:
-            paths = self.sampler.get_last_n_paths()
-        
-        if self._training_video_save_frequency > 0:
+        paths = self.sampler.get_last_n_paths(
+            math.ceil(self._epoch_length / self.sampler._max_path_length))
+
+        if self._save_training_video_frequency:
             fps = 1 // getattr(self._training_environment, 'dt', 1/30)
             for i, path in enumerate(reversed(paths)):
-                if i % self._training_video_save_frequency == 0:
-                    # Use pixel observations
-                    # video_frames = path['observations']['pixels']
-                    # Use images appended by SimpleSampler
+                if i % self._save_training_video_frequency == 0:
                     video_frames = path.pop('images')
-                    if video_frames.shape[-1] == 6: # concatenated image by channel
-                        # change so that it's concatenated side to side
-                        img_obs, goal_obs = video_frames[:, :, :, :3], video_frames[:, :, :, 3:]
-                        video_frames = np.concatenate([img_obs, goal_obs], axis=1)
-                    if video_frames.dtype != np.uint8:
-                        video_frames = ((video_frames + 1) * 255. / 2.).astype(np.uint8)
-                    video_file_name = f'training_path_{self._epoch}_{i}.avi'
+                    video_file_name = f'training_path_{self._epoch}_{i}.mp4'
                     video_file_path = os.path.join(
                         os.getcwd(), 'videos', video_file_name)
                     save_video(video_frames, video_file_path, fps=fps)
 
         return paths
 
-
     def _evaluation_paths(self, policy, evaluation_env):
         if self._eval_n_episodes < 1: return ()
+
+        should_save_video = (
+            self._video_save_frequency > 0
+            and self._epoch % self._video_save_frequency == 0)
+
         with policy.set_deterministic(self._eval_deterministic):
             paths = rollouts(
                 self._eval_n_episodes,
                 evaluation_env,
                 policy,
                 self.sampler._max_path_length,
-                render_kwargs=self._eval_render_kwargs)
-
-        should_save_video = (
-            self._video_save_frequency > 0
-            and (self._epoch == 0
-                 or (self._epoch + 1) % self._video_save_frequency == 0))
+                render_kwargs=(self._eval_render_kwargs if should_save_video
+                               else {}))
 
         if should_save_video:
             fps = 1 // getattr(self._training_environment, 'dt', 1/30)
             for i, path in enumerate(paths):
                 video_frames = path.pop('images')
-                video_file_name = f'evaluation_path_{self._epoch}_{i}.avi'
+                video_file_name = f'evaluation_path_{self._epoch}_{i}.mp4'
                 video_file_path = os.path.join(
                     os.getcwd(), 'videos', video_file_name)
                 save_video(video_frames, video_file_path, fps=fps)
-
         return paths
 
     def _evaluate_rollouts(self, episodes, env):

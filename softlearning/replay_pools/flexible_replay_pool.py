@@ -112,6 +112,16 @@ class FlexibleReplayPool(ReplayPool):
         for field_name, values in samples.items():
             default_value = self.fields_flat[field_name].default_value
             values = samples.get(field_name, default_value)
+            if field_name == "super_observations":
+                values = np.array([
+                    info['super_observation']
+                    for info in samples['infos']
+                    ])
+            if field_name == "images":
+                values = np.array([
+                    info['image']
+                    for info in samples['infos']
+                    ])
             assert values.shape[0] == num_samples
             self.data[field_name][index] = values
 
