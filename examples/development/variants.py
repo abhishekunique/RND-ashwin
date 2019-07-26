@@ -120,7 +120,7 @@ MAX_PATH_LENGTH_PER_UNIVERSE_DOMAIN_TASK = {
             'TurnFreeValve3Fixed-v0': tune.grid_search([50]),
             'TurnFreeValve3RandomReset-v0': 50,
             'TurnFreeValve3ResetFree-v0': tune.grid_search([50]),
-            'TurnFreeValve3ResetFreeSwapGoal-v0': tune.grid_search([100]),
+            'TurnFreeValve3ResetFreeSwapGoal-v0': tune.grid_search([50]),
             'TurnFreeValve3ResetFreeRandomGoal-v0': tune.grid_search([100]),
             'TurnFreeValve3FixedResetSwapGoal-v0': 50,
             'TurnRandomResetSingleGoal-v0': 100,
@@ -131,6 +131,10 @@ MAX_PATH_LENGTH_PER_UNIVERSE_DOMAIN_TASK = {
 
             # Lifting Tasks
             'LiftDDFixed-v0': tune.grid_search([50]),
+
+            # Flipping Tasks
+            'FlipEraserFixed-v0': tune.grid_search([50]),
+            'FlipEraserResetFree-v0': tune.grid_search([50]),
         },
     },
 }
@@ -188,7 +192,7 @@ NUM_EPOCHS_PER_UNIVERSE_DOMAIN_TASK = {
             DEFAULT_KEY: 100,
         },
         'DClaw': {
-            DEFAULT_KEY: int(1e3),
+            DEFAULT_KEY: int(1.5e3),
         },
     },
     'dm_control': {
@@ -475,12 +479,11 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK = {
                 'reset_fingers': True,
             },
             'TurnFreeValve3ResetFreeSwapGoal-v0': {
-                'reward_keys': (
-                    'object_to_target_position_distance_cost',
-                    'object_to_target_orientation_distance_cost',
-                ),
+                'reward_keys_and_weights': {
+                    'object_to_target_position_distance_reward': 2,
+                    'object_to_target_orientation_distance_reward': 1,
+                },
                 'reset_fingers': True,
-                'position_reward_weight': tune.sample_from([2, 5, 10]),
             },
             'TurnFreeValve3ResetFreeCurriculum-v0': {
                 'reward_keys': (
@@ -525,15 +528,27 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK = {
             'ScrewRandomDynamics-v0': {},
             # Lifting Tasks
             'LiftDDFixed-v0': {
-                'reward_keys': (
-                    'object_to_target_z_position_distance_cost',
-                    'object_to_target_orientation_distance_cost',
-                ),
-                'init_angle_range': (0, 0),
-                'target_angle_range': (-np.pi, np.pi),
-                'init_x_pos_range': (0, 0),
-                'init_y_pos_range': (0, 0),
-                'position_reward_weight': tune.sample_from([5]),
+                'reward_keys_and_weights': {
+                    'object_to_target_z_position_distance_reward': 10,
+                    'object_to_target_xy_position_distance_reward': 1,
+                    'object_to_target_orientation_distance_reward': 5,
+                },
+                'init_qpos_range': [(0, 0, 0, 0, 0, 0)],
+                'target_qpos_range': [(0, 0, 0.05, 0, 0, np.pi)],
+            },
+            'FlipEraserFixed-v0': {
+                'reward_keys_and_weights': {
+                    'object_to_target_position_distance_reward': 1,
+                    'object_to_target_orientation_distance_reward': 20,
+                },
+                'init_qpos_range': [(0, 0, 0, 0, 0, 0)],
+                'target_qpos_range': [(0, 0, 0, np.pi, 0, 0)],
+            },
+            'FlipEraserResetFree-v0': {
+                'reward_keys_and_weights': {
+                    'object_to_target_position_distance_reward': 1,
+                    'object_to_target_orientation_distance_reward': 20,
+                },
             },
 
         },
@@ -725,23 +740,23 @@ def evaluation_environment_params(spec):
                                    ['training'])
     eval_environment_params = training_environment_params.copy()
     if training_environment_params['task'] == 'TurnFreeValve3ResetFree-v0':
-        # eval_environment_params['task'] = 'TurnFreeValve3Fixed-v0'
-        # eval_environment_params['kwargs'] = {
-        #     'reward_keys': (
-        #         'object_to_target_position_distance_cost',
-        #         'object_to_target_orientation_distance_cost',
-        #     ),
-        #     # 'initial_distribution_path': '/mnt/sda/ray_results/gym/DClaw/TurnFreeValve3ResetFree-v0/2019-06-30T18-53-06-baseline_both_push_and_turn_log_rew/id=38872574-seed=6880_2019-06-30_18-53-07whkq1aax/',
-        #     # 'reset_from_corners': False,
-        # }
-        pass
-    elif training_environment_params['task'] == 'TurnFreeValve3ResetFreeSwapGoal-v0':
-        eval_environment_params['task'] = 'TurnFreeValve3ResetFreeSwapGoalEval-v0' #'TurnFreeValve3RandomReset-v0'
+        eval_environment_params['task'] = 'TurnFreeValve3Fixed-v0'
         eval_environment_params['kwargs'] = {
             'reward_keys': (
                 'object_to_target_position_distance_cost',
                 'object_to_target_orientation_distance_cost',
             ),
+            # 'initial_distribution_path': '/mnt/sda/ray_results/gym/DClaw/TurnFreeValve3ResetFree-v0/2019-06-30T18-53-06-baseline_both_push_and_turn_log_rew/id=38872574-seed=6880_2019-06-30_18-53-07whkq1aax/',
+            # 'reset_from_corners': False,
+        }
+        pass
+    elif training_environment_params['task'] == 'TurnFreeValve3ResetFreeSwapGoal-v0':
+        eval_environment_params['task'] = 'TurnFreeValve3ResetFreeSwapGoalEval-v0' #'TurnFreeValve3RandomReset-v0'
+        eval_environment_params['kwargs'] = {
+            'reward_keys_and_weights': {
+                'object_to_target_position_distance_reward': 2,
+                'object_to_target_orientation_distance_reward': 1,
+            },
             # 'initial_distribution_path': '/mnt/sda/ray_results/gym/DClaw/TurnFreeValve3ResetFree-v0/2019-06-30T18-53-06-baseline_both_push_and_turn_log_rew/id=38872574-seed=6880_2019-06-30_18-53-07whkq1aax/',
             # 'reset_from_corners': False,
         }
@@ -859,10 +874,10 @@ def get_variant_spec_base(universe, domain, task, policy, algorithm):
         #     'object_to_target_relative_position',
         # )
     if task == 'TurnFreeValve3ResetFreeSwapGoal-v0':
-        # pass
-        # variant_spec['replay_pool_params']['type'] = 'MultiGoalReplayPool'
-        variant_spec['replay_pool_params']['kwargs']['mode'] = 'Bellman_Error'
-        variant_spec['replay_pool_params']['kwargs']['per_alpha'] = tune.grid_search([0.25, 0.5, 0.75])
+        pass
+        # variant_spec['replay_pool_params']['type'] = 'PrioritizedExperienceReplayPool'
+        # variant_spec['replay_pool_params']['kwargs']['mode'] = 'Bellman_Error'
+        # variant_spec['replay_pool_params']['kwargs']['per_alpha'] = tune.grid_search([0.25, 0.5, 0.75])
         # DEFAULT_OBSERVATION_KEYS = (
         #     'claw_qpos',
         #     'object_position',
