@@ -1,3 +1,5 @@
+import ipdb; ipdb.set_trace()
+
 import numpy as np
 import os
 from softlearning.replay_pools import SimpleReplayPool
@@ -75,7 +77,9 @@ def plot_angle_distribution(angles, save_path):
 experiment_dir = sys.argv[1]
 xy_max = float(sys.argv[2])
 for experiment_root in sorted(glob.iglob(
-        os.path.join(experiment_dir, 'id=*'))):
+        os.path.join(experiment_dir, '*'))):
+    if not os.path.isdir(experiment_root):
+        continue
     print(experiment_root)
     experience_paths = [
         replay_pool_pickle_path(checkpoint_dir)
@@ -105,7 +109,6 @@ for experiment_root in sorted(glob.iglob(
         with gzip.open(experience_path, 'rb') as f:
             pool = pickle.load(f)
             pools.append(pool)
-            from pprint import pprint; import ipdb; ipdb.set_trace(context=30)
 
             obs = pool['observations']
             screw_positions = obs['object_position'][:, :2]

@@ -9,7 +9,7 @@ import imageio
 import pickle
 
 cur_dir = os.path.dirname(os.path.realpath(__file__))
-directory = cur_dir + "/free_screw_180_regular_box_state"
+directory = cur_dir + "/free_screw_180_higher_walls"
 if not os.path.exists(directory):
     os.makedirs(directory)
 
@@ -18,19 +18,27 @@ def main():
     NUM_TOTAL_EXAMPLES, ROLLOUT_LENGTH, STEPS_PER_SAMPLE = 200, 25, 4
     goal_angle = np.pi
     observations = []
-    images = False
-    image_shape = (48, 48, 3)
+    images = True
+    image_shape = (32, 32, 3)
 
     env_kwargs = {
-        # 'pixel_wrapper_kwargs': {
-        #     'pixels_only': False,
-        #     'normalize': False,
-        #     'render_kwargs': {
-        #         'width': image_shape[0],
-        #         'height': image_shape[1],
-        #         'camera_id': -1,
-        #     },
-        # },
+        'pixel_wrapper_kwargs': {
+            'pixels_only': False,
+            'normalize': False,
+            'render_kwargs': {
+                'width': image_shape[0],
+                'height': image_shape[1],
+                'camera_id': -1,
+            },
+        },
+        # New params: higher walls
+        'camera_settings': {
+            'azimuth': 0.,
+            'distance': 0.32,
+            'elevation': -55.88,
+            'lookat': np.array([0.00046945, -0.00049496, 0.05389398]),
+        },
+        # OLD GOAL COLLECTION CAMERA PARAMS
         # 'camera_settings': {
         #     'azimuth': 0.,
         #     'distance': 0.35,
@@ -39,7 +47,7 @@ def main():
         # },
         'init_angle_range': (goal_angle - 0.05, goal_angle + 0.05),
         'target_angle_range': (goal_angle, goal_angle),
-        # 'observation_keys': ('pixels', 'claw_qpos', 'last_action'), 
+        'observation_keys': ('pixels', 'claw_qpos', 'last_action'), 
     }
     env = GymAdapter(
         domain='DClaw',
@@ -74,8 +82,6 @@ def main():
                 print(observation)
                 if images:
                     img_obs = observation['pixels']
-                    # image = img_obs[:np.prod(image_shape)].reshape(image_shape)
-                    # print_image = (image + 1.) * 255. / 2.
                     imageio.imwrite(directory + '/img%i.jpg' % num_positives, img_obs)
                 num_positives += 1
             t += 1
