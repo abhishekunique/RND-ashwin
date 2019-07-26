@@ -1,6 +1,3 @@
-import tensorflow as tf
-from tensorflow.python.keras.engine import training_utils
-
 from softlearning.models.feedforward import feedforward_model
 from softlearning.models.utils import flatten_input_structure, create_inputs
 from softlearning.utils.keras import PicklableModel

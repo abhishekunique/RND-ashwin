@@ -20,7 +20,7 @@ class SimpleSampler(BaseSampler):
         self._n_episodes = 0
         self._current_observation = None
         self._total_samples = 0
-        self._save_training_video_frequency = False
+        self._save_training_video_frequency = 0
         self._images = []
 
     @property
@@ -60,6 +60,7 @@ class SimpleSampler(BaseSampler):
 
         action = self.policy.actions_np(self._policy_input)[0]
         next_observation, reward, terminal, info = self.env.step(action)
+
         self._path_length += 1
         self._path_return += reward
         self._total_samples += 1
@@ -81,7 +82,6 @@ class SimpleSampler(BaseSampler):
                 field_name: np.array(values)
                 for field_name, values in self._current_path.items()
             })
-
             self.pool.add_path({
                 key: value
                 for key, value in last_path.items()

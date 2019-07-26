@@ -12,6 +12,8 @@ from softlearning.environments.gym import register_environments
 from softlearning.environments.gym.wrappers import (
     NormalizeActionWrapper, PixelObservationWrapper)
 
+import tensorflow as tf
+from softlearning.utils.keras import PicklableKerasModel
 
 def parse_domain_task(gym_id):
     domain_task_parts = gym_id.split('-')

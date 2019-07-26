@@ -1,8 +1,24 @@
-# Softlearning
+# reward-learning-rl
 
-Softlearning is a deep reinforcement learning toolbox for training maximum entropy policies in continuous domains. The implementation is fairly thin and primarily optimized for our own development purposes. It utilizes the tf.keras modules for most of the model classes (e.g. policies and value functions). We use Ray for the experiment orchestration. Ray Tune and Autoscaler implement several neat features that enable us to seamlessly run the same experiment scripts that we use for local prototyping to launch large-scale experiments on any chosen cloud service (e.g. GCP or AWS), and intelligently parallelize and distribute training for effective resource allocation.
+This repository is the official implementation of the following paper:
 
-This implementation uses Tensorflow. For a PyTorch implementation of soft actor-critic, take a look at [rlkit](https://github.com/vitchyr/rlkit).
+**End-to-End Robotic Reinforcement Learning without Reward Engineering** <br/>
+Avi Singh, Larry Yang, Kristian Hartikainen, Chelsea Finn, Sergey Levine <br/>
+[Robotics: Science and Systems](http://www.roboticsconference.org/) 2019 <br/>
+[Website](https://sites.google.com/view/reward-learning-rl/) | [Video](https://www.youtube.com/watch?v=9pWJzb4G-CA) | [Arxiv](https://arxiv.org/abs/1904.07854)
+
+| Visual Draping             |  Visual Pushing | Visual Bookshelf |
+:-------------------------:|:-------------------------:|:-------------------------:
+![](https://imgur.com/CbwNUZv.gif)  |  ![](https://imgur.com/NPQBnBW.gif) |  ![](https://imgur.com/bl6Qszu.gif) <br/> ![](https://imgur.com/MpNlZxK.gif)
+
+
+| Visual Door Opening      |   Visual Pusher | Visual Picker |
+:-------------------------:|:-------------------------:|:-------------------------:
+![](https://imgur.com/zPI1zAa.gif) | ![](https://imgur.com/pns0uwY.gif) | ![](https://imgur.com/UYbpTLt.gif) |
+
+We propose a method for end-to-end learning of robotic skills in the real world using deep reinforcement learning. We learn these policies directly on pixel observations, and we do so without any hand-engineered or task-specific reward functions, and instead learn the rewards for such tasks from a small number of user-provided goal examples (around 80), followed by a modest number of active queries (around 25-75).
+
+This implementation is based on [softlearning](https://github.com/rail-berkeley/softlearning).
 
 # Getting Started
 
@@ -12,21 +28,21 @@ The environment can be run either locally using conda or inside a docker contain
 
 ## Conda Installation
 
-1. [Download](https://www.roboti.us/index.html) and install MuJoCo 1.50 and 2.00 from the MuJoCo website. We assume that the MuJoCo files are extracted to the default location (`~/.mujoco/mjpro150` and `~/.mujoco/mujoco200_{platform}`). Unfortunately, `gym` and `dm_control` expect different paths for MuJoCo 2.00 installation, which is why you will need to have it installed both in `~/.mujoco/mujoco200_{platform}` and `~/.mujoco/mujoco200`. The easiest way is to create a symlink from `~/.mujoco/mujoco200_{plaftorm}` -> `~/.mujoco/mujoco200` with: `ln -s ~/.mujoco/mujoco200_{platform} ~/.mujoco/mujoco200`.
+1. [Download](https://www.roboti.us/index.html) and install MuJoCo 1.50 from the MuJoCo website. We assume that the MuJoCo files are extracted to the default location (`~/.mujoco/mjpro150`).
 
 2. Copy your MuJoCo license key (mjkey.txt) to ~/.mujoco/mjkey.txt:
 
-3. Clone `softlearning`
+3. Clone `reward-learning-rl`
 ```
-git clone https://github.com/rail-berkeley/softlearning.git ${SOFTLEARNING_PATH}
+git clone https://github.com/avisingh599/reward-learning-rl.git ${REWARD_LEARNING_PATH}
 ```
 
 4. Create and activate conda environment, install softlearning to enable command line interface.
 ```
-cd ${SOFTLEARNING_PATH}
+cd ${REWARD_LEARNING_PATH}
 conda env create -f environment.yml
 conda activate softlearning
-pip install -e ${SOFTLEARNING_PATH}
+pip install -e ${REWARD_LEARNING_PATH}
 ```
 
 The environment should be ready to run. See examples section for examples of how to train and simulate the agents.
@@ -68,124 +84,42 @@ docker-compose \
 ```
 
 ## Examples
-### Training and simulating an agent
-1. To train the agent
+### Training an agent
 ```
-softlearning run_example_local examples.development \
-    --universe=gym \
-    --domain=HalfCheetah \
-    --task=v3 \
-    --exp-name=my-sac-experiment-1 \
-    --checkpoint-frequency=1000  # Save the checkpoint to resume training later
+softlearning run_example_local examples.classifier_rl \
+--n_goal_examples 10 \
+--task=Image48SawyerDoorPullHookEnv-v0 \
+--algorithm VICERAQ \
+--num-samples 5 \
+--n_epochs 300 \
+--active_query_frequency 10
 ```
+The tasks used in the paper were `Image48SawyerPushForwardEnv-v0`, `Image48SawyerDoorPullHookEnv-v0` and `Image48SawyerPickAndPlace3DEnv-v0`.  For the algorithm, you can experiment with `VICERAQ`, `VICE`,  `RAQ`, `SACClassifier`, and `SAC`. The `--num-samples` flag specifies the number of random seeds launched. All results in the paper were averaged across five random seeds. The hyperparameters are stored in `examples/classifier_rl/variants.py`.
 
-2. To simulate the resulting policy:
-First, find the path that the checkpoint is saved to. By default (i.e. without specifying the `log-dir` argument to the previous script), the data is saved under `~/ray_results/<universe>/<domain>/<task>/<datatimestamp>-<exp-name>/<trial-id>/<checkpoint-id>`. For example: `~/ray_results/gym/HalfCheetah/v3/2018-12-12T16-48-37-my-sac-experiment-1-0/mujoco-runner_0_seed=7585_2018-12-12_16-48-37xuadh9vd/checkpoint_1000/`. The next command assumes that this path is found from `${SAC_CHECKPOINT_DIR}` environment variable.
+`examples.classifier_rl.main` contains several different environments. For more information about the agents and configurations, run the scripts with `--help` flag: `python ./examples/classifier_rl/main.py --help`.
 
-```
-python -m examples.development.simulate_policy \
-    ${SAC_CHECKPOINT_DIR} \
-    --max-path-length=1000 \
-    --num-rollouts=1 \
-    --render-mode=human
-```
+## Version history
 
-`examples.development.main` contains several different environments and there are more example scripts available in the  `/examples` folder. For more information about the agents and configurations, run the scripts with `--help` flag: `python ./examples/development/main.py --help`
+### v0.1
+- This version contains the code to reproduce the results in Singh et al, RSS 2019.
+
+## Citation
+If this codebase helps you in your academic research, you are encouraged to cite our paper. Here is an example bibtex:
 ```
-optional arguments:
-  -h, --help            show this help message and exit
-  --universe {gym}
-  --domain {...}
-  --task {...}
-  --num-samples NUM_SAMPLES
-  --resources RESOURCES
-                        Resources to allocate to ray process. Passed to
-                        `ray.init`.
-  --cpus CPUS           Cpus to allocate to ray process. Passed to `ray.init`.
-  --gpus GPUS           Gpus to allocate to ray process. Passed to `ray.init`.
-  --trial-resources TRIAL_RESOURCES
-                        Resources to allocate for each trial. Passed to
-                        `tune.run`.
-  --trial-cpus TRIAL_CPUS
-                        Resources to allocate for each trial. Passed to
-                        `tune.run`.
-  --trial-gpus TRIAL_GPUS
-                        Resources to allocate for each trial. Passed to
-                        `tune.run`.
-  --trial-extra-cpus TRIAL_EXTRA_CPUS
-                        Extra CPUs to reserve in case the trials need to
-                        launch additional Ray actors that use CPUs.
-  --trial-extra-gpus TRIAL_EXTRA_GPUS
-                        Extra GPUs to reserve in case the trials need to
-                        launch additional Ray actors that use GPUs.
-  --checkpoint-frequency CHECKPOINT_FREQUENCY
-                        Save the training checkpoint every this many epochs.
-                        If set, takes precedence over
-                        variant['run_params']['checkpoint_frequency'].
-  --checkpoint-at-end CHECKPOINT_AT_END
-                        Whether a checkpoint should be saved at the end of
-                        training. If set, takes precedence over
-                        variant['run_params']['checkpoint_at_end'].
-  --restore RESTORE     Path to checkpoint. Only makes sense to set if running
-                        1 trial. Defaults to None.
-  --policy {gaussian}
-  --env ENV
-  --exp-name EXP_NAME
-  --log-dir LOG_DIR
-  --upload-dir UPLOAD_DIR
-                        Optional URI to sync training results to (e.g.
-                        s3://<bucket> or gs://<bucket>).
-  --confirm-remote [CONFIRM_REMOTE]
-                        Whether or not to query yes/no on remote run.
+@article{singh2019,
+  title={End-to-End Robotic Reinforcement Learning without Reward Engineering},
+  author={Avi Singh and Larry Yang and Kristian Hartikainen and Chelsea Finn and Sergey Levine},
+  journal={Robotics: Science and Systems},
+  year={2019}
+}
 ```
 
-### Resume training from a saved checkpoint
-In order to resume training from previous checkpoint, run the original example main-script, with an additional `--restore` flag. For example, the previous example can be resumed as follows:
-
+If you mainly use the VICE algorithm implemented here, you should also cite:
 ```
-softlearning run_example_local examples.development \
-    --universe=gym \
-    --domain=HalfCheetah \
-    --task=v3 \
-    --exp-name=my-sac-experiment-1 \
-    --checkpoint-frequency=1000 \
-    --restore=${SAC_CHECKPOINT_PATH}
-```
-
-# References
-The algorithms are based on the following papers:
-
-*Soft Actor-Critic Algorithms and Applications*.</br>
-Tuomas Haarnoja*, Aurick Zhou*, Kristian Hartikainen*, George Tucker, Sehoon Ha, Jie Tan, Vikash Kumar, Henry Zhu, Abhishek Gupta, Pieter Abbeel, and Sergey Levine.
-arXiv preprint, 2018.</br>
-[paper](https://arxiv.org/abs/1812.05905)  |  [videos](https://sites.google.com/view/sac-and-applications)
-
-*Latent Space Policies for Hierarchical Reinforcement Learning*.</br>
-Tuomas Haarnoja*, Kristian Hartikainen*, Pieter Abbeel, and Sergey Levine.
-International Conference on Machine Learning (ICML), 2018.</br>
-[paper](https://arxiv.org/abs/1804.02808) | [videos](https://sites.google.com/view/latent-space-deep-rl)
-
-*Soft Actor-Critic: Off-Policy Maximum Entropy Deep Reinforcement Learning with a Stochastic Actor*.</br>
-Tuomas Haarnoja, Aurick Zhou, Pieter Abbeel, and Sergey Levine.
-International Conference on Machine Learning (ICML), 2018.</br>
-[paper](https://arxiv.org/abs/1801.01290) | [videos](https://sites.google.com/view/soft-actor-critic)
-
-*Composable Deep Reinforcement Learning for Robotic Manipulation*.</br>
-Tuomas Haarnoja, Vitchyr Pong, Aurick Zhou, Murtaza Dalal, Pieter Abbeel, Sergey Levine.
-International Conference on Robotics and Automation (ICRA), 2018.</br>
-[paper](https://arxiv.org/abs/1803.06773) | [videos](https://sites.google.com/view/composing-real-world-policies)
-
-*Reinforcement Learning with Deep Energy-Based Policies*.</br>
-Tuomas Haarnoja*, Haoran Tang*, Pieter Abbeel, Sergey Levine.
-International Conference on Machine Learning (ICML), 2017.</br>
-[paper](https://arxiv.org/abs/1702.08165) | [videos](https://sites.google.com/view/softqlearning/home)
-
-If Softlearning helps you in your academic research, you are encouraged to cite our paper. Here is an example bibtex:
-```
-@techreport{haarnoja2018sacapps,
-  title={Soft Actor-Critic Algorithms and Applications},
-  author={Tuomas Haarnoja and Aurick Zhou and Kristian Hartikainen and George Tucker and Sehoon Ha and Jie Tan and Vikash Kumar and Henry Zhu and Abhishek Gupta and Pieter Abbeel and Sergey Levine},
-  journal={arXiv preprint arXiv:1812.05905},
+@article{fu2018,
+  title={Variational Inverse Control with Events: A General Framework for Data-Driven Reward Definition},
+  author={Justin Fu and Avi Singh and Dibya Ghosh and Larry Yang and Sergey Levine},
+  journal={Neural Information Processing Systems},
   year={2018}
 }
 ```

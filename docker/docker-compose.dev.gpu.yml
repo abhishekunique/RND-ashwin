@@ -27,7 +27,7 @@ services:
       - "6006"  # Tensorboard
       - "5000"  # Viskit
       - "8888"  # Jupyter
-    volumes:
+    volumes: # host : container
        - ~/.aws:/root/.aws  # If using aws, e.g. for s3
        - ~/.config/gcloud:/root/.config/gcloud  # If using gcp, e.g. for gs
        - ~/.mujoco/mjkey.txt:/root/.mujoco/mjkey.txt
@@ -35,6 +35,7 @@ services:
        - ~/github/StanfordVL/robosuite:/root/robosuite
        - ..:/root/softlearning
        - ~/ray_results/softlearning-dev-gpu:/root/ray_results
+       - ../../dsuite:/root/dsuite
     command:
       - bash
     stdin_open: true

@@ -8,6 +8,7 @@ from . import (
     remote_sampler,
     base_sampler,
     simple_sampler,
+    active_sampler,
     goal_sampler,
     pool_sampler,
     nn_sampler)
@@ -19,6 +20,7 @@ def get_sampler_from_variant(variant, *args, **kwargs):
         'RemoteSampler': remote_sampler.RemoteSampler,
         'Sampler': base_sampler.BaseSampler,
         'SimpleSampler': simple_sampler.SimpleSampler,
+        'ActiveSampler': active_sampler.ActiveSampler,
         'GoalSampler': goal_sampler.GoalSampler,
         'PoolSampler': pool_sampler.PoolSampler,
         'NNSampler': nn_sampler.NNSampler,
@@ -80,7 +82,6 @@ def rollout(env,
 
     images = []
     infos = defaultdict(list)
-
     t = 0
     for t in range(path_length):
         observation, reward, terminal, info = sampler.sample()
@@ -91,8 +92,32 @@ def rollout(env,
             callback(observation)
 
         if render_kwargs:
-            image = env.render(**render_kwargs)
-            images.append(image)
+            if render_mode == 'rgb_array':
+                #note: this will only work for mujoco-py environments
+                if hasattr(env.unwrapped, 'imsize'):
+                    imsize = env.unwrapped.imsize
+                else:
+                    imsize = 200
+
+                imsize_flat = imsize*imsize*3
+                #for goal conditioned stuff
+                #if observation['observations'].shape[0] == 2*imsize_flat:
+                #    image1 = observation['observations'][:imsize_flat].reshape(48,48,3)
+                #    image2 = observation['observations'][imsize_flat:].reshape(48,48,3)
+                #    image1 = (image1*255.0).astype(np.uint8)
+                #    image2 = (image2*255.0).astype(np.uint8)
+                #    image = np.concatenate([image1, image2], axis=1)
+
+                if 'pixels' in observation.keys() and observation['pixels'].shape[-1] == 6:
+                    pixels = observation['pixels']
+                    image1 = pixels[:, :, :3]
+                    image2 = pixels[:, :, 3:]
+                    image = np.concatenate([image1, image2], axis=1)
+                else:
+                    image = env.render(**render_kwargs)
+                images.append(image)
+            else:
+                raise NotImplementedError()
 
         if terminal:
             policy.reset()

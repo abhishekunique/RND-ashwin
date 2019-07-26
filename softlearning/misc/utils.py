@@ -151,3 +151,35 @@ def unflatten(flattened, separator='.'):
         d[parts[-1]] = value
 
     return result
+
+
+def mixup(features, labels, alpha=0.2):
+    assert isinstance(features, dict), (type(features), features)
+    assert all(features[key].shape[0] == labels.shape[0]
+               for key in features.keys())
+
+    num_elements = labels.shape[0]
+    permutation_idx = np.random.permutation(num_elements)
+
+    shuffled_features = type(features)((
+        (key, features[key][permutation_idx]) for key in features.keys()
+    ))
+
+    shuffled_labels = labels[permutation_idx]
+
+    lambda_ = np.random.beta(alpha, alpha, size=(num_elements, 1))
+
+    def broadcast_multiply(lambda_, values):
+        reshaped_lambda_ = lambda_.reshape(
+            (lambda_.shape[0], *((1, ) * len(values.shape[1:]))))
+        result = reshaped_lambda_ * values
+        return result
+
+    features_convex = type(features)((
+        (key, (broadcast_multiply(lambda_, features[key])
+               + broadcast_multiply((1 - lambda_), shuffled_features[key])))
+        for key in features.keys()
+    ))
+    labels_convex = lambda_ * labels + (1 - lambda_) * shuffled_labels
+
+    return features_convex, labels_convex

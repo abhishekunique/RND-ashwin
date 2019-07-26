@@ -1,6 +1,49 @@
+from collections import OrderedDict
+from copy import deepcopy
+
 import tensorflow as tf
 
 from softlearning.utils.tensorflow import nest
+from softlearning.preprocessors.utils import get_preprocessor_from_params
+
+
+def get_reward_classifier_from_variant(variant, env, *args, **kwargs):
+    from .vice_models import create_feedforward_reward_classifier_function
+
+    reward_classifier_params = deepcopy(variant['reward_classifier_params'])
+    reward_classifier_type = deepcopy(reward_classifier_params['type'])
+    assert reward_classifier_type == 'feedforward_classifier', (
+        reward_classifier_type)
+    reward_classifier_kwargs = deepcopy(reward_classifier_params['kwargs'])
+
+    observation_preprocessors_params = reward_classifier_kwargs.pop(
+        'observation_preprocessors_params', {}).copy()
+    observation_keys = reward_classifier_kwargs.pop(
+        'observation_keys', None) or env.observation_keys
+
+    observation_shapes = OrderedDict((
+        (key, value) for key, value in env.observation_shape.items()
+        if key in observation_keys
+    ))
+
+    observation_preprocessors = OrderedDict()
+    for name, observation_shape in observation_shapes.items():
+        preprocessor_params = observation_preprocessors_params.get(name, None)
+        if not preprocessor_params:
+            observation_preprocessors[name] = None
+            continue
+        observation_preprocessors[name] = get_preprocessor_from_params(
+            env, preprocessor_params)
+
+    reward_classifier = create_feedforward_reward_classifier_function(
+        input_shapes=observation_shapes,
+        observation_keys=observation_keys,
+        *args,
+        preprocessors=observation_preprocessors,
+        **reward_classifier_kwargs,
+        **kwargs)
+
+    return reward_classifier
 
 
 def get_inputs_for_nested_shapes(input_shapes, name=None):

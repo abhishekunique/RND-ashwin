@@ -17,6 +17,7 @@ class PixelObservationWrapper(ObservationWrapper):
                  env,
                  pixels_only=True,
                  render_kwargs=None,
+                 normalize=False,
                  observation_key='pixels'):
         """Initializes a new pixel Wrapper.
 
@@ -51,6 +52,11 @@ class PixelObservationWrapper(ObservationWrapper):
 
         wrapped_observation_space = env.observation_space
 
+        self._env = env
+        self._pixels_only = pixels_only
+        self._render_kwargs = render_kwargs
+        self._observation_key = observation_key
+
         if isinstance(wrapped_observation_space, spaces.Box):
             self._observation_is_dict = False
             invalid_keys = set([STATE_KEY])
@@ -73,13 +79,15 @@ class PixelObservationWrapper(ObservationWrapper):
             self.observation_space = spaces.Dict()
             self.observation_space.spaces[STATE_KEY] = wrapped_observation_space
 
+        self._normalize = normalize
+
         # Extend observation space with pixels.
-        pixels = self.env.render(**render_kwargs)
+        pixels = self._get_pixels()
 
         if np.issubdtype(pixels.dtype, np.integer):
             low, high = (0, 255)
         elif np.issubdtype(pixels.dtype, np.float):
-            low, high = (-float('inf'), float('inf'))
+            low, high = (-float('inf'), float('inf')) # Fix for normalized between [-1, 1]
         else:
             raise TypeError(pixels.dtype)
 
@@ -87,14 +95,20 @@ class PixelObservationWrapper(ObservationWrapper):
             shape=pixels.shape, low=low, high=high, dtype=pixels.dtype)
         self.observation_space.spaces[observation_key] = pixels_space
 
-        self._env = env
-        self._pixels_only = pixels_only
-        self._render_kwargs = render_kwargs
-        self._observation_key = observation_key
-
     def observation(self, observation):
         pixel_observation = self._add_pixel_observation(observation)
         return pixel_observation
+
+    def _get_pixels(self):
+        try:
+            pixels = self.env.get_pixels(**self._render_kwargs)
+        except AttributeError:
+            pixels = self.env.render(**self._render_kwargs)
+
+        if self._normalize:
+            pixels = (2. / 255. * pixels) - 1.
+        return pixels
+
 
     def _add_pixel_observation(self, observation):
         if self._pixels_only:
@@ -105,7 +119,7 @@ class PixelObservationWrapper(ObservationWrapper):
             observation = collections.OrderedDict()
             observation[STATE_KEY] = observation
 
-        pixels = self.env.render(**self._render_kwargs)
+        pixels = self._get_pixels()
         observation[self._observation_key] = pixels
 
         return observation

@@ -160,6 +160,9 @@ RUN echo "${MJKEY}" > ~/.mujoco/mjkey.txt \
 RUN echo "conda activate softlearning" >> ~/.bashrc \
     && echo "cd ~/softlearning" >> ~/.bashrc
 
+#Hack for gpu rendering for mujoco_py
+RUN mkdir -p /usr/lib/nvidia-384
+ENV LD_LIBRARY_PATH ${LD_LIBRARY_PATH}:/usr/lib/nvidia-384
 
 # =========== Container Entrypoint =============
 COPY ./docker/entrypoint.sh /entrypoint.sh

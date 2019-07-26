@@ -44,6 +44,8 @@ class RLAlgorithm(Checkpointable):
             video_save_frequency=0,
             save_training_video_frequency=0,
             session=None,
+            training_video_save_frequency=0,
+            n_training_videos_to_save=None,
     ):
         """
         Args:
@@ -72,15 +74,21 @@ class RLAlgorithm(Checkpointable):
         self._n_initial_exploration_steps = n_initial_exploration_steps
         self._initial_exploration_policy = initial_exploration_policy
 
+        self._training_video_save_frequency = training_video_save_frequency
+        self._n_training_videos_to_save = n_training_videos_to_save
+        if self._training_video_save_frequency > 0:
+            self.sampler.set_save_training_videos_flag(True)
+
         self._eval_n_episodes = eval_n_episodes
         self._eval_deterministic = eval_deterministic
         self._video_save_frequency = video_save_frequency
+        self._path_save_frequency = path_save_frequency
 
         self._eval_render_kwargs = eval_render_kwargs or {}
 
         if self._video_save_frequency > 0:
             render_mode = self._eval_render_kwargs.pop('mode', 'rgb_array')
-            assert render_mode != 'human', (
+            assert render_mode == 'rgb_array', (
                 "RlAlgorithm cannot render and save videos at the same time")
             self._eval_render_kwargs['mode'] = render_mode
 
@@ -280,6 +288,22 @@ class RLAlgorithm(Checkpointable):
             training_metrics = self._evaluate_rollouts(
                 training_paths, training_environment)
             gt.stamp('training_metrics')
+
+            should_save_path = (
+                self._path_save_frequency > 0
+                and self._epoch % self._path_save_frequency == 0)
+            if should_save_path:
+                import pickle
+                for i, path in enumerate(training_paths):
+                    #path.pop('images')
+                    path_file_name = f'training_path_{self._epoch}_{i}.pkl'
+                    path_file_path = os.path.join(
+                        os.getcwd(), 'paths', path_file_name)
+                    if not os.path.exists(os.path.dirname(path_file_path)):
+                        os.makedirs(os.path.dirname(path_file_path))
+                    with open(path_file_path, 'wb' ) as f:
+                        pickle.dump(path, f)
+
             if evaluation_paths:
                 evaluation_metrics = self._evaluate_rollouts(
                     evaluation_paths, evaluation_environment)
@@ -379,7 +403,6 @@ class RLAlgorithm(Checkpointable):
                 video_file_path = os.path.join(
                     os.getcwd(), 'videos', video_file_name)
                 save_video(video_frames, video_file_path, fps=fps)
-                del video_frames
         return paths
 
     def _evaluate_rollouts(self, episodes, env):
