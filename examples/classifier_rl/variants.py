@@ -385,11 +385,17 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK = {
                 'goal_completion_position_threshold': 0.05,
                 'goal_completion_orientation_threshold': 0.15,
                 'camera_settings': {
-                    'azimuth': 30.,
-                    'distance': 0.35,
-                    'elevation': -38.18,
-                    'lookat': np.array([0.00047, -0.0005, 0.054])
+                    'azimuth': 45.,
+                    'distance': 0.32,
+                    'elevation': -55.88,
+                    'lookat': np.array([0.00097442, 0.00063182, 0.03435371])
                 },
+                # 'camera_settings': {
+                #     'azimuth': 30.,
+                #     'distance': 0.35,
+                #     'elevation': -38.18,
+                #     'lookat': np.array([0.00047, -0.0005, 0.054])
+                # },
                 'pixel_wrapper_kwargs': {
                     'pixels_only': False,
                     'normalize': False,
@@ -400,16 +406,22 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK = {
                     },
                 },
                 'swap_goals_upon_completion': False,
-                'observation_keys': ('pixels', 'claw_qpos', 'last_action', 'goal_index', 'object_position', 'object_orientation_sin', 'object_orientation_sin'),
+                'observation_keys': ('pixels', 'claw_qpos', 'last_action', 'goal_index', 'object_position', 'object_orientation_sin', 'object_orientation_cos'),
             },
             'TurnFreeValve3MultiGoal-v0': {
                 'goals': ((0, 0, 0, 0, 0, np.pi), (0, 0, 0, 0, 0, 0)),
                 'camera_settings': {
-                    'azimuth': 30.,
-                    'distance': 0.35,
-                    'elevation': -38.18,
-                    'lookat': np.array([0.00047, -0.0005, 0.054])
+                    'azimuth': 45.,
+                    'distance': 0.32,
+                    'elevation': -55.88,
+                    'lookat': np.array([0.00097442, 0.00063182, 0.03435371])
                 },
+                # 'camera_settings': {
+                #     'azimuth': 30.,
+                #     'distance': 0.35,
+                #     'elevation': -38.18,
+                #     'lookat': np.array([0.00047, -0.0005, 0.054])
+                # },
                 'pixel_wrapper_kwargs': {
                     'pixels_only': False,
                     'normalize': False,
@@ -694,7 +706,7 @@ def get_variant_spec(args):
                     ['observation_preprocessors_params']
                 )))
             # TODO: Make this work in general (move into the above if statement)
-            # variant_spec['reward_classifier_params']['kwargs']['observation_keys'] = ('pixels', 'claw_qpos', 'last_action', 'goal_index')
+            variant_spec['reward_classifier_params']['kwargs']['observation_keys'] = ('pixels', 'claw_qpos', 'last_action', 'goal_index')
 
     if args.checkpoint_replay_pool is not None:
         variant_spec['run_params']['checkpoint_replay_pool'] = (

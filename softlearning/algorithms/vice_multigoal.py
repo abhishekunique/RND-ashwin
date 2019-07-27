@@ -32,7 +32,7 @@ class VICEGANTwoGoal(SAC):
             classifier_lr=1e-4,
             classifier_batch_size=128,
             reward_type = 'logits',
-            n_classifier_train_steps=int(1e4),
+            n_classifier_train_steps=5,
             classifier_optim_name='adam',
             mixup_alpha=0.2,
             **kwargs,
