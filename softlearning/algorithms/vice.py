@@ -53,14 +53,18 @@ class VICE(SACClassifier):
             name: self._placeholders['observations'][name]
             for name in self._policy.observation_keys
         })
-        curr_actions = self._policy.actions(curr_policy_inputs)
-        curr_log_pis = self._policy.log_pis(curr_policy_inputs, curr_actions)
 
-        self._classifier_output_t = observation_log_p
-        self._reward_t = observation_log_p - curr_log_pis
+        # Calculate log probability of the actions taken
+        # curr_actions = self._placeholders['actions']
+        # curr_log_pis = self._policy.log_pis(curr_policy_inputs, curr_actions)
+ 
+        # self._classifier_log_p_t = observation_log_p
+        # self._log_pi_t = curr_log_pis
+        self._reward_t = observation_log_p 
+        # self._reward_t = observation_log_p - curr_log_pis
 
-        log_pi_log_p_concat = tf.concat([curr_log_pis, observation_log_p], axis=1)
-        self._discriminator_output_t = tf.compat.v1.math.softmax(log_pi_log_p_concat)
+        # log_pi_log_p_concat = tf.concat([curr_log_pis, observation_log_p], axis=1)
+        # self._discriminator_output_t = tf.compat.v1.math.softmax(log_pi_log_p_concat)
 
         terminals = tf.cast(self._placeholders['terminals'], next_values.dtype)
 
@@ -156,13 +160,24 @@ class VICE(SACClassifier):
             iteration, batch, training_paths, evaluation_paths)
 
         sample_observations = batch['observations']
+        sample_actions = batch['actions']
+        num_sample_observations = sample_observations[
+            next(iter(sample_observations))].shape[0]
+        sample_labels = np.repeat(((1, 0), ), num_sample_observations, axis=0)
+
         goal_index = np.random.randint(
             self._goal_examples[next(iter(self._goal_examples))].shape[0],
             size=sample_observations[next(iter(sample_observations))].shape[0])
         goal_observations = {
             key: values[goal_index] for key, values in self._goal_examples.items()
         }
-
+        # Sample goal actions uniformly in action space
+        # action_space_dim = sample_actions.shape[1]
+        # goal_actions = np.random.uniform(
+        #     low=-1, high=1, size=(num_sample_observations, action_space_dim)) 
+        # goal_validation_actions = np.random.uniform(
+        #     low=-1, high=1, size=(num_sample_observations, action_space_dim)) 
+      
         goal_index_validation = np.random.randint(
             self._goal_examples_validation[
                 next(iter(self._goal_examples_validation))].shape[0],
@@ -171,11 +186,7 @@ class VICE(SACClassifier):
             key: values[goal_index_validation]
             for key, values in self._goal_examples_validation.items()
         }
-
-        num_sample_observations = sample_observations[
-            next(iter(sample_observations))].shape[0]
-        sample_labels = np.repeat(((1, 0), ), num_sample_observations, axis=0)
-
+ 
         num_goal_observations = goal_observations[
             next(iter(goal_observations))].shape[0]
         goal_labels = np.repeat(((0, 1), ), num_goal_observations, axis=0)
@@ -185,30 +196,68 @@ class VICE(SACClassifier):
         goal_validation_labels = np.repeat(
             ((0, 1), ), num_goal_observations_validation, axis=0)
 
-        # reward_observations, classifier_outputs, classifier_losses = self._session.run(
-        #     (self._reward_t, self._classifier_output_t, self._classifier_loss_t),
+        # observations = {
+        #     key: np.concatenate((
+        #         sample_observations[key],
+        #         goal_observations[key],
+        #         goal_observations_validation[key]
+        #     ), axis=0)
+        #     for key in sample_observations.keys()
+        # }
+        # labels = np.concatenate((
+        #     sample_labels, goal_labels, goal_validation_labels,
+        # ), axis=0)
+        # actions = np.concatenate((
+        #     sample_actions, goal_actions, goal_validation_actions), axis=0)
+
+        # (reward_observations,
+        #  classifier_output,
+        #  log_pi,
+        #  discriminator_output,
+        #  classifier_loss) = self._session.run(
+        #     (self._reward_t, 
+        #      self._classifier_log_p_t,
+        #      self._log_pi_t,
+        #      self._discriminator_output_t,
+        #      self._classifier_loss_t),
         #     feed_dict={
         #         **{
         #             self._placeholders['observations'][key]: values
         #             for key, values in sample_observations.items()
         #         },
-        #         self._placeholders['labels']: sample_labels
+        #         self._placeholders['labels']: sample_labels,
+        #         self._placeholders['actions']: sample_actions,
         #     }
         # )
 
-        reward_negative_observations, classifier_output_negative, discriminator_output_negative, negative_classifier_loss = self._session.run(
-            (self._reward_t, self._classifier_output_t, self._discriminator_output_t, self._classifier_loss_t),
+        (reward_negative_observations,
+         # classifier_output_negative,
+         # log_pi_negative,
+         # discriminator_output_negative,
+         negative_classifier_loss) = self._session.run(
+            (self._reward_t, 
+             # self._classifier_log_p_t,
+             # self._log_pi_t,
+             # self._discriminator_output_t,
+             self._classifier_loss_t),
             feed_dict={
                 **{
                     self._placeholders['observations'][key]: values
                     for key, values in sample_observations.items()
                 },
-                self._placeholders['labels']: sample_labels
+                self._placeholders['labels']: sample_labels,
+                # self._placeholders['actions']: sample_actions,
             }
         )
 
-        reward_goal_observations_training, classifier_output_goal_training, discriminator_output_goal_training, goal_classifier_training_loss = self._session.run(
-            (self._reward_t, self._classifier_output_t, self._discriminator_output_t, self._classifier_loss_t),
+        (reward_goal_observations_training, 
+         # classifier_output_goal_training, 
+         # discriminator_output_goal_training, 
+         goal_classifier_training_loss) = self._session.run(
+            (self._reward_t, 
+             # self._classifier_log_p_t, 
+             # self._discriminator_output_t, 
+             self._classifier_loss_t),
             feed_dict={
                 **{
                     self._placeholders['observations'][key]: values
@@ -218,8 +267,14 @@ class VICE(SACClassifier):
             }
         )
 
-        reward_goal_observations_validation, classifier_output_goal_validation, discriminator_output_goal_validation, goal_classifier_validation_loss = self._session.run(
-            (self._reward_t, self._classifier_output_t, self._discriminator_output_t, self._classifier_loss_t),
+        (reward_goal_observations_validation,
+         # classifier_output_goal_validation,
+         # discriminator_output_goal_validation,
+         goal_classifier_validation_loss) = self._session.run(
+            (self._reward_t, 
+             # self._classifier_log_p_t,
+             # self._discriminator_output_t,
+             self._classifier_loss_t),
             feed_dict={
                 **{
                     self._placeholders['observations'][key]: values
@@ -246,18 +301,18 @@ class VICE(SACClassifier):
                 reward_goal_observations_training),
             'reward_learning/reward_goal_obs_validation_mean': np.mean(
                 reward_goal_observations_validation),
-            'reward_learning/classifier_negative_obs_log_p_mean': np.mean(
-                classifier_output_negative),
-            'reward_learning/classifier_goal_obs_training_log_p_mean': np.mean(
-                classifier_output_goal_training),
-            'reward_learning/classifier_goal_obs_validation_log_p_mean': np.mean(
-                classifier_output_goal_validation),
-            'reward_learning/discriminator_output_negative_mean': np.mean(
-                discriminator_output_negative),
-            'reward_learning/discriminator_output_goal_obs_training_mean': np.mean(
-                discriminator_output_goal_training),
-            'reward_learning/discriminator_output_goal_obs_validation_mean': np.mean(
-                discriminator_output_goal_validation),
+            # 'reward_learning/classifier_negative_obs_log_p_mean': np.mean(
+            #     classifier_output_negative),
+            # 'reward_learning/classifier_goal_obs_training_log_p_mean': np.mean(
+            #     classifier_output_goal_training),
+            # 'reward_learning/classifier_goal_obs_validation_log_p_mean': np.mean(
+            #     classifier_output_goal_validation),
+            # 'reward_learning/discriminator_output_negative_mean': np.mean(
+            #     discriminator_output_negative),
+            # 'reward_learning/discriminator_output_goal_obs_training_mean': np.mean(
+            #     discriminator_output_goal_training),
+            # 'reward_learning/discriminator_output_goal_obs_validation_mean': np.mean(
+            #     discriminator_output_goal_validation),
    
 
             # TODO: Figure out why converting to probabilities isn't working

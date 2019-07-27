@@ -9,7 +9,7 @@ def create_feedforward_reward_classifier_function(input_shapes,
                                                   preprocessors=None,
                                                   observation_keys=None,
                                                   name='feedforward_reward_classifier',
-                                                  output_activation=tf.math.log_sigmoid,
+                                                  # output_activation=tf.math.log_sigmoid,
                                                   **kwargs):
     inputs_flat = create_inputs(input_shapes)
     preprocessors_flat = (
@@ -31,7 +31,7 @@ def create_feedforward_reward_classifier_function(input_shapes,
         output_size=1,
         kernel_regularizer=tf.keras.regularizers.l2(0.001),
         name=name,
-        output_activation=output_activation,
+        # output_activation=output_activation,
         **kwargs)
 
     reward_classifier_function = PicklableModel(inputs_flat, reward_classifier_function(preprocessed_inputs))
