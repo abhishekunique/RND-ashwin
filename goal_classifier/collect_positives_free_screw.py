@@ -9,7 +9,7 @@ import imageio
 import pickle
 
 cur_dir = os.path.dirname(os.path.realpath(__file__))
-directory = cur_dir + "/free_screw_180_higher_walls"
+directory = cur_dir + "/free_screw_180_less_tiny_box_old_camera"
 if not os.path.exists(directory):
     os.makedirs(directory)
 
@@ -19,7 +19,7 @@ def main():
     goal_angle = np.pi
     observations = []
     images = True
-    image_shape = (32, 32, 3)
+    image_shape = (48, 48, 3)
 
     env_kwargs = {
         'pixel_wrapper_kwargs': {
@@ -32,19 +32,19 @@ def main():
             },
         },
         # New params: higher walls
-        'camera_settings': {
-            'azimuth': 0.,
-            'distance': 0.32,
-            'elevation': -55.88,
-            'lookat': np.array([0.00046945, -0.00049496, 0.05389398]),
-        },
-        # OLD GOAL COLLECTION CAMERA PARAMS
         # 'camera_settings': {
-        #     'azimuth': 0.,
-        #     'distance': 0.35,
-        #     'elevation': -38.17570837642188,
+        #     'azimuth': 45.,
+        #     'distance': 0.32,
+        #     'elevation': -55.88,
         #     'lookat': np.array([0.00046945, -0.00049496, 0.05389398]),
         # },
+        # OLD GOAL COLLECTION CAMERA PARAMS
+        'camera_settings': {
+            'azimuth': 0.,
+            'distance': 0.35,
+            'elevation': -38.17570837642188,
+            'lookat': np.array([0.00046945, -0.00049496, 0.05389398]),
+        },
         'init_angle_range': (goal_angle - 0.05, goal_angle + 0.05),
         'target_angle_range': (goal_angle, goal_angle),
         'observation_keys': ('pixels', 'claw_qpos', 'last_action'), 
@@ -55,7 +55,7 @@ def main():
         **env_kwargs
     )
 
-    ANGLE_THRESHOLD, POSITION_THRESHOLD = 0.15, 0.04
+    ANGLE_THRESHOLD, POSITION_THRESHOLD = 0.15, 0.035
     goal_criteria = lambda angle_dist, pos_dist: angle_dist < ANGLE_THRESHOLD \
         and pos_dist < POSITION_THRESHOLD
 
