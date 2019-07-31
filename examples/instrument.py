@@ -95,6 +95,12 @@ def generate_experiment_kwargs(variant_spec, command_line_args):
         variant_spec['algorithm_params']['kwargs']['video_save_frequency'] = (
             command_line_args.video_save_frequency)
 
+    if hasattr(command_line_args, 'save_training_video_frequency') \
+        and command_line_args.save_training_video_frequency is not None:
+        assert 'algorithm_params' in variant_spec
+        variant_spec['algorithm_params']['kwargs']['save_training_video_frequency'] = (
+            command_line_args.save_training_video_frequency)
+
     # if command_line_args.n_training_videos_to_save is not None:
     #     variant_spec['algorithm_params']['kwargs']['n_training_videos_to_save'] = (
     #         command_line_args.n_training_videos_to_save)

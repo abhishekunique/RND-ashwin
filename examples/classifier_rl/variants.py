@@ -65,7 +65,7 @@ ALGORITHM_PARAMS_BASE = {
         'eval_render_kwargs': {},
         'eval_n_episodes': 3,
         'eval_deterministic': True,
-
+        'save_training_video_frequency': 5,
         'discount': 0.99,
         'tau': 5e-3,
         'reward_scale': 1.0,
@@ -255,7 +255,7 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK = {
                 'target_pos_range': (np.pi, np.pi),
                 'pixel_wrapper_kwargs': {
                     'pixels_only': False,
-                    'normalize': False, # maybe this is causing the issue?
+                    'normalize': False,
                     'render_kwargs': {
                         'width': 32,
                         'height': 32,
@@ -324,14 +324,17 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK = {
                 },
                 'observation_keys': ('pixels', 'claw_qpos', 'last_action', 'goal_index'),
             },
-            # 'TurnFreeValve3ResetFree-v0': {
-            #     'reward_keys': (
-            #         'object_to_target_position_distance_cost',
-            #         'object_to_target_orientation_distance_cost',
-            #     ),
-            #     'reset_fingers': True,
-            #     'swap_goal_upon_completion': False,
-            # }, 
+
+            # Purely from state 
+            'TurnFreeValve3ResetFree-v0': {
+                'reward_keys_and_weights': {
+                    'object_to_target_position_distance_reward': 2,
+                    'object_to_target_orientation_distance_reward': 1,
+                },
+                'reset_fingers': True,
+                'swap_goal_upon_completion': False,
+            },
+            # VICE + vision
             # 'TurnFreeValve3ResetFree-v0': {
             #     'pixel_wrapper_kwargs': {
             #        'pixels_only': False,
