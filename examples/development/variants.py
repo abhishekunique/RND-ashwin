@@ -37,7 +37,7 @@ ALGORITHM_PARAMS_BASE = {
         'discount': 0.99,
         'tau': 5e-3,
         'reward_scale': 1.0,
-        'save_training_video_frequency': 5,
+        'save_training_video_frequency': 0,
         'eval_render_kwargs': {
             'width': 480,
             'height': 480,
@@ -480,10 +480,12 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK = {
             },
             'TurnFreeValve3ResetFreeSwapGoal-v0': {
                 'reward_keys_and_weights': {
-                    'object_to_target_position_distance_reward': 2,
+                    'object_to_target_position_distance_reward': 5,
                     'object_to_target_orientation_distance_reward': 1,
                 },
                 'reset_fingers': True,
+                'goals': [(0, 0, 0, 0, 0, np.pi / 2),
+                          (-0, -0, 0, 0, 0, -np.pi / 2)],
             },
             'TurnFreeValve3ResetFreeCurriculum-v0': {
                 'reward_keys': (
@@ -530,12 +532,18 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK = {
             'LiftDDFixed-v0': {
                 'reward_keys_and_weights': {
                     'object_to_target_z_position_distance_reward': 10,
-                    'object_to_target_xy_position_distance_reward': 1,
-                    'object_to_target_orientation_distance_reward': 5,
+                    'object_to_target_xy_position_distance_reward': 0,
+                    'object_to_target_orientation_distance_reward': 0, #5,
                 },
-                'init_qpos_range': [(0, 0, 0, 0, 0, 0)],
-                'target_qpos_range': [(0, 0, 0.05, 0, 0, np.pi)],
+                'init_qpos_range': [(0, 0, 0.041, 1.017, 0, 0)],
+                'target_qpos_range': [(0, 0, 0.05, 0, 0, 0)]
+                # [  # target pos relative to init
+                #      (0, 0, 0, 0, 0, np.pi),
+                #      (0, 0, 0, np.pi, 0, 0), # bgreen side up
+                #      (0, 0, 0, 1.017, 0, 2*np.pi/5), # black side up
+                #  ],
             },
+            # Flipping Tasks
             'FlipEraserFixed-v0': {
                 'reward_keys_and_weights': {
                     'object_to_target_position_distance_reward': 1,
@@ -545,6 +553,12 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK = {
                 'target_qpos_range': [(0, 0, 0, np.pi, 0, 0)],
             },
             'FlipEraserResetFree-v0': {
+                'reward_keys_and_weights': {
+                    'object_to_target_position_distance_reward': 1,
+                    'object_to_target_orientation_distance_reward': 20,
+                },
+            },
+            'FlipEraserResetFreeSwapGoal-v0': {
                 'reward_keys_and_weights': {
                     'object_to_target_position_distance_reward': 1,
                     'object_to_target_orientation_distance_reward': 20,
@@ -759,6 +773,7 @@ def evaluation_environment_params(spec):
             },
             # 'initial_distribution_path': '/mnt/sda/ray_results/gym/DClaw/TurnFreeValve3ResetFree-v0/2019-06-30T18-53-06-baseline_both_push_and_turn_log_rew/id=38872574-seed=6880_2019-06-30_18-53-07whkq1aax/',
             # 'reset_from_corners': False,
+            'goals': training_environment_params['kwargs']['goals'],
         }
     elif training_environment_params['task'] == 'TurnFreeValve3ResetFreeCurriculum-v0':
         eval_environment_params['task'] = 'TurnFreeValve3ResetFreeCurriculumEval-v0' #'TurnFreeValve3RandomReset-v0'
@@ -770,6 +785,15 @@ def evaluation_environment_params(spec):
             # 'initial_distribution_path': '/mnt/sda/ray_results/gym/DClaw/TurnFreeValve3ResetFree-v0/2019-06-30T18-53-06-baseline_both_push_and_turn_log_rew/id=38872574-seed=6880_2019-06-30_18-53-07whkq1aax/',
             # 'reset_from_corners': False,
         }
+    elif training_environment_params['task'] == 'FlipEraserResetFreeSwapGoal-v0':
+        eval_environment_params['task'] = 'FlipEraserResetFreeSwapGoalEval-v0' #'TurnFreeValve3RandomReset-v0'
+        eval_environment_params['kwargs'] = {
+            'reward_keys_and_weights': {
+                'object_to_target_position_distance_reward': 1,
+                'object_to_target_orientation_distance_reward': 20,
+            },
+        }
+
     return eval_environment_params
 
 

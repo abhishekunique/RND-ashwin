@@ -1,4 +1,4 @@
-name: vice-multigoal
+name: vice
 channels:
 - defaults
 - conda-forge

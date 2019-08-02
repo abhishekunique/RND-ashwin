@@ -82,7 +82,6 @@ class RLAlgorithm(Checkpointable):
         self._eval_n_episodes = eval_n_episodes
         self._eval_deterministic = eval_deterministic
         self._video_save_frequency = video_save_frequency
-        self._path_save_frequency = path_save_frequency
 
         self._eval_render_kwargs = eval_render_kwargs or {}
 
