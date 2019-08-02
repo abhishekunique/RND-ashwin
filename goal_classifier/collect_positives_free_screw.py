@@ -31,14 +31,6 @@ def main():
                 'camera_id': -1,
             },
         },
-        # New params: higher walls
-        # 'camera_settings': {
-        #     'azimuth': 45.,
-        #     'distance': 0.32,
-        #     'elevation': -55.88,
-        #     'lookat': np.array([0.00046945, -0.00049496, 0.05389398]),
-        # },
-        # OLD GOAL COLLECTION CAMERA PARAMS
         'camera_settings': {
             'azimuth': 0.,
             'distance': 0.35,

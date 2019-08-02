@@ -1,5 +1,3 @@
-import ipdb; ipdb.set_trace()
-
 import numpy as np
 import os
 from softlearning.replay_pools import SimpleReplayPool
