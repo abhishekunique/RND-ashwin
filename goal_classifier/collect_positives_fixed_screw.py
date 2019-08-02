@@ -2,14 +2,14 @@ import argparse
 import numpy as np
 import dsuite
 import gym
-from dsuite.dclaw.turn import DClawTurnImage, DClawTurnFixed
+from dsuite.dclaw.turn import DClawTurnFixed
 from softlearning.environments.adapters.gym_adapter import GymAdapter
 import os
 import imageio
 import pickle
 
 cur_dir = os.path.dirname(os.path.realpath(__file__))
-directory = cur_dir + "/free_screw_180_less_tiny_box_old_camera"
+directory = cur_dir + "/fixed_screw_180_no_normalization"
 if not os.path.exists(directory):
     os.makedirs(directory)
 
@@ -18,8 +18,8 @@ def main():
     NUM_TOTAL_EXAMPLES, ROLLOUT_LENGTH, STEPS_PER_SAMPLE = 200, 25, 4
     goal_angle = np.pi
     observations = []
-    images = True
-    image_shape = (48, 48, 3)
+    images = False
+    image_shape = (32, 32, 3)
 
     env_kwargs = {
         'pixel_wrapper_kwargs': {
@@ -37,19 +37,18 @@ def main():
             'elevation': -38.17570837642188,
             'lookat': np.array([0.00046945, -0.00049496, 0.05389398]),
         },
-        'init_angle_range': (goal_angle - 0.05, goal_angle + 0.05),
-        'target_angle_range': (goal_angle, goal_angle),
+        'init_object_pos_range': (goal_angle - 0.05, goal_angle + 0.05),
+        'target_pos_range': (goal_angle, goal_angle),
         'observation_keys': ('pixels', 'claw_qpos', 'last_action'), 
     }
     env = GymAdapter(
         domain='DClaw',
-        task='TurnFreeValve3Fixed-v0',
+        task='TurnFixed-v0',
         **env_kwargs
     )
 
-    ANGLE_THRESHOLD, POSITION_THRESHOLD = 0.15, 0.035
-    goal_criteria = lambda angle_dist, pos_dist: angle_dist < ANGLE_THRESHOLD \
-        and pos_dist < POSITION_THRESHOLD
+    ANGLE_THRESHOLD = 0.15
+    goal_criteria = lambda angle_dist: angle_dist < ANGLE_THRESHOLD
 
     # reset the environment
     while num_positives <= NUM_TOTAL_EXAMPLES:
@@ -64,16 +63,17 @@ def main():
             # env.render()  # render on display
             obs_dict = env.get_obs_dict()
 
-            circle_dist = obs_dict['object_to_target_circle_distance']
-            pos_dist = obs_dict['object_to_target_position_distance']
-            print(f"Circle dist: {circle_dist}, Position dist: {pos_dist}")
+            circle_dist = obs_dict['object_to_target_angle_dist']
+            print(f"Circle dist: {circle_dist}")
 
-            if goal_criteria(circle_dist, pos_dist):
+            if goal_criteria(circle_dist):
                 # Add observation if meets criteria
                 observations.append(observation)
                 print(observation)
                 if images:
                     img_obs = observation['pixels']
+                    # image = img_obs[:np.prod(image_shape)].reshape(image_shape)
+                    img_obs = 255 / 2 * (img_obs + 1)
                     imageio.imwrite(directory + '/img%i.jpg' % num_positives, img_obs)
                 num_positives += 1
             t += 1
@@ -87,7 +87,6 @@ def main():
 
     with open(directory + '/positives.pkl', 'wb') as file:
         pickle.dump(goal_examples, file)
-
 
 if __name__ == "__main__":
     main()

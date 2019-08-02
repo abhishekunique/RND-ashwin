@@ -179,6 +179,10 @@ def get_parser(allow_policy_list=False):
         '--n-epochs', type=int, default=200)
     parser.add_argument(
         '--active-query-frequency', type=int, default=1)
+    parser.add_argument(
+        '--from-pixels',
+        type=lambda x: bool(strtobool(x)),
+        default=True)
 
     parser.add_argument(
         '--checkpoint-replay-pool',
@@ -230,18 +234,16 @@ def get_parser(allow_policy_list=False):
         default=0,
         help="Save frequency for videos.")
     parser.add_argument(
-        '--training-video-save-frequency',
+        '--save-training-video-frequency',
         type=int,
-        nargs='?',
-        const=True,
-        default=0,
+        default=5,
         help="Save frequency for training videos.")
+
     parser.add_argument(
-        '--n-training-videos-to-save',
+        '--num-goals',
         type=int,
-        nargs='?',
-        default=3,
-        help="Number of training videos to save per epoch.")
+        default=2,
+        help="Number of goals set in the environment.")
 
     parser.add_argument(
         '--path-save-frequency',

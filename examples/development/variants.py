@@ -192,7 +192,8 @@ NUM_EPOCHS_PER_UNIVERSE_DOMAIN_TASK = {
             DEFAULT_KEY: 100,
         },
         'DClaw': {
-            DEFAULT_KEY: int(1.5e3),
+            # DEFAULT_KEY: int(1.5e3),
+            DEFAULT_KEY: 500,
         },
     },
     'dm_control': {
@@ -413,17 +414,39 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK = {
                 'observation_keys': ('claw_qpos', 'last_action', 'pixels'),
             },
             'TurnRandomDynamics-v0': {},
+            # 'TurnFreeValve3Fixed-v0': {
+            #     'reward_keys': (
+            #         'object_to_target_position_distance_cost',
+            #         'object_to_target_orientation_distance_cost',
+            #     ),
+            #     'init_angle_range': (0, 0),
+            #     'target_angle_range': (0, 0),
+            #     'init_x_pos_range': (0, 0),
+            #     'init_y_pos_range': (0, 0),
+            #     'position_reward_weight': tune.sample_from([50]),
+            # },
             'TurnFreeValve3Fixed-v0': {
-                'reward_keys': (
-                    'object_to_target_position_distance_cost',
-                    'object_to_target_orientation_distance_cost',
-                ),
-                'init_angle_range': (0, 0),
-                'target_angle_range': (0, 0),
-                'init_x_pos_range': (0, 0),
-                'init_y_pos_range': (0, 0),
-                'position_reward_weight': tune.sample_from([50]),
+	 	'camera_settings': {
+                    'azimuth': 0,
+                    'distance': 0.25,
+                    'elevation': -45,
+                    'lookat': np.array([0, 0, 0.02])
+                },
+                'observation_keys': ('claw_qpos', 'last_action', 'pixels'),
+                'pixel_wrapper_kwargs': {
+                    'pixels_only': False,
+                    'render_kwargs': {
+                        'camera_id': -1,
+                        'width': 32,
+                        'height': 32
+                    }
+                },
+                'reward_keys_and_weights': {
+                    'object_to_target_position_distance_reward': 0.1,
+                    'object_to_target_orientation_distance_reward': 1,
+                },
             },
+
             'TurnFreeValve3RandomReset-v0': {
                 'reward_keys': (
                     'object_to_target_position_distance_cost',
@@ -848,7 +871,7 @@ def get_variant_spec_base(universe, domain, task, policy, algorithm):
         'replay_pool_params': {
             'type': 'SimpleReplayPool',
             'kwargs': {
-                'max_size': int(1e6),
+                'max_size': int(3e5) # int(1e6),
             },
             'last_checkpoint_dir': '',
             # 'last_checkpoint_dir': '/mnt/sda/ray_results/gym/DClaw/TurnFreeValve3ResetFree-v0/2019-07-01T12-08-30-smaller_box/id=70000b2d-seed=8699_2019-07-01_12-08-314r_kc234/',

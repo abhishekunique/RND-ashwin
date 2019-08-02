@@ -28,9 +28,12 @@ PUSH_TASKS = [
 ]
 
 GOAL_IMAGE_PATH_PER_ENVIRONMENT = {
-    'TurnFreeValve3ResetFree-v0': 'free_screw_180_less_tiny_box_48/',
+    # 'TurnFreeValve3ResetFree-v0': 'free_screw_180_less_tiny_box/',
+    'TurnFreeValve3ResetFree-v0': 'free_screw_180_less_tiny_box_state_minimal/',
+    # 'TurnFreeValve3Fixed-v0': 'free_screw_180_regular_box_48/',
     'TurnFreeValve3Fixed-v0': 'free_screw_180_less_tiny_box_48/',
     'TurnFixed-v0': 'fixed_screw_180_no_normalization/',
+    'TurnMultiGoalResetFree-v0': 'fixed_screw_2_goals_mixed_pool_goal_index/',
 }
 
 def get_goal_example_from_variant(variant):

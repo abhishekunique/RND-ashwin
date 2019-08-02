@@ -73,7 +73,7 @@ def add_command_line_args_to_variant_spec(variant_spec, command_line_args):
 def generate_experiment_kwargs(variant_spec, command_line_args):
     # TODO(hartikainen): Allow local dir to be modified through cli args
     local_dir = os.path.join(
-        '/mnt/sda/ray_results',
+        '~/ray_results',
         command_line_args.universe,
         command_line_args.domain,
         command_line_args.task)
@@ -94,6 +94,17 @@ def generate_experiment_kwargs(variant_spec, command_line_args):
         assert 'algorithm_params' in variant_spec
         variant_spec['algorithm_params']['kwargs']['video_save_frequency'] = (
             command_line_args.video_save_frequency)
+
+    if hasattr(command_line_args, 'save_training_video_frequency') \
+        and command_line_args.save_training_video_frequency is not None:
+        assert 'algorithm_params' in variant_spec
+        variant_spec['algorithm_params']['kwargs']['save_training_video_frequency'] = (
+            command_line_args.save_training_video_frequency)
+
+    if hasattr(command_line_args, 'num_goals') \
+        and command_line_args.num_goals is not None:
+        variant_spec['num_goals'] = (
+            command_line_args.num_goals)
 
     # if command_line_args.n_training_videos_to_save is not None:
     #     variant_spec['algorithm_params']['kwargs']['n_training_videos_to_save'] = (
@@ -228,7 +239,7 @@ def run_example_local(example_module_name, example_argv, local_mode=False):
         resources=example_args.resources or {},
         local_mode=local_mode,
         include_webui=example_args.include_webui,
-        temp_dir=os.path.join('/tmp/ray-henry', datetime_string))
+        temp_dir=os.path.join('/tmp/ray-justin', datetime_string))
 
     tune.run(
         trainable_class,

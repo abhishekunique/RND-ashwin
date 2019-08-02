@@ -32,7 +32,7 @@ class VICEGANTwoGoal(SAC):
             classifier_lr=1e-4,
             classifier_batch_size=128,
             reward_type = 'logits',
-            n_classifier_train_steps=int(1e4),
+            n_classifier_train_steps=5,
             classifier_optim_name='adam',
             mixup_alpha=0.2,
             **kwargs,
@@ -107,7 +107,6 @@ class VICEGANTwoGoal(SAC):
             name: self._placeholders['observations'][name]
             for name in self._classifier_0.observation_keys
         })
-        # TODO: the labels are definitely not right here: how to switch the labels for the different goals?
         logits_0 = self._classifier_0(classifier_inputs)
         logits_1 = self._classifier_1(classifier_inputs)
         self._classifier_loss_t_0 = tf.reduce_mean(
@@ -119,8 +118,22 @@ class VICEGANTwoGoal(SAC):
         self._classifier_training_ops = self._get_classifier_training_ops()
 
     def _get_classifier_feed_dicts(self):
+        # Get 2x the number of negatives, filter out by goal index
         negatives = self.sampler.random_batch(
-            self._classifier_batch_size)['observations']
+            2 * self._classifier_batch_size)['observations'] 
+
+        negative_ind_0 = (negatives['goal_index'] == 0).flatten()
+        negative_ind_1 = (negatives['goal_index'] == 1).flatten()
+        n_negatives_0, n_negatives_1 = (
+            np.sum(negative_ind_0.astype(int)), np.sum(negative_ind_1.astype(int)))
+        negatives_0 = {
+            key: values[negative_ind_0]
+            for key, values in negatives.items()
+        }
+        negatives_1 = {
+            key: values[negative_ind_1]
+            for key, values in negatives.items()
+        }
 
         # Get positives from different goal pools
         rand_positive_ind_0 = np.random.randint(
@@ -139,23 +152,30 @@ class VICEGANTwoGoal(SAC):
             for key, values in self._goal_examples_1.items()
         }
 
-        labels_batch = np.zeros((2*self._classifier_batch_size, 1))
-        labels_batch[self._classifier_batch_size:] = 1.0
+        # labels_batch_0 = np.zeros((2 * self._classifier_batch_size, 1))
+        # labels_batch[self._classifier_batch_size:] = 1.0
+        # labels_batch_0 = labels_batch.copy()
+        # labels_batch_1 = labels_batch.copy()
+
+        labels_batch_0 = np.zeros((n_negatives_0 + self._classifier_batch_size, 1))
+        labels_batch_0[n_negatives_0:] = 1.0
+        labels_batch_1 = np.zeros((n_negatives_1 + self._classifier_batch_size, 1))
+        labels_batch_1[n_negatives_1:] = 1.0
 
         observations_batch_0 = {
-            key: np.concatenate((negatives[key], positives_0[key]), axis=0)
+            key: np.concatenate((negatives_0[key], positives_0[key]), axis=0)
             for key in self._classifier_0.observation_keys
         }
         observations_batch_1 = {
-            key: np.concatenate((negatives[key], positives_1[key]), axis=0)
+            key: np.concatenate((negatives_1[key], positives_1[key]), axis=0)
             for key in self._classifier_1.observation_keys
         }
 
         if self._mixup_alpha > 0:
-            observation_batch_0, labels_batch = mixup(
-                observations_batch_0, labels_batch, alpha=self._mixup_alpha)
-            observation_batch_1, labels_batch = mixup(
-                observations_batch_1, labels_batch, alpha=self._mixup_alpha)
+            observation_batch_0, labels_batch_0 = mixup(
+                observations_batch_0, labels_batch_0, alpha=self._mixup_alpha)
+            observation_batch_1, labels_batch_1 = mixup(
+                observations_batch_1, labels_batch_1, alpha=self._mixup_alpha)
 
         feed_dict_0 = {
             **{
@@ -163,7 +183,7 @@ class VICEGANTwoGoal(SAC):
                 observations_batch_0[key]
                 for key in self._classifier_0.observation_keys
             },
-            self._placeholders['labels']: labels_batch
+            self._placeholders['labels']: labels_batch_0
         }
 
         feed_dict_1 = {
@@ -172,7 +192,7 @@ class VICEGANTwoGoal(SAC):
                 observations_batch_1[key]
                 for key in self._classifier_1.observation_keys
             },
-            self._placeholders['labels']: labels_batch
+            self._placeholders['labels']: labels_batch_1
         }
 
         return feed_dict_0, feed_dict_1
