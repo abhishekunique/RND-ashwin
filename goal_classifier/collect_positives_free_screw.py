@@ -9,7 +9,7 @@ import imageio
 import pickle
 
 cur_dir = os.path.dirname(os.path.realpath(__file__))
-directory = cur_dir + "/free_screw_180_less_tiny_box_old_camera"
+directory = cur_dir + "/free_screw_180_regular_box_32"
 if not os.path.exists(directory):
     os.makedirs(directory)
 
@@ -19,7 +19,7 @@ def main():
     goal_angle = np.pi
     observations = []
     images = True
-    image_shape = (48, 48, 3)
+    image_shape = (32, 32, 3)
 
     env_kwargs = {
         'pixel_wrapper_kwargs': {

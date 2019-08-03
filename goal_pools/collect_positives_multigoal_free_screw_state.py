@@ -10,8 +10,11 @@ cur_dir = os.path.dirname(os.path.realpath(__file__))
 directory = cur_dir + "/free_screw_4_goals_regular_box_state_"
 
 def main(): 
-    pos_goals = [(0.01, 0.01), (-0.01, 0.01), (-0.01, -0.01), (0.01, -0.01)]
-    angle_goals = [0, 90, 180, -90]
+    pos_goals = [(0.01, 0.01), (-0.01, -0.01)]
+    angle_goals = [180, 0]
+
+    # pos_goals = [(0.01, 0.01), (-0.01, 0.01), (-0.01, -0.01), (0.01, -0.01)]
+    # angle_goals = [0, 90, 180, -90]
     for goal_index, (angle_goal, pos_goal) in enumerate(zip(angle_goals, pos_goals)):
         num_positives = 0
         NUM_TOTAL_EXAMPLES, ROLLOUT_LENGTH, STEPS_PER_SAMPLE = 200, 25, 4

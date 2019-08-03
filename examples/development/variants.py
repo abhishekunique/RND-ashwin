@@ -430,7 +430,7 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK = {
                     'azimuth': 0,
                     'distance': 0.25,
                     'elevation': -45,
-                    'lookat': np.array([0, 0, 0.02])
+                    'lookat': (0, 0, 0.02)
                 },
                 'observation_keys': ('claw_qpos', 'last_action', 'pixels'),
                 'pixel_wrapper_kwargs': {
@@ -960,17 +960,22 @@ def get_variant_spec_image(universe,
         universe, domain, task, policy, algorithm, *args, **kwargs)
 
     if is_image_env(universe, domain, task, variant_spec):
-        preprocessor_params = {
-            'type': 'ConvnetPreprocessor',
-            'kwargs': {
-                'conv_filters': (64, ) * 3,
-                'conv_kernel_sizes': (3, ) * 3,
-                'conv_strides': (2, ) * 3,
-                'normalization_type': 'layer',
-                'downsampling_type': 'conv',
-            },
-        }
-
+        preprocessor_params = tune.grid_search([
+            {
+                'type': 'ConvnetPreprocessor',
+                'kwargs': {
+                    'conv_filters': (64, ) * num_layers,
+                    'conv_kernel_sizes': (3, ) * num_layers,
+                    'conv_strides': (2, ) * num_layers,
+                    # 'normalization_type': 'layer',
+                    'normalization_type': normalization_type,
+                    'downsampling_type': 'conv',
+                },
+            }
+            for num_layers in (4, )
+            for normalization_type in (None, )
+        ])
+         
         variant_spec['policy_params']['kwargs']['hidden_layer_sizes'] = (M, M)
         variant_spec['policy_params']['kwargs'][
             'observation_preprocessors_params'] = {

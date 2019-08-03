@@ -49,6 +49,7 @@ class VICE(SACClassifier):
             for name in self._classifier.observation_keys
         })
         observation_log_p = self._classifier(classifier_inputs)
+        
         curr_policy_inputs = flatten_input_structure({
             name: self._placeholders['observations'][name]
             for name in self._policy.observation_keys
@@ -79,11 +80,13 @@ class VICE(SACClassifier):
         negatives = self.sampler.random_batch(
             self._classifier_batch_size
         )['observations']
+
         # DEBUG: Testing with the same negatives pool for each training iteration
         # negatives = type(self._pool.data)(
         #     (key[1], value[:self._classifier_batch_size])
         #     for key, value in self._pool.data.items()
         #     if key[0] == 'observations')
+
         rand_positive_ind = np.random.randint(
             self._goal_examples[next(iter(self._goal_examples))].shape[0],
             size=self._classifier_batch_size)
@@ -96,9 +99,11 @@ class VICE(SACClassifier):
             dtype=np.int32)
         labels_batch[:self._classifier_batch_size, 0] = 1
         labels_batch[self._classifier_batch_size:, 1] = 1
+
         observations_batch = {
             key: np.concatenate((negatives[key], positives[key]), axis=0)
-            for key in self._classifier.observation_keys
+            # for key in self._classifier.observation_keys
+            for key in self._policy.observation_keys
         }
 
         if self._mixup_alpha > 0:
@@ -109,7 +114,8 @@ class VICE(SACClassifier):
             **{
                 self._placeholders['observations'][key]:
                 observations_batch[key]
-                for key in self._classifier.observation_keys
+                # for key in self._classifier.observation_keys
+                for key in self._policy.observation_keys
             },
             self._placeholders['labels']: labels_batch,
         }
@@ -136,6 +142,7 @@ class VICE(SACClassifier):
         })
         sampled_actions = self._policy.actions(policy_inputs)
         log_pi = self._policy.log_pis(policy_inputs, sampled_actions)
+        # pi / (pi + f), f / (f + pi)
         log_pi_log_p_concat = tf.concat([log_pi, log_p], axis=1)
 
         self._classifier_loss_t = tf.reduce_mean(
@@ -171,6 +178,7 @@ class VICE(SACClassifier):
         goal_observations = {
             key: values[goal_index] for key, values in self._goal_examples.items()
         }
+        
         # Sample goal actions uniformly in action space
         # action_space_dim = sample_actions.shape[1]
         # goal_actions = np.random.uniform(

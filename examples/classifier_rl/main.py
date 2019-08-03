@@ -52,7 +52,6 @@ class ExperimentRunnerClassifierRL(ExperimentRunner):
         initial_exploration_policy = self.initial_exploration_policy = (
             get_policy_from_params(
                 variant['exploration_policy_params'], training_environment))
-
         algorithm_kwargs = {
             'variant': variant,
             'training_environment': training_environment,

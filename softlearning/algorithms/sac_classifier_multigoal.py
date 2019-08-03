@@ -317,7 +317,8 @@ class SACClassifierMultiGoal(SAC):
                             goal_obs[key],
                             goal_obs_validation[key]
                         ), axis=0)
-                        for key in self._classifiers[goal_index].observation_keys
+                        for key in self._policy.observation_keys
+                        # for key in self._classifiers[goal_index].observation_keys
                     },
                     self._placeholders['labels']: np.concatenate([
                         np.zeros((n_sample_obs, 1)),
@@ -374,7 +375,8 @@ class SACClassifierMultiGoal(SAC):
                     episode['observations'][name]
                     for episode in episodes
                 ])
-                for name in self._classifiers[0].observation_keys
+                for name in self._policy.observation_keys
+                # for name in self._classifiers[0].observation_keys
             })
 
         diagnostics[f'reward_learning/reward-mean'] = np.mean(learned_reward)

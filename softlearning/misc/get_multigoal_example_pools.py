@@ -6,13 +6,15 @@ goal_directory = os.path.abspath(
         os.path.join(os.path.dirname( __file__ ), '..', '..')) + '/goal_pools/'
 
 # expects a list of paths for each of the goals
+# TODO: Split up by vision/state experiments
 GOAL_POOL_PATHS_PER_ENV_PER_NUM_GOALS = {
     # Needs to be 180, 0, since the first goal is 180
     'TurnMultiGoalResetFree-v0': {
         '2': (f'fixed_screw_2_goals_{goal}/' for goal in [180, 0]), 
     },
     'TurnFreeValve3MultiGoalResetFree-v0': {
-        '2': (f'free_screw_2_goals_regular_box_state_{goal}/' for goal in (180, 0)),
+        '2': (f'free_screw_2_goals_less_tiny_box_{goal}/' for goal in (180, 0)),
+        # '2': (f'free_screw_2_goals_regular_box_state_{goal}/' for goal in (180, 0)),
         '4': (f'free_screw_4_goals_regular_box_state_{goal}/' for goal in (0, 90, 180, -90)),
     },
     # 'TurnFreeValve3MultiGoalResetFree-v0': {
