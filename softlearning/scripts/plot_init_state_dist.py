@@ -1,3 +1,6 @@
+import matplotlib
+matplotlib.use('Agg')
+
 import numpy as np
 import os
 from softlearning.replay_pools import SimpleReplayPool
@@ -19,25 +22,54 @@ def replay_pool_pickle_path(checkpoint_dir):
     return os.path.join(checkpoint_dir, 'replay_pool.pkl')
 
 
-def plot_position_heatmap(positions, xy_max, save_path):
+def plot_position_and_reward_heatmap(positions, rewards, xy_max, save_path, save_path_rew):
     num_points = positions.shape[0]
+
     plt.figure()
     ax = plt.gca()
     hexbins = plt.hexbin(positions[:, 0], positions[:, 1],
                          linewidths=0.2, vmax=num_points / 100)
     hexbins = hexbins.get_array()
+
     thresholds = [1, num_points // 10000]
     support_metric = [np.sum(hexbins >= i) / hexbins.shape[0] for i in thresholds]
 
     ax.set_xlim([-xy_max, xy_max])
     ax.set_ylim([-xy_max, xy_max])
-    ax.ticklabel_format(axis='both', style='sci')
+
+    plt.ticklabel_format(axis='both', style='sci')
     plt.colorbar()
+
     plt.gca().set_aspect('equal', adjustable='box')
     plt.title("Prop of bins with >x visits:\n(x=1, {0:.2f}), (x={1}, {2:.2f})".format(
         support_metric[0], thresholds[1], support_metric[1]))
     plt.savefig(save_path)
     plt.close()
+
+    total_reward = np.sum(rewards)
+
+    import ipdb; ipdb.set_trace()
+    plt.style.use('dark_background')
+
+    plt.figure()
+    ax = plt.gca()
+    ax.grid(False)
+    reward_hexbins = plt.hexbin(x=positions[:, 0],
+                                y=positions[:, 1],
+                                C=rewards,
+                                linewidths=0.2,
+                                mincnt=0)
+    ax.set_xlim([-xy_max, xy_max])
+    ax.set_ylim([-xy_max, xy_max])
+
+    plt.ticklabel_format(axis='both', style='sci')
+    plt.colorbar()
+
+    plt.gca().set_aspect('equal', adjustable='box')
+    plt.title('Rewards by position binning')
+    plt.savefig(save_path_rew)
+    plt.close()
+
     return support_metric, thresholds
 
 
@@ -86,14 +118,18 @@ for experiment_root in sorted(glob.iglob(
     ]
 
     position_heatmap_directory = experiment_root + '/object_position_heatmaps/'
+    reward_heatmap_directory = experiment_root + '/reward_position_heatmaps/'
     orient_dist_directory = experiment_root + '/object_orientation_heatmaps/'
     if not os.path.exists(position_heatmap_directory):
         os.mkdir(position_heatmap_directory)
+    if not os.path.exists(reward_heatmap_directory):
+        os.mkdir(reward_heatmap_directory)
     if not os.path.exists(orient_dist_directory):
         os.mkdir(orient_dist_directory)
 
     screw_positions_total = []
     object_angles_total = []
+    rewards_total = []
     pools = []
     support_metrics, thresholds = [], []
     checkpoint_nums = []
@@ -116,11 +152,13 @@ for experiment_root in sorted(glob.iglob(
                 obs['object_orientation_cos'][:, 2],
             )
             object_angles_total.append(object_angles)
+            rewards = pool['rewards']
+            rewards_total.append(rewards)
             # two_set_angles.append(object_angles)
             # two_set_positions.append(screw_positions)
         # if i % 2 == 1:
         #     save_path = position_heatmap_directory + checkpoint_num + '.png'
-        #     support_metric, threshold = plot_position_heatmap(np.concatenate(two_set_positions, axis=0), xy_max, save_path)
+        #     support_metric, threshold = plot_position_and_reward_heatmap(np.concatenate(two_set_positions, axis=0), xy_max, save_path)
 
         #     save_path = orient_dist_directory + checkpoint_num + '.png'
         #     plot_angle_distribution(np.concatenate(two_set_angles, axis=0), save_path)
@@ -130,7 +168,9 @@ for experiment_root in sorted(glob.iglob(
 
 
         save_path = position_heatmap_directory + checkpoint_num + '.png'
-        support_metric, threshold = plot_position_heatmap(screw_positions, xy_max, save_path)
+        save_path_rew = reward_heatmap_directory + checkpoint_num + '.png'
+        support_metric, threshold = plot_position_and_reward_heatmap(
+                screw_positions, rewards, xy_max, save_path, save_path_rew)
 
         save_path = orient_dist_directory + checkpoint_num + '.png'
         angular_support_metric, angular_threshold = plot_angle_distribution(object_angles, save_path)
@@ -144,7 +184,7 @@ for experiment_root in sorted(glob.iglob(
     object_angles_total = np.concatenate(object_angles_total, axis=0)
 
     save_path = position_heatmap_directory + '/total.png'
-    plot_position_heatmap(screw_positions_total, xy_max, save_path)
+    plot_position_and_reward_heatmap(screw_positions_total, rewards_total, xy_max, save_path)
 
     save_path = orient_dist_directory + '/total.png'
     plot_angle_distribution(object_angles_total, save_path)

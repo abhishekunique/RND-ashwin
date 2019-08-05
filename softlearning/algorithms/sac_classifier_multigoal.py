@@ -386,6 +386,17 @@ class SACClassifierMultiGoal(SAC):
 
         return diagnostics
 
+    def get_reward(self, observations):
+        learned_reward = self._session.run(
+            self._reward_t,
+            feed_dict={
+                self._placeholders['observations'][name]: observations
+                for name in self._policy.observation_keys
+                # for name in self._classifiers[0].observation_keys
+            }
+        )
+
+
     @property
     def tf_saveables(self):
         saveables = super(SACClassifierMultiGoal, self).tf_saveables
