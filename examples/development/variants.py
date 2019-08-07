@@ -781,7 +781,9 @@ def get_environment_params(universe, domain, task):
 NUM_CHECKPOINTS = 10
 SAMPLER_PARAMS_PER_DOMAIN = {
     'DClaw': {
-        'type': 'SimpleSampler', #'NNSampler', #'PoolSampler', #'RemoteSampler', #'PoolSampler',
+        # 'type': 'SimpleSampler', 
+        'type': 'PoolSampler', 
+
         # 'nn_pool_dir': '/mnt/sda/ray_results/gym/DClaw/TurnFreeValve3ResetFree-v0/2019-07-01T12-08-30-smaller_box/id=70000b2d-seed=8699_2019-07-01_12-08-314r_kc234/'
     },
     'DClaw3': {
@@ -910,9 +912,9 @@ def get_variant_spec_base(universe, domain, task, policy, algorithm):
             'kwargs': {
                 'max_size': int(3e5) # int(1e6),
             },
-            'last_checkpoint_dir': '',
-            # 'last_checkpoint_dir': '/mnt/sda/ray_results/gym/DClaw/TurnFreeValve3ResetFree-v0/2019-07-01T12-08-30-smaller_box/id=70000b2d-seed=8699_2019-07-01_12-08-314r_kc234/',
-            # 'last_checkpoint_dir': '/mnt/sda/ray_results/gym/DClaw/TurnFreeValve3RandomReset-v0/2019-07-02T21-34-15-nn/id=350324ce-seed=3063_2019-07-02_21-34-15zhfga4a0/checkpoint_400',
+            # 'last_checkpoint_dir': '',
+            'last_checkpoint_dir': '/home/justinvyu/ray_results/gym/DClaw/TurnFreeValve3ResetFreeSwapGoal-v0/2019-08-05T15-41-14-state_gtr_2_goals_with_resets_regular_box_saving_pixels/id=22505fd1-seed=1822_2019-08-05_15-41-164900r5on',
+            # 'last_checkpoint_dir': '/mnt/sda/ray_results/gym/DClaw/TurnFreeValve3ResetFree-v0/2019-07-01T12-08-30-smaller_box/id=70000b2d-seed=8699_2019-07-01_12-08-314r_kc234/', 
         },
         'sampler_params': deep_update({
             'type': 'SimpleSampler',
@@ -1025,22 +1027,37 @@ def get_variant_spec_image(universe,
     variant_spec = get_variant_spec_base(
         universe, domain, task, policy, algorithm, *args, **kwargs)
 
+    use_state_estimation = False
     if is_image_env(universe, domain, task, variant_spec):
-        preprocessor_params = tune.grid_search([
-            {
-                'type': 'ConvnetPreprocessor',
+        if use_state_estimation:
+            preprocessor_params = {
+                'type': 'StateEstimatorPreprocessor',
                 'kwargs': {
-                    'conv_filters': (64, ) * num_layers,
-                    'conv_kernel_sizes': (3, ) * num_layers,
-                    'conv_strides': (2, ) * num_layers,
-                    # 'normalization_type': 'layer',
-                    'normalization_type': normalization_type,
-                    'downsampling_type': 'conv',
-                },
+                    'domain': domain,
+                    'task': task,
+                    'obs_keys_to_estimate': (
+                        'object_position',
+                        'object_orientation_cos',
+                        'object_orientation_sin',
+                    )
+                }
             }
-            for num_layers in (4, )
-            for normalization_type in (None, )
-        ])
+        else:
+            preprocessor_params = tune.grid_search([
+                {
+                    'type': 'ConvnetPreprocessor',
+                    'kwargs': {
+                        'conv_filters': (64, ) * num_layers,
+                        'conv_kernel_sizes': (3, ) * num_layers,
+                        'conv_strides': (2, ) * num_layers,
+                        # 'normalization_type': 'layer',
+                        'normalization_type': normalization_type,
+                        'downsampling_type': 'conv',
+                    },
+                }
+                for num_layers in (4, )
+                for normalization_type in (None, )
+            ])
          
         variant_spec['policy_params']['kwargs']['hidden_layer_sizes'] = (M, M)
         variant_spec['policy_params']['kwargs'][

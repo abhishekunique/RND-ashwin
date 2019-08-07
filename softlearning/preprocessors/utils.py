@@ -9,6 +9,22 @@ def get_convnet_preprocessor(name='convnet_preprocessor', **kwargs):
     return preprocessor
 
 
+def get_state_estimator_preprocessor(name='state_estimator_preprocessor', **kwargs):
+    from softlearning.models.state_estimation import state_estimator_model
+    
+    path = '/home/justinvyu/dev/softlearning-vice/softlearning/models/state_estimator_model_all_replay_pools.h5'
+    preprocessor = state_estimator_model(**kwargs)
+
+    print('Loading model weights...')
+    preprocessor.load_weights(path)
+
+    # Set all params to not-trainable 
+    preprocessor.trainable = False 
+
+    preprocessor.summary()
+    return preprocessor  
+
+
 def get_feedforward_preprocessor(name='feedforward_preprocessor', **kwargs):
     from softlearning.models.feedforward import feedforward_model
 
@@ -20,6 +36,8 @@ def get_feedforward_preprocessor(name='feedforward_preprocessor', **kwargs):
 PREPROCESSOR_FUNCTIONS = {
     'ConvnetPreprocessor': get_convnet_preprocessor,
     'FeedforwardPreprocessor': get_feedforward_preprocessor,
+    'StateEstimatorPreprocessor': get_state_estimator_preprocessor,
+
     None: lambda *args, **kwargs: None
 }
 

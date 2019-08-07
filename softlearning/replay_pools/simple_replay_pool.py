@@ -59,7 +59,6 @@ class SimpleReplayPool(FlexibleReplayPool):
 
     def save_latest_experience(self, pickle_path):
         latest_samples = self.last_n_batch(self._samples_since_save)
-
         if self._obs_save_keys:
             latest_samples['observations'] = {k: v for k, v in
                                               latest_samples['observations'].items()

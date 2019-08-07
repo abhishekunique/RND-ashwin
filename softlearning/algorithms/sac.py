@@ -476,8 +476,30 @@ class SAC(RLAlgorithm):
             })).items()
         ]))
 
+        if 'pixels' in self._policy.preprocessors:
+            state_estimator = self._policy.preprocessors['pixels']
+            if state_estimator.name == 'state_estimator_preprocessor':
+                eval_obs = batch['observations']
+                obs_keys_to_estimate = (
+                    'object_position',
+                    'object_orientation_cos',
+                    'object_orientation_sin',
+                )
+                pixels = eval_obs['pixels']
+                ground_truth_state = np.concatenate(
+                    [eval_obs[key] for key in obs_keys_to_estimate], axis=1)
+                preds = state_estimator.predict(pixels)
+                diffs = preds - ground_truth_state
+                norms = np.linalg.norm(diffs, axis=1)
+                diagnostics.update({
+                    'state_estimator/state_estimation_error_mean': np.mean(
+                        norms
+                    ) 
+                })
+        
         if self._goal_classifier:
-            diagnostics.update({'goal_classifier/avg_reward': np.mean(feed_dict[self._rewards_ph])})
+            diagnostics.update({
+                'goal_classifier/avg_reward': np.mean(feed_dict[self._rewards_ph])})
 
         if self._save_eval_paths:
             import pickle
@@ -489,6 +511,15 @@ class SAC(RLAlgorithm):
             self._plotter.draw()
 
         return diagnostics
+
+    # def training_before_hook(self):
+    #     preprocessor = self.policy.preprocessors['pixels']
+    #     self.preprocessor_weights = preprocessor.get_weights()
+
+    # def training_after_hook(self):
+    #     new_weights = self.policy.preprocessors['pixels'].get_weights
+    #     for weight, new_weight in zip(self.preprocessor_weights, new_weights):
+    #         np.testing.assert_equal(weight, new_weight)
 
     @property
     def tf_saveables(self):
