@@ -38,6 +38,8 @@ class SAC(RLAlgorithm):
             policy,
             Qs,
             pool,
+            Q_targets=None,
+
             plotter=None,
 
             lr=3e-4,
@@ -84,7 +86,11 @@ class SAC(RLAlgorithm):
         self._policy = policy
 
         self._Qs = Qs
-        self._Q_targets = tuple(tf.keras.models.clone_model(Q) for Q in Qs)
+       
+        if Q_targets:
+            self._Q_targets = Q_targets
+        else:
+            self._Q_targets = tuple(tf.keras.models.clone_model(Q) for Q in Qs)
 
         self._pool = pool
         if isinstance(self._pool, PrioritizedExperienceReplayPool) and \

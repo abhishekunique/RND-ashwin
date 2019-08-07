@@ -60,6 +60,9 @@ class ExperimentRunner(tune.Trainable):
         sampler = self.sampler = get_sampler_from_variant(variant)
         Qs = self.Qs = get_Q_function_from_variant(
             variant, training_environment)
+        Q_targets = self.Q_targets = get_Q_function_from_variant(
+            variant, training_environment)
+
         policy = self.policy = get_policy_from_variant(
             variant, training_environment)
 
@@ -90,6 +93,7 @@ class ExperimentRunner(tune.Trainable):
             policy=policy,
             initial_exploration_policy=initial_exploration_policy,
             Qs=Qs,
+            Q_targets=Q_targets,
             pool=replay_pool,
             sampler=sampler,
             session=self._session)

@@ -19,22 +19,28 @@ class PicklableKerasModel(object):
 
             loaded_model = tf.keras.models.load_model(
                 fd.name, custom_objects={
-                    self.__class__.__name__: self.__class__})
+                    self.__class__.__name__: self.__class__,
+                    'PicklableSequential': PicklableSequential,
+                    'PicklableModel': PicklableModel})
 
         self.__dict__.update(loaded_model.__dict__.copy())
 
     @classmethod
     def from_config(cls, *args, custom_objects=None, **kwargs):
         custom_objects = custom_objects or {}
-        custom_objects[cls.__name__] = cls
-        custom_objects['tf'] = tf
+        custom_objects.update({
+            cls.__name__: cls,
+            'PicklableSequential': PicklableSequential,
+            'PicklableModel': PicklableModel,
+            'tf': tf,
+        })
         return super(PicklableKerasModel, cls).from_config(
             *args, custom_objects=custom_objects, **kwargs)
 
 
-class PicklableSequential(tf.keras.Sequential, PicklableKerasModel):
+class PicklableSequential(PicklableKerasModel, tf.keras.Sequential):
     pass
 
 
-class PicklableModel(tf.keras.Model, PicklableKerasModel):
+class PicklableModel(PicklableKerasModel, tf.keras.Model):
     pass
