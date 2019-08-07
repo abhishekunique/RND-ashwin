@@ -1,6 +1,7 @@
 import matplotlib
 matplotlib.use('Agg')
 
+import matplotlib.pyplot as plt
 import numpy as np
 import os
 from softlearning.replay_pools import SimpleReplayPool
@@ -10,7 +11,6 @@ import glob
 import sys
 import pickle
 import gzip
-import matplotlib.pyplot as plt
 import seaborn as sns; sns.set()
 from matplotlib.colors import ListedColormap
 
@@ -24,6 +24,8 @@ def replay_pool_pickle_path(checkpoint_dir):
 
 def plot_position_and_reward_heatmap(positions, rewards, xy_max, save_path, save_path_rew):
     num_points = positions.shape[0]
+
+    plt.style.use('default')
 
     plt.figure()
     ax = plt.gca()
@@ -46,9 +48,6 @@ def plot_position_and_reward_heatmap(positions, rewards, xy_max, save_path, save
     plt.savefig(save_path)
     plt.close()
 
-    total_reward = np.sum(rewards)
-
-    import ipdb; ipdb.set_trace()
     plt.style.use('dark_background')
 
     plt.figure()
@@ -75,6 +74,7 @@ def plot_position_and_reward_heatmap(positions, rewards, xy_max, save_path, save
 
 def plot_angle_distribution(angles, save_path):
     num_angles = angles.shape[0]
+    plt.style.use('default')
     plt.figure()
     ax = plt.gca()
     if num_angles > 1e6:
@@ -152,7 +152,8 @@ for experiment_root in sorted(glob.iglob(
                 obs['object_orientation_cos'][:, 2],
             )
             object_angles_total.append(object_angles)
-            rewards = pool['rewards']
+            rewards = pool['learned_rewards']
+            # rewards = pool['rewards']
             rewards_total.append(rewards)
             # two_set_angles.append(object_angles)
             # two_set_positions.append(screw_positions)
@@ -181,10 +182,13 @@ for experiment_root in sorted(glob.iglob(
         i += 1
 
     screw_positions_total = np.concatenate(screw_positions_total, axis=0)
+    rewards_total = np.concatenate(rewards_total, axis=0)
     object_angles_total = np.concatenate(object_angles_total, axis=0)
 
     save_path = position_heatmap_directory + '/total.png'
-    plot_position_and_reward_heatmap(screw_positions_total, rewards_total, xy_max, save_path)
+    save_path_rew = reward_heatmap_directory + '/total.png'
+
+    plot_position_and_reward_heatmap(screw_positions_total, rewards_total, xy_max, save_path, save_path_rew)
 
     save_path = orient_dist_directory + '/total.png'
     plot_angle_distribution(object_angles_total, save_path)

@@ -1,13 +1,23 @@
 from .simple_sampler import SimpleSampler
+import numpy as np
 
 class ClassifierSampler(SimpleSampler):
-    def __init__(self, algorithm, **kwargs):
+    def __init__(self, algorithm=None, **kwargs):
         super().__init__(**kwargs)
 
+        if algorithm:
+            assert hasattr(algorithm, 'get_reward'), (
+                'Must implement `get_reward` method to save in algorithm'
+            )
         self._algorithm = algorithm
-        assert hasattr(algorithm, 'get_reward'), (
-            'Must implement `get_reward` method to save in replay pool'
-        )
+
+    def set_algorithm(self, algorithm):
+        if algorithm:
+            assert hasattr(algorithm, 'get_reward'), (
+                'Must implement `get_reward` method to save in algorithm'
+            )
+
+        self._algorithm = algorithm
 
     def _process_sample(self,
                         observation,
@@ -16,11 +26,18 @@ class ClassifierSampler(SimpleSampler):
                         terminal,
                         next_observation,
                         info):
-        learned_reward = self._algorithm.get_reward(observation)
+        assert self._algorithm, 'Need to set the algorithm first'
+        obs_input = {
+            key: observation[key][None, ...]
+            for key in self.policy.observation_keys
+        }
+        learned_reward = self._algorithm.get_reward(obs_input)
+        learned_reward = np.asscalar(learned_reward)
         processed_observation = {
             'observations': observation,
             'actions': action,
-            'rewards': [learned_reward],
+            'rewards': [reward],
+            'learned_rewards': [learned_reward],
             'terminals': [terminal],
             'next_observations': next_observation,
             'infos': info,

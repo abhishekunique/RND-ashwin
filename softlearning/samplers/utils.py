@@ -11,7 +11,8 @@ from . import (
     active_sampler,
     goal_sampler,
     pool_sampler,
-    nn_sampler)
+    nn_sampler,
+    classifier_sampler)
 
 
 def get_sampler_from_variant(variant, *args, **kwargs):
@@ -24,6 +25,8 @@ def get_sampler_from_variant(variant, *args, **kwargs):
         'GoalSampler': goal_sampler.GoalSampler,
         'PoolSampler': pool_sampler.PoolSampler,
         'NNSampler': nn_sampler.NNSampler,
+        'PoolSampler': pool_sampler.PoolSampler,
+        'ClassifierSampler': classifier_sampler.ClassifierSampler,
     }
 
     sampler_params = variant['sampler_params']

@@ -158,6 +158,17 @@ class VICE(SACClassifier):
             feed_dict = self._get_classifier_feed_dict()
             self._train_classifier_step(feed_dict)
 
+    def get_reward(self, observations):
+        learned_reward = self._session.run(
+            self._reward_t,
+            feed_dict={
+                self._placeholders['observations'][name]: observations[name]
+                for name in self._policy.observation_keys
+                # for name in self._classifiers[0].observation_keys
+            }
+        )
+        return learned_reward
+
     def get_diagnostics(self,
                         iteration,
                         batch,

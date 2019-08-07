@@ -8,18 +8,18 @@ from softlearning.models.utils import flatten_input_structure
 
 class SACClassifierMultiGoal(SAC):
     def __init__(
-            self,
-            classifiers,
-            goal_example_pools,
-            goal_example_validation_pools,
-            classifier_lr=1e-4,
-            classifier_batch_size=128,
-            reward_type='logits',
-            n_classifier_train_steps=int(1e4),
-            classifier_optim_name='adam',
-            mixup_alpha=0.2,
-            goal_conditioned=False,
-            **kwargs,
+        self,
+        classifiers,
+        goal_example_pools,
+        goal_example_validation_pools,
+        classifier_lr=1e-4,
+        classifier_batch_size=128,
+        reward_type='logits',
+        n_classifier_train_steps=int(1e4),
+        classifier_optim_name='adam',
+        mixup_alpha=0.2,
+        goal_conditioned=False,
+        **kwargs,
     ):
         self._classifiers = classifiers
         self._goal_example_pools = goal_example_pools
@@ -390,12 +390,12 @@ class SACClassifierMultiGoal(SAC):
         learned_reward = self._session.run(
             self._reward_t,
             feed_dict={
-                self._placeholders['observations'][name]: observations
+                self._placeholders['observations'][name]: observations[name]
                 for name in self._policy.observation_keys
                 # for name in self._classifiers[0].observation_keys
             }
         )
-
+        return learned_reward
 
     @property
     def tf_saveables(self):

@@ -48,7 +48,8 @@ POLICY_PARAMS_FOR_DOMAIN.update({
 
 DEFAULT_MAX_PATH_LENGTH = 100
 MAX_PATH_LENGTH_PER_DOMAIN = {
-    'DClaw': 100, # 50
+    'DClaw': 100,
+    # 'DClaw': tune.grid_search([50, 100, 150]), # 100, # 50
 }
 
 """
@@ -177,7 +178,7 @@ ALGORITHM_PARAMS_ADDITIONAL = {
             'classifier_lr': 1e-4,
             'classifier_batch_size': 128,
             'n_initial_exploration_steps': int(1e3),
-            'n_classifier_train_steps': 5,
+            'n_classifier_train_steps': tune.grid_search([5]), # 5,
             'classifier_optim_name': 'adam',
             'n_epochs': 500,
             'mixup_alpha': 1.0,
@@ -466,9 +467,9 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_VISION = {
                 },
                 'camera_settings': {
                     'azimuth': 0.,
-                    'distance': 0.35,
-                    'elevation': -38.17570837642188,
-                    'lookat': (0.00046945, -0.00049496, 0.05389398),
+                    'distance': 0.32,
+                    'elevation': -45,
+                    'lookat': (0, 0, 0.03),
                 },
                 'init_angle_range': (0., 0.),
                 'target_angle_range': (np.pi, np.pi),
@@ -482,13 +483,13 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_VISION = {
             },
             'TurnFreeValve3MultiGoalResetFree-v0': {
                 'goals': ((0, 0, 0, 0, 0, np.pi), (0, 0, 0, 0, 0, 0)),
-                'goal_completion_position_threshold': 0.05,
+                'goal_completion_position_threshold': 0.04,
                 'goal_completion_orientation_threshold': 0.15,
                 'camera_settings': {
                     'azimuth': 0,
-                    'distance': 0.25,
+                    'distance': 0.32,
                     'elevation': -45,
-                    'lookat': (0, 0, 0.025)
+                    'lookat': (0, 0, 0.03)
                 },
 
                 # 'camera_settings': {
@@ -527,9 +528,9 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_VISION = {
                 'goals': ((0, 0, 0, 0, 0, np.pi), (0, 0, 0, 0, 0, 0)),
                 'camera_settings': {
                     'azimuth': 0,
-                    'distance': 0.25,
+                    'distance': 0.32,
                     'elevation': -45,
-                    'lookat': (0, 0, 0.025)
+                    'lookat': (0, 0, 0.03)
                 },
 
                 # 'camera_settings': {
@@ -561,7 +562,10 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_VISION = {
                     'pixels',
                     'claw_qpos',
                     'last_action',
-                    'goal_index'
+                    'goal_index',
+                    'object_position',
+                    'object_orientation_sin',
+                    'object_orientation_cos'
                 ),
             },
         }
@@ -622,8 +626,8 @@ def get_variant_spec_base(universe, domain, task, task_eval,
 
     variant_spec = {
         'git_sha': get_git_rev(),
-        # 'num_goals': 2, # TODO: Separate classifier_rl with multigoal
-        'num_goals': 4,
+        'num_goals': 2, # TODO: Separate classifier_rl with multigoal
+        # 'num_goals': 4,
         'environment_params': {
             'training': {
                 'domain': domain,
@@ -671,14 +675,16 @@ def get_variant_spec_base(universe, domain, task, task_eval,
         'replay_pool_params': {
             'type': 'SimpleReplayPool',
             'kwargs': {
-                'max_size': int(2e5), #int(1e6)
+                'max_size': int(3e5), #int(1e6)
             }
         },
         'sampler_params': {
             'type': 'SimpleSampler',
             'kwargs': {
+                # 'max_path_length': get_max_path_length(universe, domain, task),
+                # 'min_pool_size': get_max_path_length(universe, domain, task),
                 'max_path_length': get_max_path_length(universe, domain, task),
-                'min_pool_size': get_max_path_length(universe, domain, task),
+                'min_pool_size': 50,
                 'batch_size': 256,
                 'store_last_n_paths': 20,
             }
@@ -731,14 +737,8 @@ def get_variant_spec_classifier(universe,
         }
 
     # TODO: Abstract this
-    # variant_spec['reward_classifier_params']['kwargs']['observation_keys'] = tune.sample_from(lambda spec: (
-    #     spec.get('config', spec)
-    #     ['policy_params']
-    #     ['kwargs']
-    #     .get('observation_keys')
-    # ))
 
-    # Only use pixels for vision
+    # Only use pixels for vision goal classification
     variant_spec['reward_classifier_params']['kwargs']['observation_keys'] = (
        'pixels', ) 
 
@@ -750,8 +750,18 @@ def get_variant_spec_classifier(universe,
         'n_goal_examples_validation_max': 100,
     }
 
+    variant_spec['sampler_params']['type'] = 'ClassifierSampler'
+    # Add classifier rewards to the replay pool
+    from softlearning.replay_pools.flexible_replay_pool import Field
+    variant_spec['replay_pool_params']['kwargs']['extra_fields'] = {
+        'learned_rewards': Field(
+            name='learned_rewards',
+            dtype='float32',
+            shape=(1, )
+        )
+    }
+    
     if algorithm in ['RAQ', 'VICERAQ']:
-
         if task in DOOR_TASKS:
             is_goal_key = 'angle_success'
         elif task in PUSH_TASKS:

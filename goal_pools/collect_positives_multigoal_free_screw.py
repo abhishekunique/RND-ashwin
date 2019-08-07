@@ -7,7 +7,8 @@ import imageio
 import pickle
 
 cur_dir = os.path.dirname(os.path.realpath(__file__))
-directory = cur_dir + "/free_screw_2_goals_less_tiny_box_"
+# directory = cur_dir + "/free_screw_2_goals_less_tiny_box_"
+directory = cur_dir + "/free_screw_2_goals_regular_box_"
 
 def main():
     pos_goals = [(0.01, 0.01), (-0.01, -0.01)]
@@ -15,20 +16,28 @@ def main():
     for goal_index, (angle_goal, pos_goal) in enumerate(zip(angle_goals, pos_goals)):
         num_positives = 0
         NUM_TOTAL_EXAMPLES, ROLLOUT_LENGTH, STEPS_PER_SAMPLE = 200, 25, 4
-        ANGLE_THRESHOLD, POSITION_THRESHOLD = 0.15, 0.04
+        ANGLE_THRESHOLD, POSITION_THRESHOLD = 0.15, 0.035
         goal_radians = np.pi / 180. * angle_goal  # convert to radians
         observations = []
         images = True
         image_shape = (32, 32, 3)
-        # image_shape = (128, 128, 3)
         
         x, y = pos_goal
         env_kwargs = {
             'camera_settings': {
                 'azimuth': 0,
-                'distance': 0.25,
+                'distance': 0.32,
                 'elevation': -45,
-                'lookat': (0, 0, 0.025)
+                'lookat': (0, 0, 0.03)
+            },
+            'pixel_wrapper_kwargs': {
+                'pixels_only': False,
+                'normalize': False,
+                'render_kwargs': {
+                    'width': image_shape[0],
+                    'height': image_shape[1],
+                    'camera_id': -1,
+                }
             },
 
             # 'camera_settings': {
@@ -47,19 +56,11 @@ def main():
             'goal_collection': True,
             'init_angle_range': (goal_radians - 0.05, goal_radians + 0.05),
             'target_angle_range': (goal_radians, goal_radians),
-            'pixel_wrapper_kwargs': {
-                'pixels_only': False,
-                'normalize': False,
-                'render_kwargs': {
-                    'width': image_shape[0],
-                    'height': image_shape[1],
-                    'camera_id': -1
-                },
-            },
             'observation_keys': ('pixels', 'claw_qpos', 'last_action', 'goal_index'),
             'goal_completion_orientation_threshold': ANGLE_THRESHOLD,
             'goal_completion_position_threshold': POSITION_THRESHOLD,
         }
+
         env = GymAdapter(
             domain='DClaw',
             task='TurnFreeValve3MultiGoal-v0',

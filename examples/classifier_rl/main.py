@@ -109,6 +109,10 @@ class ExperimentRunnerClassifierRL(ExperimentRunner):
             algorithm_kwargs['goal_example_validation_pools'] = goal_pools_validation
 
         self.algorithm = get_algorithm_from_variant(**algorithm_kwargs)
+        
+        # Give the algorithm to the sampler to calculate reward
+        if variant['sampler_params']['type'] == 'ClassifierSampler':
+            sampler.set_algorithm(self.algorithm)
 
         initialize_tf_variables(self._session, only_uninitialized=True)
 

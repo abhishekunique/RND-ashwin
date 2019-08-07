@@ -41,7 +41,6 @@ class PixelObservationWrapper(ObservationWrapper):
             ValueError: If `env`'s observation already contains the specified
                 `observation_key`.
         """
-
         super(PixelObservationWrapper, self).__init__(env)
         if render_kwargs is None:
             render_kwargs = {}

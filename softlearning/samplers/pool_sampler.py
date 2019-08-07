@@ -57,7 +57,6 @@ class PoolSampler(BaseSampler):
         return processed_observation
 
     def sample(self):
-        print('sampling')
         assert self._initial_pool_size == self.pool.size
 
         if self._current_observation is None:

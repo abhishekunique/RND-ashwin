@@ -202,8 +202,8 @@ class ExperimentRunner(tune.Trainable):
         self.replay_pool.save_latest_experience(replay_pool_pickle_path)
 
     def _restore_replay_pool(self, current_checkpoint_dir):
-        experiment_root = os.path.dirname(current_checkpoint_dir)
-
+        # experiment_root = os.path.dirname(current_checkpoint_dir)
+        experiment_root = current_checkpoint_dir
         experience_paths = [
             self._replay_pool_pickle_path(checkpoint_dir)
             for checkpoint_dir in sorted(glob.iglob(

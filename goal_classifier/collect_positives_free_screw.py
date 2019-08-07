@@ -33,9 +33,9 @@ def main():
         },
         'camera_settings': {
             'azimuth': 0.,
-            'distance': 0.35,
-            'elevation': -38.17570837642188,
-            'lookat': np.array([0.00046945, -0.00049496, 0.05389398]),
+            'distance': 0.32,
+            'elevation': -45,
+            'lookat': (0, 0, 0.03),
         },
         'init_angle_range': (goal_angle - 0.05, goal_angle + 0.05),
         'target_angle_range': (goal_angle, goal_angle),
