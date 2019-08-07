@@ -55,6 +55,8 @@ class SAC(RLAlgorithm):
             save_full_state=False,
             save_eval_paths=False,
             per_alpha=1,
+
+            state_estimator=None,
             **kwargs,
     ):
         """
@@ -80,7 +82,6 @@ class SAC(RLAlgorithm):
         """
 
         super(SAC, self).__init__(**kwargs)
-
         self._training_environment = training_environment
         self._evaluation_environment = evaluation_environment
         self._policy = policy
@@ -124,6 +125,8 @@ class SAC(RLAlgorithm):
         self._save_full_state = save_full_state
         self._save_eval_paths = save_eval_paths
         self._goal_classifier_params_directory = goal_classifier_params_directory
+
+        self._state_estimator = state_estimator
         self._build()
 
     def _build(self):
@@ -350,6 +353,33 @@ class SAC(RLAlgorithm):
         feed_dict = self._get_feed_dict(iteration, batch)
         self._session.run(self._training_ops, feed_dict)
 
+        # Train the state estimator
+        if self._state_estimator is not None:
+            self._state_estimator.trainable = True
+            self._state_estimator.compile(optimizer='adam', loss='mse')
+            train_obs = batch['observations']
+            obs_keys_to_estimate = (
+                'object_position',
+                'object_orientation_cos',
+                'object_orientation_sin',
+            )
+            pixels = train_obs['pixels']
+            ground_truth_state = np.concatenate(
+                [eval_obs[key] for key in obs_keys_to_estimate], axis=1)
+
+            self._state_estimator.fit(
+                x=pixels,
+                y=ground_truth_state,
+                batch_size=32,
+                epochs=self._state_estimation_iters or 1
+            )
+            self._state_estimator.trainable = False
+            self._state_estimator.compile()
+            # Copy over weights
+            for Q, Q_target in zip(self._Qs, self._Q_targets):
+                Q.preprocessors['pixels'].set_weights(self._state_estimator.get_weights())
+                Q_target.preprocessors['pixels'].set_weights(self._state_estimator.get_weights())
+
         if self._her_iters:
             # Q: Is it better to build a large batch and take one grad step, or
             # resample many mini batches and take many grad steps?
@@ -482,26 +512,26 @@ class SAC(RLAlgorithm):
             })).items()
         ]))
 
-        if 'pixels' in self._policy.preprocessors:
-            state_estimator = self._policy.preprocessors['pixels']
-            if state_estimator.name == 'state_estimator_preprocessor':
-                eval_obs = batch['observations']
-                obs_keys_to_estimate = (
-                    'object_position',
-                    'object_orientation_cos',
-                    'object_orientation_sin',
-                )
-                pixels = eval_obs['pixels']
-                ground_truth_state = np.concatenate(
-                    [eval_obs[key] for key in obs_keys_to_estimate], axis=1)
-                preds = state_estimator.predict(pixels)
-                diffs = preds - ground_truth_state
-                norms = np.linalg.norm(diffs, axis=1)
-                diagnostics.update({
-                    'state_estimator/state_estimation_error_mean': np.mean(
-                        norms
-                    ) 
-                })
+        if 'pixels' in self._policy.preprocessors and self._state_estimator is not None:
+            # state_estimator = self._policy.preprocessors['pixels']
+            state_estimator = self._state_estimator
+            eval_obs = batch['observations']
+            obs_keys_to_estimate = (
+                'object_position',
+                'object_orientation_cos',
+                'object_orientation_sin',
+            )
+            pixels = eval_obs['pixels']
+            ground_truth_state = np.concatenate(
+                [eval_obs[key] for key in obs_keys_to_estimate], axis=1)
+            preds = state_estimator.predict(pixels)
+            diffs = preds - ground_truth_state
+            norms = np.linalg.norm(diffs, axis=1)
+            diagnostics.update({
+                'state_estimator/state_estimation_error_mean': np.mean(
+                    norms
+                ) 
+            })
         
         if self._goal_classifier:
             diagnostics.update({
@@ -519,8 +549,12 @@ class SAC(RLAlgorithm):
         return diagnostics
 
     # def training_before_hook(self):
-    #     preprocessor = self.policy.preprocessors['pixels']
-    #     self.preprocessor_weights = preprocessor.get_weights()
+    #     print('\n TRAINING BEFORE HOOK \n')
+    #     if self._state_estimator is not None:
+    #         print('Training state estimator...')
+            
+    #     # preprocessor = self.policy.preprocessors['pixels']
+    #     # self.preprocessor_weights = preprocessor.get_weights()
 
     # def training_after_hook(self):
     #     new_weights = self.policy.preprocessors['pixels'].get_weights

@@ -19,7 +19,8 @@ def get_state_estimator_preprocessor(name='state_estimator_preprocessor', **kwar
     preprocessor.load_weights(path)
 
     # Set all params to not-trainable 
-    preprocessor.trainable = False 
+    preprocessor.trainable = False
+    preprocessor.compile(optimizer='adam', loss='mean_squared_error')
 
     preprocessor.summary()
     return preprocessor  

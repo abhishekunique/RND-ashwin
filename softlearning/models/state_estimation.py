@@ -14,7 +14,7 @@ import pickle
 import glob
 import os
 
-def state_estimator_model(domain, task, obs_keys_to_estimate):
+def state_estimator_model(domain, task, obs_keys_to_estimate, input_shape):
     """
     Need to pass in the obs_keys that the model will estimate
     """
@@ -36,7 +36,8 @@ def state_estimator_model(domain, task, obs_keys_to_estimate):
     }
     preprocessor = convnet_model(name='convnet_preprocessor', **convnet_kwargs)
 
-    inputs = Input(shape=(32, 32, 3))
+    
+    inputs = Input(shape=input_shape)
     preprocessed = preprocessor(inputs)
     estimator_outputs = feedforward_model(
         hidden_layer_sizes=(256, 256),
@@ -45,7 +46,6 @@ def state_estimator_model(domain, task, obs_keys_to_estimate):
     )(preprocessed)
    
     # model = PicklableSequential((
-
     # ), name='state_estimator_preprocessor')
 
     return PicklableModel(inputs, estimator_outputs, name='state_estimator_preprocessor')
