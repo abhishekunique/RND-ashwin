@@ -7,6 +7,7 @@ from . import (
     prioritized_experience_replay_pool,
     multigoal_replay_pool,
     partial_save_pool,
+    uniformly_reweighted_replay_pool,
 )
 
 
@@ -20,6 +21,7 @@ POOL_CLASSES = {
     'PrioritizedExperienceReplayPool': prioritized_experience_replay_pool.PrioritizedExperienceReplayPool,
     'MultiGoalReplayPool': multigoal_replay_pool.MultiGoalReplayPool,
     'PartialSaveReplayPool': partial_save_pool.PartialSaveReplayPool,
+    'UniformlyReweightedReplayPool': uniformly_reweighted_replay_pool.UniformlyReweightedReplayPool,
 }
 
 DEFAULT_REPLAY_POOL = 'SimpleReplayPool'
