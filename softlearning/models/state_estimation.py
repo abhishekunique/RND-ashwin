@@ -112,41 +112,8 @@ def train(model, obs_keys_to_estimate):
 if __name__ == '__main__':
     image_shape = (32, 32, 3)
 
-    env_kwargs = {
-        'pixel_wrapper_kwargs': {
-            'pixels_only': False,
-            'normalize': False,
-            'render_kwargs': {
-                'width': image_shape[0],
-                'height': image_shape[1],
-                'camera_id': -1,
-            },
-        },
-        'camera_settings': {
-            'azimuth': 0.,
-            'distance': 0.32,
-            'elevation': -45,
-            'lookat': (0, 0, 0.03),
-        },
-        'init_angle_range': (-np.pi, np.pi),
-        'target_angle_range': (-np.pi, np.pi),
-        'observation_keys': (
-            'pixels',
-            'claw_qpos',
-            'last_action',
-            'object_position',
-            'object_orientation_cos',
-            'object_orientation_sin'
-        ), 
-    }
-    env = GymAdapter(
-        domain='DClaw',
-        task='TurnFreeValve3Fixed-v0',
-        **env_kwargs
-    )
-
     obs_keys = ('object_position', 'object_orientation_cos', 'object_orientation_sin')
-    model = state_estimator_model(env, obs_keys_to_estimate=obs_keys)
+    model = state_estimator_model('DClaw', 'TurnFreeValve3ResetFreeSwapGoal-v0', obs_keys_to_estimate=obs_keys, input_shape=image_shape)
     model.summary()
     model.compile(optimizer='adam', loss='mean_squared_error')
 

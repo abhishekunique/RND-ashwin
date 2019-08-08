@@ -538,7 +538,7 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK = {
                     'object_position',
                     'object_orientation_cos',
                     'object_orientation_sin',
-                    'target_orientation',
+                    'target_angle',
                 ),
             },
             'TurnFreeValve3ResetFreeCurriculum-v0': {
@@ -781,8 +781,8 @@ def get_environment_params(universe, domain, task):
 NUM_CHECKPOINTS = 10
 SAMPLER_PARAMS_PER_DOMAIN = {
     'DClaw': {
-        # 'type': 'SimpleSampler', 
-        'type': 'PoolSampler', 
+        'type': 'SimpleSampler', 
+        # 'type': 'PoolSampler', 
 
         # 'nn_pool_dir': '/mnt/sda/ray_results/gym/DClaw/TurnFreeValve3ResetFree-v0/2019-07-01T12-08-30-smaller_box/id=70000b2d-seed=8699_2019-07-01_12-08-314r_kc234/'
     },
@@ -842,7 +842,7 @@ def evaluation_environment_params(spec):
                 'object_position',
                 'object_orientation_cos',
                 'object_orientation_sin',
-                'target_orientation',
+                'target_angle',
             ),
 
         }
@@ -912,8 +912,8 @@ def get_variant_spec_base(universe, domain, task, policy, algorithm):
             'kwargs': {
                 'max_size': int(3e5) # int(1e6),
             },
-            # 'last_checkpoint_dir': '',
-            'last_checkpoint_dir': '/home/justinvyu/ray_results/gym/DClaw/TurnFreeValve3ResetFreeSwapGoal-v0/2019-08-05T15-41-14-state_gtr_2_goals_with_resets_regular_box_saving_pixels/id=22505fd1-seed=1822_2019-08-05_15-41-164900r5on',
+            'last_checkpoint_dir': '',
+            # 'last_checkpoint_dir': '/home/justinvyu/ray_results/gym/DClaw/TurnFreeValve3ResetFreeSwapGoal-v0/2019-08-05T15-41-14-state_gtr_2_goals_with_resets_regular_box_saving_pixels/id=22505fd1-seed=1822_2019-08-05_15-41-164900r5on',
             # 'last_checkpoint_dir': '/mnt/sda/ray_results/gym/DClaw/TurnFreeValve3ResetFree-v0/2019-07-01T12-08-30-smaller_box/id=70000b2d-seed=8699_2019-07-01_12-08-314r_kc234/', 
         },
         'sampler_params': deep_update({
@@ -1027,7 +1027,7 @@ def get_variant_spec_image(universe,
     variant_spec = get_variant_spec_base(
         universe, domain, task, policy, algorithm, *args, **kwargs)
 
-    use_state_estimation = False
+    use_state_estimation = True
     if is_image_env(universe, domain, task, variant_spec):
         if use_state_estimation:
             preprocessor_params = {
@@ -1039,7 +1039,10 @@ def get_variant_spec_image(universe,
                         'object_position',
                         'object_orientation_cos',
                         'object_orientation_sin',
-                    )
+                    ),
+                    'input_shape': (32, 32, 3)
+
+                    # 'input_shape': (64, 64, 3)
                 }
             }
         else:

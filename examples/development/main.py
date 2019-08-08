@@ -95,7 +95,8 @@ class ExperimentRunner(tune.Trainable):
             Q_targets=Q_targets,
             pool=replay_pool,
             sampler=sampler,
-            session=self._session)
+            session=self._session,
+            state_estimator=self.policy.preprocessors['pixels'])
 
         if isinstance(replay_pool, PrioritizedExperienceReplayPool) and \
            replay_pool._mode == 'Bellman_Error':
