@@ -7,6 +7,7 @@ class UniformlyReweightedReplayPool(ReweightedReplayPool):
     def __init__(self,
                  bin_boundaries,
                  bin_obs_keys, # obs keys to bin on
+                 inverse_proportion_exploration_bonus_scaling=0,
                  *args,
                  **kwargs):
         super().__init__(*args, **kwargs)
@@ -14,6 +15,7 @@ class UniformlyReweightedReplayPool(ReweightedReplayPool):
         self._bin_obs_keys = bin_obs_keys
         self._bins = defaultdict(list) # dict: bin_index_tuple->list of sample_inds
         self._reverse_bins = {} # sample_ind -> bin_index_tuple
+        self._inverse_proportion_exploration_bonus_scaling = inverse_proportion_exploration_bonus_scaling
 
     def _set_sample_weights(self, batch, batch_indices):
         observation = batch['observations']
@@ -45,3 +47,14 @@ class UniformlyReweightedReplayPool(ReweightedReplayPool):
             self._unnormalized_weights[sample_inds] = 1 / len(sample_inds)
             delta_norm_constant += np.sum(self._unnormalized_weights[sample_inds])
         self._normalization_constant += delta_norm_constant
+
+    def random_batch(self, batch_size, field_name_filter=None, **kwargs):
+        """ Modify random training batch by adding an exploration bonus to the rewards. """
+        random_indices = self.random_indices(batch_size)
+        batch = self.batch_by_indices(
+            random_indices, field_name_filter=field_name_filter, **kwargs)
+        if self._inverse_proportion_exploration_bonus_scaling:
+            ## Add bonus to rewards
+            inverse_proportions = np.array([self._normalization_constant/len(self._bins[self._reverse_bins[i]]) for i in random_indices])
+            batch['rewards'] += inverse_proportions * self._inverse_proportion_exploration_bonus_scaling
+        return batch
