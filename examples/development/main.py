@@ -84,6 +84,11 @@ class ExperimentRunner(tune.Trainable):
         initial_exploration_policy = self.initial_exploration_policy = (
             get_policy_from_params(
                 variant['exploration_policy_params'], training_environment))
+        
+        try:
+            state_estimator = self.policy.preprocessors['pixels']
+        except:
+            state_estimator = None
 
         self.algorithm = get_algorithm_from_variant(
             variant=self._variant,
@@ -96,7 +101,7 @@ class ExperimentRunner(tune.Trainable):
             pool=replay_pool,
             sampler=sampler,
             session=self._session,
-            state_estimator=self.policy.preprocessors['pixels'])
+            state_estimator=state_estimator)
 
         if isinstance(replay_pool, PrioritizedExperienceReplayPool) and \
            replay_pool._mode == 'Bellman_Error':

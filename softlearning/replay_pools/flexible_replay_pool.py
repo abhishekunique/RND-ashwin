@@ -108,8 +108,10 @@ class FlexibleReplayPool(ReplayPool):
 
         index = np.arange(
             self._pointer, self._pointer + num_samples) % self._max_size
-
         for field_name, values in samples.items():
+            # Extra items in the pool that don't need to be added
+            if field_name not in self.fields_flat:
+                continue
             default_value = self.fields_flat[field_name].default_value
             values = samples.get(field_name, default_value)
             if field_name == "super_observations":
