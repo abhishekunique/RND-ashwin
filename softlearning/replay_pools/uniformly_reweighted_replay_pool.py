@@ -56,5 +56,6 @@ class UniformlyReweightedReplayPool(ReweightedReplayPool):
         if self._inverse_proportion_exploration_bonus_scaling:
             ## Add bonus to rewards
             inverse_proportions = np.array([self._normalization_constant/len(self._bins[self._reverse_bins[i]]) for i in random_indices])
+            inverse_proportions = inverse_proportions.reshape(-1, 1)
             batch['rewards'] += inverse_proportions * self._inverse_proportion_exploration_bonus_scaling
         return batch
