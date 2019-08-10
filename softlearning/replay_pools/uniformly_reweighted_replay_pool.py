@@ -17,10 +17,10 @@ class UniformlyReweightedReplayPool(ReweightedReplayPool):
         self._reverse_bins = {} # sample_ind -> bin_index_tuple
         self._inverse_proportion_exploration_bonus_scaling = inverse_proportion_exploration_bonus_scaling
 
-    def _set_sample_weights(self, batch, batch_indices):
-        observation = batch['observations']
+    def _set_sample_weights(self, samples, sample_indices):
+        observation = samples['observations']
         bin_inds = []
-        for i, batch_ind in enumerate(batch_indices):
+        for i, sample_ind in enumerate(sample_indices):
             bin_ind = []
             bin_dim = 0
             for key in self._bin_obs_keys:
@@ -33,11 +33,11 @@ class UniformlyReweightedReplayPool(ReweightedReplayPool):
             bin_ind = tuple(bin_ind)
             bin_inds.append(bin_ind)
 
-            self._bins[bin_ind].append(batch_ind)
+            self._bins[bin_ind].append(sample_ind)
             if self._size == self._max_size: # samples are starting to get deleted
-                old_bin_ind = self._reverse_bins[batch_ind]
-                self._bins[old_bin_ind].remove(batch_ind)
-            self._reverse_bins[batch_ind] = bin_ind
+                old_bin_ind = self._reverse_bins[sample_ind]
+                self._bins[old_bin_ind].remove(sample_ind)
+            self._reverse_bins[sample_ind] = bin_ind
         bin_inds = set(bin_inds)
 
         delta_norm_constant = 0

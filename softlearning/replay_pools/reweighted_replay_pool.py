@@ -51,9 +51,8 @@ class ReweightedReplayPool(SimpleReplayPool):
             )[::-1, None],
         })
 
+        self._set_sample_weights(path, indices)
         self.add_samples(path)
-        path_batch = self.last_n_batch(path_length)
-        self._set_sample_weights(path_batch, indices)
 
     @abc.abstractmethod
     def _set_sample_weights(self, batch, indices):
