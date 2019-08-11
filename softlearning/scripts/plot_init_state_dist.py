@@ -8,7 +8,6 @@ import sys
 import pickle
 import gzip
 import matplotlib.pyplot as plt
-import seaborn as sns; sns.set()
 from matplotlib.colors import ListedColormap
 
 # from softlearning.environments.gym import register_environments

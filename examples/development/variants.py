@@ -789,15 +789,7 @@ def evaluation_environment_params(spec):
         pass
     elif training_environment_params['task'] == 'TurnFreeValve3ResetFreeSwapGoal-v0':
         eval_environment_params['task'] = 'TurnFreeValve3ResetFreeSwapGoalEval-v0' #'TurnFreeValve3RandomReset-v0'
-        eval_environment_params['kwargs'] = {
-            'reward_keys_and_weights': {
-                'object_to_target_position_distance_reward': 2,
-                'object_to_target_orientation_distance_reward': 1,
-            },
-            # 'initial_distribution_path': '/mnt/sda/ray_results/gym/DClaw/TurnFreeValve3ResetFree-v0/2019-06-30T18-53-06-baseline_both_push_and_turn_log_rew/id=38872574-seed=6880_2019-06-30_18-53-07whkq1aax/',
-            # 'reset_from_corners': False,
-            'goals': training_environment_params['kwargs']['goals'],
-        }
+        del eval_environment_params['kwargs']['reset_fingers']
     elif training_environment_params['task'] == 'TurnFreeValve3ResetFreeCurriculum-v0':
         eval_environment_params['task'] = 'TurnFreeValve3ResetFreeCurriculumEval-v0' #'TurnFreeValve3RandomReset-v0'
         eval_environment_params['kwargs'] = {
@@ -952,7 +944,8 @@ def get_variant_spec_base(universe, domain, task, policy, algorithm):
         variant_spec['policy_params']['kwargs']['observation_keys'] = variant_spec[
             'exploration_policy_params']['kwargs']['observation_keys'] = variant_spec[
                 'Q_params']['kwargs']['observation_keys'] = non_object_obs_keys
-
+    if "ResetFree" not in task:
+        variant_spec['algorithm_params']['kwargs']['save_training_video_frequency'] = 0
     return variant_spec
 
 

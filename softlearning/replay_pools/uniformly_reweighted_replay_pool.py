@@ -1,33 +1,35 @@
 from .reweighted_replay_pool import ReweightedReplayPool
 import numpy as np
 from collections import defaultdict
+from flatten_dict import flatten
 
 
 class UniformlyReweightedReplayPool(ReweightedReplayPool):
     def __init__(self,
                  bin_boundaries,
-                 bin_obs_keys, # obs keys to bin on
+                 bin_keys, # obs keys to bin on
                  inverse_proportion_exploration_bonus_scaling=0,
                  *args,
                  **kwargs):
         super().__init__(*args, **kwargs)
         self._bin_boundaries = bin_boundaries
-        self._bin_obs_keys = bin_obs_keys
+        self._bin_keys = bin_keys # sample keys to bin on
         self._bins = defaultdict(list) # dict: bin_index_tuple->list of sample_inds
         self._reverse_bins = {} # sample_ind -> bin_index_tuple
         self._inverse_proportion_exploration_bonus_scaling = inverse_proportion_exploration_bonus_scaling
 
     def _set_sample_weights(self, samples, sample_indices):
-        observation = samples['observations']
+        flattened_samples = flatten(samples)
+        # observation = samples['observations']
         bin_inds = []
         for i, sample_ind in enumerate(sample_indices):
             bin_ind = []
             bin_dim = 0
-            for key in self._bin_obs_keys:
-                for j in range(observation[key].shape[1]):
+            for key in self._bin_keys:
+                for j in range(flattened_samples[key].shape[1]):
                     bin_ind.append(
                         np.digitize(
-                            observation[key][i, j],
+                            flattened_samples[key][i, j],
                             self._bin_boundaries[bin_dim]))
                     bin_dim += 1
             bin_ind = tuple(bin_ind)
@@ -48,6 +50,9 @@ class UniformlyReweightedReplayPool(ReweightedReplayPool):
             delta_norm_constant += np.sum(self._unnormalized_weights[sample_inds])
         self._normalization_constant += delta_norm_constant
 
+        ## add normalized weights to env_infos
+        samples['infos']['reward/normalized_bin_weights'] = self._unnormalized_weights[sample_indices] / self._normalization_constant
+
     def random_batch(self, batch_size, field_name_filter=None, **kwargs):
         """ Modify random training batch by adding an exploration bonus to the rewards. """
         random_indices = self.random_indices(batch_size)
@@ -55,7 +60,6 @@ class UniformlyReweightedReplayPool(ReweightedReplayPool):
             random_indices, field_name_filter=field_name_filter, **kwargs)
         if self._inverse_proportion_exploration_bonus_scaling:
             ## Add bonus to rewards
-            inverse_proportions = np.array([self._normalization_constant/len(self._bins[self._reverse_bins[i]]) for i in random_indices])
-            inverse_proportions = inverse_proportions.reshape(-1, 1)
-            batch['rewards'] += inverse_proportions * self._inverse_proportion_exploration_bonus_scaling
+            inverse_proportions = self._unnormalized_weights[random_indices] / self._normalization_constant
+            batch['rewards'] += inverse_proportions.reshape(-1, 1) * self._inverse_proportion_exploration_bonus_scaling
         return batch
