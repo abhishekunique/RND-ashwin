@@ -932,6 +932,21 @@ def get_variant_spec_base(universe, domain, task, policy, algorithm):
         # variant_spec['policy_params']['kwargs']['observation_keys'] = variant_spec[
         #     'exploration_policy_params']['kwargs']['observation_keys'] = variant_spec[
         #         'Q_params']['kwargs']['observation_keys'] = DEFAULT_OBSERVATION_KEYS
+
+        variant_spec['replay_pool_params']['type'] = 'UniformlyReweightedReplayPool'
+        variant_spec['replay_pool_params']['kwargs'].update({
+            'bin_boundaries': (
+                np.arange(-0.1, 0.1, 0.01),
+                np.arange(-0.1, 0.1, 0.01),
+                np.arange(-np.pi, np.pi, 0.2),
+            ),
+            'bin_keys': (
+                ('infos', 'obs/object_xy_position'),
+                ('infos', 'obs/object_angle'),
+            ),
+            'bin_weight_bonus_scaling': 1000,
+        })
+
     env_kwargs = variant_spec['environment_params']['training']['kwargs']
     if "pixel_wrapper_kwargs" in env_kwargs.keys() and \
        "device_path" not in env_kwargs.keys():

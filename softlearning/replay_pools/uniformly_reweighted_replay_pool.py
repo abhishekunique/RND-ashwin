@@ -8,7 +8,7 @@ class UniformlyReweightedReplayPool(ReweightedReplayPool):
     def __init__(self,
                  bin_boundaries,
                  bin_keys, # obs keys to bin on
-                 inverse_proportion_exploration_bonus_scaling=0,
+                 bin_weight_bonus_scaling=0, # exploration bonus
                  *args,
                  **kwargs):
         super().__init__(*args, **kwargs)
@@ -16,7 +16,7 @@ class UniformlyReweightedReplayPool(ReweightedReplayPool):
         self._bin_keys = bin_keys # sample keys to bin on
         self._bins = defaultdict(list) # dict: bin_index_tuple->list of sample_inds
         self._reverse_bins = {} # sample_ind -> bin_index_tuple
-        self._inverse_proportion_exploration_bonus_scaling = inverse_proportion_exploration_bonus_scaling
+        self._bin_weight_bonus_scaling = bin_weight_bonus_scaling
 
     def _set_sample_weights(self, samples, sample_indices):
         flattened_samples = flatten(samples)
@@ -51,15 +51,18 @@ class UniformlyReweightedReplayPool(ReweightedReplayPool):
         self._normalization_constant += delta_norm_constant
 
         ## add normalized weights to env_infos
-        samples['infos']['reward/normalized_bin_weights'] = self._unnormalized_weights[sample_indices] / self._normalization_constant
+        samples[
+            'infos'][
+            'reward/normalized_bin_weight_bonus'] = self._unnormalized_weights[
+                sample_indices] / self._normalization_constant * self._bin_weight_bonus_scaling
 
     def random_batch(self, batch_size, field_name_filter=None, **kwargs):
         """ Modify random training batch by adding an exploration bonus to the rewards. """
         random_indices = self.random_indices(batch_size)
         batch = self.batch_by_indices(
             random_indices, field_name_filter=field_name_filter, **kwargs)
-        if self._inverse_proportion_exploration_bonus_scaling:
+        if self._bin_weight_bonus_scaling:
             ## Add bonus to rewards
-            inverse_proportions = self._unnormalized_weights[random_indices] / self._normalization_constant
-            batch['rewards'] += inverse_proportions.reshape(-1, 1) * self._inverse_proportion_exploration_bonus_scaling
+            normalized_weights = self._unnormalized_weights[random_indices] / self._normalization_constant
+            batch['rewards'] += normalized_weights.reshape(-1, 1) * self._bin_weight_bonus_scaling
         return batch
