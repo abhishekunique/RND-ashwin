@@ -194,8 +194,8 @@ NUM_EPOCHS_PER_UNIVERSE_DOMAIN_TASK = {
             DEFAULT_KEY: 100,
         },
         'DClaw': {
-            DEFAULT_KEY: int(1.5e3),
-            # DEFAULT_KEY: 500,
+            # DEFAULT_KEY: int(1.5e3),
+            DEFAULT_KEY: 500,
         },
     },
     'dm_control': {
@@ -921,9 +921,8 @@ def get_variant_spec_base(universe, domain, task, policy, algorithm):
             'kwargs': {
                 'max_size': int(3e5) # int(1e6),
             },
-            # 'last_checkpoint_dir': '',
-            'last_checkpoint_dir': '/home/justinvyu/ray_results/gym/DClaw/TurnFreeValve3ResetFreeSwapGoal-v0/2019-08-07T14-57-41-state_gtr_2_goals_with_resets_regular_box_saving_pixels_fixed_env/id=612875d0-seed=9463_2019-08-07_14-57-42op75_8n7',
-            # 'last_checkpoint_dir': '/home/justinvyu/ray_results/gym/DClaw/TurnFreeValve3ResetFreeSwapGoal-v0/2019-08-05T15-41-14-state_gtr_2_goals_with_resets_regular_box_saving_pixels/id=22505fd1-seed=1822_2019-08-05_15-41-164900r5on',
+            'last_checkpoint_dir': '',
+            # 'last_checkpoint_dir': '/home/justinvyu/ray_results/gym/DClaw/TurnFreeValve3ResetFreeSwapGoal-v0/2019-08-07T14-57-41-state_gtr_2_goals_with_resets_regular_box_saving_pixels_fixed_env/id=612875d0-seed=9463_2019-08-07_14-57-42op75_8n7',
             # 'last_checkpoint_dir': '/mnt/sda/ray_results/gym/DClaw/TurnFreeValve3ResetFree-v0/2019-07-01T12-08-30-smaller_box/id=70000b2d-seed=8699_2019-07-01_12-08-314r_kc234/', 
         },
         'sampler_params': deep_update({
@@ -1037,7 +1036,7 @@ def get_variant_spec_image(universe,
     variant_spec = get_variant_spec_base(
         universe, domain, task, policy, algorithm, *args, **kwargs)
 
-    use_state_estimation = True
+    use_state_estimation = False
     if is_image_env(universe, domain, task, variant_spec):
         if use_state_estimation:
             preprocessor_params = {
