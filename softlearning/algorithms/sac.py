@@ -393,13 +393,17 @@ class SAC(RLAlgorithm):
             from skimage import io
             random_idx = np.random.randint(
                 batch['observations']['pixels'].shape[0])
+            image = batch['observations']['pixels'][random_idx].copy()
+            if image.shape[-1] == 6:
+                img_0, img_1 = np.split(
+                    image, 2, axis=2)
+                image = np.concatenate([img_0, img_1], axis=1)
             image_save_dir = os.path.join(os.getcwd(), 'pixels')
             image_save_path = os.path.join(
                 image_save_dir, f'observation_{iteration}_batch.png')
             if not os.path.exists(image_save_dir):
                 os.makedirs(image_save_dir)
-            io.imsave(image_save_path,
-                      batch['observations']['pixels'][random_idx].copy())
+            io.imsave(image_save_path, image)
 
         feed_dict = {
             placeholders_flat[key]: batch_flat[key]

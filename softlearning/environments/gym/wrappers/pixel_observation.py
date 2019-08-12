@@ -18,7 +18,8 @@ class PixelObservationWrapper(ObservationWrapper):
                  pixels_only=True,
                  render_kwargs=None,
                  normalize=False,
-                 observation_key='pixels'):
+                 observation_key='pixels',
+                 camera_ids=(-1,)):
         """Initializes a new pixel Wrapper.
 
         Args:
@@ -48,6 +49,20 @@ class PixelObservationWrapper(ObservationWrapper):
         render_mode = render_kwargs.pop('mode', 'rgb_array')
         assert render_mode == 'rgb_array', render_mode
         render_kwargs['mode'] = 'rgb_array'
+
+        # Specify number of cameras and their ids to render with
+        # The observation will become a depthwise concatenation of all the
+        # images gathered from these specified cameras.
+        self._camera_ids = camera_ids
+        self._render_kwargs_per_camera = [
+            {
+                'mode': 'rgb_array',
+                'width': render_kwargs['width'],
+                'height': render_kwargs['height'],
+                'camera_id': camera_id,
+            }
+            for camera_id in self._camera_ids
+        ]
 
         wrapped_observation_space = env.observation_space
 
@@ -99,13 +114,25 @@ class PixelObservationWrapper(ObservationWrapper):
         return pixel_observation
 
     def _get_pixels(self):
-        try:
-            pixels = self.env.get_pixels(**self._render_kwargs)
-        except AttributeError:
-            pixels = self.env.render(**self._render_kwargs)
+        pixels = []
+        # try:
+        #     for render_kwargs in self._render_kwargs_per_camera:
+        #         _pixels = self.env.get_pixels(**render_kwargs)
+        #         pixels.append(_pixels)
+
+        # except AttributeError:
+        #     for render_kwargs in self._render_kwargs_per_camera:
+        #         _pixels = self.env.render(**self._render_kwargs)
+        #         pixels.append(_pixels)
+        for render_kwargs in self._render_kwargs_per_camera:
+            _pixels = self.env.render(**render_kwargs)
+            pixels.append(_pixels)
+           
+        pixels = np.concatenate(pixels, axis=2)
 
         if self._normalize:
             pixels = (2. / 255. * pixels) - 1.
+
         return pixels
 
 

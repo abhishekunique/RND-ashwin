@@ -9,7 +9,9 @@ import imageio
 import pickle
 
 cur_dir = os.path.dirname(os.path.realpath(__file__))
-directory = cur_dir + "/free_screw_180_regular_box_32"
+# directory = cur_dir + "/free_screw_180_regular_box_32"
+directory = cur_dir + "/test"
+
 if not os.path.exists(directory):
     os.makedirs(directory)
 
@@ -19,7 +21,7 @@ def main():
     goal_angle = np.pi
     observations = []
     images = True
-    image_shape = (32, 32, 3)
+    image_shape = (128, 128, 3)
 
     env_kwargs = {
         'pixel_wrapper_kwargs': {
@@ -30,8 +32,9 @@ def main():
                 'height': image_shape[1],
                 'camera_id': -1,
             },
+            'camera_ids': (-1, 0),
         },
-        'camera_settings': {
+        'camera_settings': { # Free camera settings
             'azimuth': 0.,
             'distance': 0.32,
             'elevation': -45,
@@ -60,7 +63,6 @@ def main():
             action = env.action_space.sample()
             for _ in range(STEPS_PER_SAMPLE):
                 observation, _, _, _ = env.step(action)
-
             # env.render()  # render on display
             obs_dict = env.get_obs_dict()
 
@@ -74,7 +76,13 @@ def main():
                 print(observation)
                 if images:
                     img_obs = observation['pixels']
-                    imageio.imwrite(directory + '/img%i.jpg' % num_positives, img_obs)
+                    img_0, img_1 = np.split(
+                        img_obs,
+                        indices_or_sections=2,
+                        axis=2
+                    )
+                    concat_obs = np.concatenate([img_0, img_1], axis=1)
+                    imageio.imwrite(directory + '/img%i.jpg' % num_positives, concat_obs)
                 num_positives += 1
             t += 1
 

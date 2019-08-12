@@ -429,7 +429,8 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK = {
             # },
             'TurnFreeValve3Fixed-v0': {
 	 	'camera_settings': {
-                    'azimuth': 45,
+                    # 'azimuth': 45,
+                    'azimuth': 0,
                     'distance': 0.35,
                     'elevation': -45,
                     'lookat': (0, 0, 0.03)
@@ -446,9 +447,10 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK = {
                     'pixels_only': False,
                     'render_kwargs': {
                         'camera_id': -1,
-                        'width': 64,
-                        'height': 64
-                    }
+                        'width': 32,
+                        'height': 32
+                    },
+                    'camera_ids': (-1, 0),
                 },
                 'reward_keys_and_weights': {
                     'object_to_target_position_distance_reward': 0.1,
@@ -523,13 +525,14 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK = {
                     'pixels_only': False,
                     'normalize': False,
                     'render_kwargs': {
-                        'width': 64,
-                        'height': 64,
+                        'width': 32,
+                        'height': 32,
                         'camera_id': -1,
                     },
+                    'camera_ids': (-1, 0),
                 },
                 'camera_settings': {
-                    'azimuth': 45,
+                    'azimuth': 0, # 45
                     'distance': 0.35,
                     'elevation': -45,
                     'lookat': (0, 0, 0.03)
@@ -790,8 +793,8 @@ def get_environment_params(universe, domain, task):
 NUM_CHECKPOINTS = 10
 SAMPLER_PARAMS_PER_DOMAIN = {
     'DClaw': {
-        # 'type': 'SimpleSampler', 
-        'type': 'PoolSampler', 
+        'type': 'SimpleSampler', 
+        # 'type': 'PoolSampler', 
 
         # 'nn_pool_dir': '/mnt/sda/ray_results/gym/DClaw/TurnFreeValve3ResetFree-v0/2019-07-01T12-08-30-smaller_box/id=70000b2d-seed=8699_2019-07-01_12-08-314r_kc234/'
     },
@@ -833,13 +836,15 @@ def evaluation_environment_params(spec):
                 'pixels_only': False,
                 'normalize': False,
                 'render_kwargs': {
-                    'width': 64,
-                    'height': 64,
+                    'width': 32,
+                    'height': 32,
                     'camera_id': -1,
                 },
+                'camera_ids': (-1, 0),
             },
             'camera_settings': {
-                'azimuth': 45,
+                # 'azimuth': 45,
+                'azimuth': 0,
                 'distance': 0.35,
                 'elevation': -45,
                 'lookat': (0, 0, 0.03)
