@@ -157,8 +157,8 @@ RUN echo "${MJKEY}" > ~/.mujoco/mjkey.txt \
     && conda clean --all -y \
     && rm ~/.mujoco/mjkey.txt
 
-RUN echo "conda activate softlearning" >> ~/.bashrc \
-    && echo "cd ~/softlearning" >> ~/.bashrc
+RUN echo "conda activate vice" >> ~/.bashrc \
+    && echo "cd ~/softlearning-vice" >> ~/.bashrc
 
 #Hack for gpu rendering for mujoco_py
 RUN mkdir -p /usr/lib/nvidia-384

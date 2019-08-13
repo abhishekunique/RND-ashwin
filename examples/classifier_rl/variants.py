@@ -140,11 +140,11 @@ ALGORITHM_PARAMS_ADDITIONAL = {
             'classifier_lr': 1e-4,
             'classifier_batch_size': 128,
             'n_initial_exploration_steps': int(1e3),
-            'n_classifier_train_steps': 5, # tune.grid_search([1, 5]),
+            'n_classifier_train_steps': 5, # tune.grid_search([2, 5]),
             'classifier_optim_name': 'adam',
             'n_epochs': 200,
             'mixup_alpha': 1.0,
-            'save_training_video_frequency': 5,
+            'save_training_video_frequency': 0,
         }
     },
     'VICEGANTwoGoal': {
