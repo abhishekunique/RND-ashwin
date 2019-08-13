@@ -136,3 +136,9 @@ videos*/
 *.h5
 *.pkl
 pixels/
+pixels/
+*.h5
+*.pkl
+*.png
+*.jpg
+*.gif

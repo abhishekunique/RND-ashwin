@@ -27,6 +27,8 @@ def convnet_model(
         downsampling_type='conv',
         activation=layers.LeakyReLU,
         name="convnet",
+        use_dense_layer_output=False,
+        dense_layer_output_size=16,
         *args,
         **kwargs):
     normalization_layer = {
@@ -72,6 +74,11 @@ def convnet_model(
         x = (tf.image.convert_image_dtype(x, tf.float32) - 0.5) * 2.0
         return x
 
+    if use_dense_layer_output:
+        output_layer = tfkl.Dense(dense_layer_output_size)
+    else:
+        output_layer = tfkl.Flatten()
+
     model = PicklableSequential((
         tfkl.Lambda(preprocess),
         *[
@@ -80,7 +87,6 @@ def convnet_model(
             zip(conv_filters, conv_kernel_sizes, conv_strides)
         ],
         tfkl.Flatten(),
-
+        output_layer,
     ), name=name)
-
     return model

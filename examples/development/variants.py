@@ -428,8 +428,8 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK = {
             #     'position_reward_weight': tune.sample_from([50]),
             # },
             'TurnFreeValve3Fixed-v0': {
-	 	'camera_settings': {
-                    'azimuth': 45,
+                'camera_settings': {
+                    'azimuth': 0,
                     'distance': 0.35,
                     'elevation': -45,
                     'lookat': (0, 0, 0.03)
@@ -441,9 +441,13 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK = {
                     'object_position',
                     'object_orientation_cos',
                     'object_orientation_sin',
+                    # 'target_xy_position',
+                    # 'target_z_orientation_cos',
+                    # 'target_z_orientation_sin',
                 ),
                 'pixel_wrapper_kwargs': {
                     'pixels_only': False,
+                    'normalize': False,
                     'render_kwargs': {
                         'camera_id': -1,
                         'width': 64,
@@ -451,9 +455,14 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK = {
                     }
                 },
                 'reward_keys_and_weights': {
-                    'object_to_target_position_distance_reward': 0.1,
+                    'object_to_target_position_distance_reward': tune.grid_search([0.1, 1, 2]),
+                    # 'object_to_target_position_distance_reward': tune.grid_search([0.1]),
                     'object_to_target_orientation_distance_reward': 1,
                 },
+                # 'target_qpos': (
+                #     (0.01, 0.01, 0, 0, 0, np.pi / 2),
+                #     (-0.01, -0.01, 0, 0, 0, -np.pi / 2)
+                # ),
             },
 
             'TurnFreeValve3RandomReset-v0': {
@@ -516,7 +525,6 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK = {
             #         'object_to_target_orientation_distance_reward': 1,
             #     },
             #     'reset_fingers': True,
-            #     # 'position_reward_weight': 2, # tune.sample_from([2, 5, 10]),
             # },
             'TurnFreeValve3ResetFreeSwapGoal-v0': {
                 'pixel_wrapper_kwargs': {
@@ -529,14 +537,14 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK = {
                     },
                 },
                 'camera_settings': {
-                    'azimuth': 45,
+                    'azimuth': 0,
                     'distance': 0.35,
                     'elevation': -45,
                     'lookat': (0, 0, 0.03)
                 },
                 'reward_keys_and_weights': {
-                    # 'object_to_target_position_distance_reward': tune.grid_search([0.5, 1, 2]),
-                    'object_to_target_position_distance_reward': 2, 
+                    'object_to_target_position_distance_reward': tune.grid_search([0.5, 1, 2]),
+                    # 'object_to_target_position_distance_reward': 2,
                     'object_to_target_orientation_distance_reward': 1,
                 },
                 'reset_fingers': True,
@@ -547,9 +555,45 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK = {
                     'object_position',
                     'object_orientation_cos',
                     'object_orientation_sin',
-                    'target_angle',
+                    'target_z_orientation_cos',
+                    'target_z_orientation_sin',
+                    'target_xy_position',
                 ),
             },
+            'TurnFreeValve3ResetFreeSwapGoalEval-v0': {
+                'pixel_wrapper_kwargs': {
+                    'pixels_only': False,
+                    'normalize': False,
+                    'render_kwargs': {
+                        'width': 32,
+                        'height': 32,
+                        'camera_id': -1,
+                    },
+                },
+                'camera_settings': {
+                    'azimuth': 0,
+                    'distance': 0.35,
+                    'elevation': -45,
+                    'lookat': (0, 0, 0.03)
+                },
+                'reward_keys_and_weights': {
+                    'object_to_target_position_distance_reward': tune.grid_search([1]),
+                    # 'object_to_target_position_distance_reward': 2,
+                    'object_to_target_orientation_distance_reward': 1,
+                },
+                'observation_keys': (
+                    'claw_qpos',
+                    'last_action',
+                    'pixels',
+                    'object_position',
+                    'object_orientation_cos',
+                    'object_orientation_sin',
+                    'target_z_orientation_cos',
+                    'target_z_orientation_sin',
+                    'target_xy_position',
+                ),
+            },
+
             'TurnFreeValve3ResetFreeCurriculum-v0': {
                 'reward_keys': (
                     'object_to_target_position_distance_cost',
@@ -790,9 +834,7 @@ def get_environment_params(universe, domain, task):
 NUM_CHECKPOINTS = 10
 SAMPLER_PARAMS_PER_DOMAIN = {
     'DClaw': {
-        # 'type': 'SimpleSampler', 
-        'type': 'PoolSampler', 
-
+        'type': 'SimpleSampler',
         # 'nn_pool_dir': '/mnt/sda/ray_results/gym/DClaw/TurnFreeValve3ResetFree-v0/2019-07-01T12-08-30-smaller_box/id=70000b2d-seed=8699_2019-07-01_12-08-314r_kc234/'
     },
     'DClaw3': {
@@ -822,39 +864,12 @@ def evaluation_environment_params(spec):
         pass
     elif training_environment_params['task'] == 'TurnFreeValve3ResetFreeSwapGoal-v0':
         eval_environment_params['task'] = 'TurnFreeValve3ResetFreeSwapGoalEval-v0' #'TurnFreeValve3RandomReset-v0'
-        eval_environment_params['kwargs'] = {
-            'reward_keys_and_weights': {
-                'object_to_target_position_distance_reward': 2,
-                'object_to_target_orientation_distance_reward': 1,
-            },
+        eval_environment_params['kwargs'].update({
             # 'initial_distribution_path': '/mnt/sda/ray_results/gym/DClaw/TurnFreeValve3ResetFree-v0/2019-06-30T18-53-06-baseline_both_push_and_turn_log_rew/id=38872574-seed=6880_2019-06-30_18-53-07whkq1aax/',
-            # 'reset_from_corners': False,
-            'pixel_wrapper_kwargs': {
-                'pixels_only': False,
-                'normalize': False,
-                'render_kwargs': {
-                    'width': 64,
-                    'height': 64,
-                    'camera_id': -1,
-                },
-            },
-            'camera_settings': {
-                'azimuth': 45,
-                'distance': 0.35,
-                'elevation': -45,
-                'lookat': (0, 0, 0.03)
-            },
-            'observation_keys': (
-                'claw_qpos',
-                'last_action',
-                'pixels',
-                'object_position',
-                'object_orientation_cos',
-                'object_orientation_sin',
-                'target_angle',
-            ),
+            # 'reset_from_corners': False, 
+        })
+        eval_environment_params['kwargs'].pop('reset_fingers')
 
-        }
     elif training_environment_params['task'] == 'TurnFreeValve3ResetFreeCurriculum-v0':
         eval_environment_params['task'] = 'TurnFreeValve3ResetFreeCurriculumEval-v0' #'TurnFreeValve3RandomReset-v0'
         eval_environment_params['kwargs'] = {
@@ -919,7 +934,7 @@ def get_variant_spec_base(universe, domain, task, policy, algorithm):
         'replay_pool_params': {
             'type': 'SimpleReplayPool',
             'kwargs': {
-                'max_size': int(3e5) # int(1e6),
+                'max_size': int(1e6),
             },
             # 'last_checkpoint_dir': '',
             'last_checkpoint_dir': '/home/justinvyu/ray_results/gym/DClaw/TurnFreeValve3ResetFreeSwapGoal-v0/2019-08-07T14-57-41-state_gtr_2_goals_with_resets_regular_box_saving_pixels_fixed_env/id=612875d0-seed=9463_2019-08-07_14-57-42op75_8n7',
@@ -989,7 +1004,7 @@ def get_variant_spec_base(universe, domain, task, policy, algorithm):
         # variant_spec['policy_params']['kwargs']['observation_keys'] = variant_spec[
         #     'exploration_policy_params']['kwargs']['observation_keys'] = variant_spec[
         #         'Q_params']['kwargs']['observation_keys'] = DEFAULT_OBSERVATION_KEYS
- 
+
     # TODO: Add this as a command line arg
     no_object_information = True
     no_pixel_information = False
@@ -1009,7 +1024,7 @@ def get_variant_spec_base(universe, domain, task, policy, algorithm):
         non_pixel_obs_keys = tuple(key for key in env_obs_keys if key != 'pixels')
         variant_spec['policy_params']['kwargs']['observation_keys'] = variant_spec[
             'exploration_policy_params']['kwargs']['observation_keys'] = variant_spec[
-                'Q_params']['kwargs']['observation_keys'] = non_pixel_obs_keys 
+                'Q_params']['kwargs']['observation_keys'] = non_pixel_obs_keys
 
     return variant_spec
 
@@ -1017,7 +1032,6 @@ def get_variant_spec_base(universe, domain, task, policy, algorithm):
 IMAGE_ENVS = (
     ('robosuite', 'InvisibleArm', 'FreeFloatManipulation'),
 )
-
 
 def is_image_env(universe, domain, task, variant_spec):
     return ('image' in task.lower()
@@ -1071,7 +1085,22 @@ def get_variant_spec_image(universe,
                 for num_layers in (4, )
                 for normalization_type in (None, )
             ])
-         
+
+        # 32 x 32 x 3 -> 16 x 16 x 64 -> 8 x 8 x 64 -> 4 x 4 x 32 -> 4 x 4 x 16
+        # -> dense layer -> 16 / 8 x 1
+        # preprocessor_params = {
+        #     'type': 'ConvnetPreprocessor',
+        #     'kwargs': {
+        #         'conv_filters': (64, 64, 32, 16),
+        #         'conv_kernel_sizes': (3, ) * 4,
+        #         'conv_strides': (2, 2, 2, 1),
+        #         'normalization_type': None,
+        #         'downsampling_type': 'conv',
+        #         'use_dense_layer_output': True,
+        #         'dense_layer_output_size': 16,
+        #     },
+        # }
+
         variant_spec['policy_params']['kwargs']['hidden_layer_sizes'] = (M, M)
         variant_spec['policy_params']['kwargs'][
             'observation_preprocessors_params'] = {
