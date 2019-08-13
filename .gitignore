@@ -133,6 +133,9 @@ goal_pools/
 goal_classifier/
 !goal_classifier/*.py
 videos*/
+*.h5
+*.pkl
+pixels/
 pixels/
 *.h5
 *.pkl
