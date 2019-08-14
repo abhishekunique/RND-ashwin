@@ -13,18 +13,19 @@ import gzip
 import pickle
 import glob
 import os
+import matplotlib.pyplot as plt
 
 def state_estimator_model(domain, task, obs_keys_to_estimate, input_shape):
     """
     Need to pass in the obs_keys that the model will estimate
     """
     env = GymAdapter(domain=domain, task=task)
-    output_sizes = OrderedDict(
-        (key, value)
-        for key, value in env.observation_shape.items()
-        if key in obs_keys_to_estimate
-    )
-    output_size = np.sum([size[0].value for size in output_sizes.values()])
+#    output_sizes = OrderedDict(
+#        (key, value)
+#        for key, value in env.observation_shape.items()
+#        if key in obs_keys_to_estimate
+#    )
+#    output_size = np.sum([size[0].value for size in output_sizes.values()])
     output_size = 4
     num_layers = 4
     normalization_type = None
@@ -46,6 +47,14 @@ def state_estimator_model(domain, task, obs_keys_to_estimate, input_shape):
     )(preprocessed)
    
     return PicklableModel(inputs, estimator_outputs, name='state_estimator_preprocessor')
+
+
+def get_dumped_pkl_data(pkl_path):
+    with gzip.open(pkl_path, 'rb') as f:
+        data = pickle.load(f)
+    
+    assert 'pixels' in data and 'states' in data
+    return data['pixels'], data['states']
 
 def get_seed_data(seed_path):
     checkpoint_paths = [
@@ -91,7 +100,6 @@ def get_training_data(exp_path, limit=None):
         training_images = []
         ground_truth_states = []
         for checkpoint_path in checkpoint_paths:
-
             i = 0
             print(checkpoint_path)
             with gzip.open(checkpoint_path, 'rb') as f:
@@ -126,36 +134,72 @@ def normalize(data, olow, ohigh, nlow, nhigh):
     percent = (data - olow) / (ohigh - olow)
     return percent * (nhigh - nlow) + nlow
 
-def train(model, obs_keys_to_estimate):
-    training_pools_base_path = '/home/justinvyu/ray_results/gym/DClaw/TurnFreeValve3ResetFreeSwapGoal-v0/2019-08-07T14-57-41-state_gtr_2_goals_with_resets_regular_box_saving_pixels_fixed_env'
-    training_pools_base_path = '/home/justinvyu/ray_results/gym/DClaw/TurnFreeValve3ResetFreeSwapGoal-v0/2019-08-07T14-57-41-state_gtr_2_goals_with_resets_regular_box_saving_pixels_fixed_env/id=612875d0-seed=9463_2019-08-07_14-57-42op75_8n7'
+def train(model, obs_keys_to_estimate, save_path, n_epochs=50):
+    # training_pools_base_path = '/home/justinvyu/ray_results/gym/DClaw/TurnFreeValve3ResetFreeSwapGoal-v0/2019-08-07T14-57-41-state_gtr_2_goals_with_resets_regular_box_saving_pixels_fixed_env'
+    # training_pools_base_path = '/home/justinvyu/ray_results/gym/DClaw/TurnFreeValve3ResetFreeSwapGoal-v0/2019-08-07T14-57-41-state_gtr_2_goals_with_resets_regular_box_saving_pixels_fixed_env/id=612875d0-seed=9463_2019-08-07_14-57-42op75_8n7'
+
+    training_pools_base_path = '/root/softlearning-vice/goal_classifier/free_screw_state_estimator_data/all_data.pkl'
+
     if 'seed' in training_pools_base_path:
         pixels, states = get_seed_data(training_pools_base_path)
+    elif 'pkl' in training_pools_base_path:
+        pixels, states = get_dumped_pkl_data(training_pools_base_path)
     else:
         pixels, states = get_training_data(training_pools_base_path)
 
-    model.fit(
+    history = model.fit(
         x=pixels,
         y=states,
         batch_size=64,
-        epochs=30,
-        validation_split=0.2,
+        epochs=n_epochs,
+        validation_split=0.05,
     )
 
-    import ipdb; ipdb.set_trace()
+    model.save_weights(save_path)
+    
+    # Plot training & validation loss values
+    plt.plot(history.history['loss'])
+    plt.plot(history.history['val_loss'])
+    plt.title('Model loss')
+    plt.ylabel('Loss')
+    plt.xlabel('Epoch')
+    plt.legend(['Train', 'Test'], loc='upper left')
+    plt.savefig('./train_history.png')
+    # plt.show()
 
-    random_indices = np.random.choice(training_images.shape[0], size=50, replace=False)
-    tests, labels = training_images[random_indices], ground_truth_states[random_indices]
+    random_indices = np.random.choice(pixels.shape[0], size=50, replace=False)
+    tests, labels = pixels[random_indices], states[random_indices]
     preds = model.predict(tests)
+    
+    pos_errors = []
+    angle_errors = []
     import imageio
-    for n, test_img in enumerate(tests):
-        imageio.imwrite(f'/tmp/test_obs/test{n}.jpg', test_img)
+    for i, (test_img, label, pred) in enumerate(zip(tests, labels, preds)):
+        pos_error_xy = np.abs(label[:2] - pred[:2])
+        pos_error = np.sum(pos_error_xy)
+        pos_error = 30 * pos_error # free box is 30 cm
+        true_angle = np.arctan2(label[3], label[2])
+        pred_angle = np.arctan2(pred[3], pred[2])
+        angle_error = min(np.abs(true_angle - pred_angle), np.abs(pred_angle - true_angle))
+        true_angle = true_angle * 180 / np.pi
+        pred_angle = pred_angle * 180 / np.pi
+        angle_error = angle_error * 180 / np.pi
 
-    print("Model error norm mean: ", np.mean(np.linalg.norm(labels - preds, axis=1)))
-    model.save_weights('./state_estimator_model_single_seed.h5')
+        pos_errors.append(pos_error)
+        angle_errors.append(angle_error)
+        
+        print('\n========== IMAGE #', i, '=========')
+        print('POS ERROR (cm):', pos_error, 'true xy: {}'.format(label[:2]), 'pred xy: {}'.format(pred[:2]))
+        print('ANGLE ERROR (degrees):', angle_error, 'true angle: {}'.format(true_angle), 'pred angle: {}'.format(pred_angle))
+        imageio.imwrite(f'/root/imgs/test{i}.jpg', test_img)
+
+    mean_pos_error = np.mean(pos_errors)
+    mean_angle_error = np.mean(angle_errors)
+    print('MEAN POS ERROR (CM):', mean_pos_error)
+    print('MEAN ANGLE ERROR (degrees):', mean_angle_error)
 
 if __name__ == '__main__':
-    image_shape = (64, 64, 3)
+    image_shape = (32, 32, 3)
 
     obs_keys = ('object_position',
                 'object_orientation_cos',
@@ -171,17 +215,49 @@ if __name__ == '__main__':
         optimizer=tf.keras.optimizers.Adam(learning_rate=3e-4),
         loss='mean_squared_error')
 
-    load_weights = True
+    load_weights = False
     if load_weights:
-        training_pools_base_path = '/home/justinvyu/ray_results/gym/DClaw/TurnFreeValve3ResetFreeSwapGoal-v0/2019-08-07T14-57-41-state_gtr_2_goals_with_resets_regular_box_saving_pixels_fixed_env'
-
-        model.load_weights('./state_estimator_model_single_seed.h5')
-        images, labels = get_training_data(training_pools_base_path, limit=1)
-        tests = images[:50]
+        # training_pools_base_path = '/home/justinvyu/ray_results/gym/DClaw/TurnFreeValve3ResetFreeSwapGoal-v0/2019-08-07T14-57-41-state_gtr_2_goals_with_resets_regular_box_saving_pixels_fixed_env'
+        training_pools_base_path = '/root/softlearning-vice/goal_classifier/free_screw_state_estimator_data/all_data.pkl' 
+        weights_path = './state_estimator_random_data.h5'
+        model.load_weights(weights_path)
+        images, labels = get_dumped_pkl_data(training_pools_base_path)
+        # images, labels = get_training_data(training_pools_base_path, limit=1)
+        random_indices = np.random.randint(images.shape[0], size=250)
+        tests = images[random_indices]
         preds = model.predict(tests)
+
+        pos_errors = []
+        angle_errors = []
         import imageio
-        for n, test_img in enumerate(tests):
-            imageio.imwrite(f'/tmp/test_obs/test{n}.jpg', test_img)
-        import ipdb; ipdb.set_trace()
+        for i, (test_img, label, pred) in enumerate(zip(tests, labels, preds)):
+            pos_error_xy = np.abs(label[:2] - pred[:2])
+            pos_error = np.sum(pos_error_xy)
+            pos_error = 30 * pos_error # free box is 30 cm
+            true_angle = np.arctan2(label[3], label[2])
+            pred_angle = np.arctan2(pred[3], pred[2])
+            angle_error = min(np.abs(true_angle - pred_angle), np.abs(pred_angle - true_angle))
+            true_angle = true_angle * 180 / np.pi
+            pred_angle = pred_angle * 180 / np.pi
+            angle_error = angle_error * 180 / np.pi
+
+            pos_errors.append(pos_error)
+            angle_errors.append(angle_error)
+            
+            print('\n========== IMAGE #', i, '=========')
+            print('POS ERROR (cm):', pos_error, 'true xy: {}'.format(label[:2]), 'pred xy: {}'.format(pred[:2]))
+            print('ANGLE ERROR (degrees):', angle_error, 'true angle: {}'.format(true_angle), 'pred angle: {}'.format(pred_angle))
+            imageio.imwrite(f'/root/imgs/test{i}.jpg', test_img)
+
+        ind = np.argpartition(pos_errors, -20)[-20:]
+        ind = ind[np.argsort(pos_errors[ind])]
+        top_error_imgs, top_error_labels, top_error_preds = images[ind], labels[ind], preds[ind]
+        # for i, (img, label, pred) in enumerate(zip(top_error_imgs, top_error_labels, top_error_preds)):
+
+        mean_pos_error = np.mean(pos_errors)
+        mean_angle_error = np.mean(angle_errors)
+        print('MEAN POS ERROR (CM):', mean_pos_error)
+        print('MEAN ANGLE ERROR (degrees):', mean_angle_error)
+    
     else:
-        train(model, obs_keys)
+        train(model, obs_keys, './state_estimator_invisible_claw.h5')
