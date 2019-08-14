@@ -12,6 +12,7 @@ import sys
 import pickle
 import gzip
 import seaborn as sns; sns.set()
+import matplotlib.pyplot as plt
 from matplotlib.colors import ListedColormap
 
 # from softlearning.environments.gym import register_environments

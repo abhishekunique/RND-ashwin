@@ -82,10 +82,10 @@ class SimpleSampler(BaseSampler):
                 field_name: np.array(values)
                 for field_name, values in self._current_path.items()
             })
+
             self.pool.add_path({
                 key: value
                 for key, value in last_path.items()
-                if key != 'infos'
             })
 
             if self._save_training_video_frequency:

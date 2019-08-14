@@ -152,7 +152,11 @@ def register_environments():
     registered_general_environments = register_general_environments()
     registered_multiworld_environments = register_multiworld_environments()
     # register_dclaw_environments()
-    import dsuite
+    try:
+        import dsuite
+    except:
+        import robel
+
     return (
         *registered_mujoco_environments,
         *registered_general_environments,

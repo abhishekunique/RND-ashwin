@@ -519,10 +519,12 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK = {
             },
             # 'TurnFreeValve3ResetFreeSwapGoal-v0': {
             #     'reward_keys_and_weights': {
-            #         'object_to_target_position_distance_reward': 2,
+            #         'object_to_target_position_distance_reward': 5,
             #         'object_to_target_orientation_distance_reward': 1,
             #     },
             #     'reset_fingers': True,
+            #     'goals': [(0, 0, 0, 0, 0, np.pi / 2),
+            #               (-0, -0, 0, 0, 0, -np.pi / 2)],
             # },
             'TurnFreeValve3ResetFreeSwapGoal-v0': {
                 'pixel_wrapper_kwargs': {
@@ -591,7 +593,6 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK = {
                     'target_xy_position',
                 ),
             },
-
             'TurnFreeValve3ResetFreeCurriculum-v0': {
                 'reward_keys': (
                     'object_to_target_position_distance_cost',
@@ -636,16 +637,19 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK = {
             # Lifting Tasks
             'LiftDDFixed-v0': {
                 'reward_keys_and_weights': {
-                    'object_to_target_z_position_distance_reward': 1,    
+                    'object_to_target_z_position_distance_reward': 10,
+                    'object_to_target_xy_position_distance_reward': 0,
+                    'object_to_target_orientation_distance_reward': 0, #5,
                 },
-                # 'reward_keys_and_weights': {
-                #     'object_to_target_z_position_distance_reward': 10,
-                #     'object_to_target_xy_position_distance_reward': 1,
-                #     'object_to_target_orientation_distance_reward': 5,
-                # },
-                'init_qpos_range': [(0, 0, 0, 0, 0, 0)],
-                'target_qpos_range': [(0, 0, 0.05, 0, 0, np.pi)],
+                'init_qpos_range': [(0, 0, 0.041, 1.017, 0, 0)],
+                'target_qpos_range': [(0, 0, 0.05, 0, 0, 0)]
+                # [  # target pos relative to init
+                #      (0, 0, 0, 0, 0, np.pi),
+                #      (0, 0, 0, np.pi, 0, 0), # bgreen side up
+                #      (0, 0, 0, 1.017, 0, 2*np.pi/5), # black side up
+                #  ],
             },
+            # Flipping Tasks
             'FlipEraserFixed-v0': {
                 'reward_keys_and_weights': {
                     'object_to_target_position_distance_reward': 1,
@@ -655,6 +659,12 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK = {
                 'target_qpos_range': [(0, 0, 0, np.pi, 0, 0)],
             },
             'FlipEraserResetFree-v0': {
+                'reward_keys_and_weights': {
+                    'object_to_target_position_distance_reward': 1,
+                    'object_to_target_orientation_distance_reward': 20,
+                },
+            },
+            'FlipEraserResetFreeSwapGoal-v0': {
                 'reward_keys_and_weights': {
                     'object_to_target_position_distance_reward': 1,
                     'object_to_target_orientation_distance_reward': 20,
@@ -866,8 +876,7 @@ def evaluation_environment_params(spec):
             # 'initial_distribution_path': '/mnt/sda/ray_results/gym/DClaw/TurnFreeValve3ResetFree-v0/2019-06-30T18-53-06-baseline_both_push_and_turn_log_rew/id=38872574-seed=6880_2019-06-30_18-53-07whkq1aax/',
             # 'reset_from_corners': False, 
         })
-        eval_environment_params['kwargs'].pop('reset_fingers')
-
+        del eval_environment_params['kwargs']['reset_fingers']
     elif training_environment_params['task'] == 'TurnFreeValve3ResetFreeCurriculum-v0':
         eval_environment_params['task'] = 'TurnFreeValve3ResetFreeCurriculumEval-v0' #'TurnFreeValve3RandomReset-v0'
         eval_environment_params['kwargs'] = {
@@ -878,6 +887,15 @@ def evaluation_environment_params(spec):
             # 'initial_distribution_path': '/mnt/sda/ray_results/gym/DClaw/TurnFreeValve3ResetFree-v0/2019-06-30T18-53-06-baseline_both_push_and_turn_log_rew/id=38872574-seed=6880_2019-06-30_18-53-07whkq1aax/',
             # 'reset_from_corners': False,
         }
+    elif training_environment_params['task'] == 'FlipEraserResetFreeSwapGoal-v0':
+        eval_environment_params['task'] = 'FlipEraserResetFreeSwapGoalEval-v0' #'TurnFreeValve3RandomReset-v0'
+        eval_environment_params['kwargs'] = {
+            'reward_keys_and_weights': {
+                'object_to_target_position_distance_reward': 1,
+                'object_to_target_orientation_distance_reward': 20,
+            },
+        }
+
     return eval_environment_params
 
 
@@ -1002,9 +1020,24 @@ def get_variant_spec_base(universe, domain, task, policy, algorithm):
         #     'exploration_policy_params']['kwargs']['observation_keys'] = variant_spec[
         #         'Q_params']['kwargs']['observation_keys'] = DEFAULT_OBSERVATION_KEYS
 
+    # variant_spec['replay_pool_params']['type'] = 'UniformlyReweightedReplayPool'
+    # variant_spec['replay_pool_params']['kwargs'].update({
+    #     'bin_boundaries': (
+    #         np.arange(-0.1, 0.1, 0.01),
+    #         np.arange(-0.1, 0.1, 0.01),
+    #         np.arange(-np.pi, np.pi, 0.2),
+    #     ),
+    #     'bin_keys': (
+    #         ('infos', 'obs/object_xy_position'),
+    #         ('infos', 'obs/object_angle'),
+    #     ),
+    #     'bin_weight_bonus_scaling': 1000,
+    # })
+
     # TODO: Add this as a command line arg
     no_object_information = True
     no_pixel_information = False
+
     env_kwargs = variant_spec['environment_params']['training']['kwargs']
 
     env_obs_keys = env_kwargs['observation_keys']
@@ -1022,6 +1055,9 @@ def get_variant_spec_base(universe, domain, task, policy, algorithm):
         variant_spec['policy_params']['kwargs']['observation_keys'] = variant_spec[
             'exploration_policy_params']['kwargs']['observation_keys'] = variant_spec[
                 'Q_params']['kwargs']['observation_keys'] = non_pixel_obs_keys
+
+    if "ResetFree" not in task:
+        variant_spec['algorithm_params']['kwargs']['save_training_video_frequency'] = 0
 
     return variant_spec
 
