@@ -20,7 +20,7 @@ services:
       args:
         - MJKEY
     init: true
-    working_dir: /root/softlearning
+    working_dir: /root/softlearning-vice
     environment:
       - DISPLAY=:0
     ports:
@@ -28,12 +28,9 @@ services:
       - "5000"  # Viskit
       - "8888"  # Jupyter
     volumes: # host : container
-       - ~/.aws:/root/.aws  # If using aws, e.g. for s3
        - ~/.config/gcloud:/root/.config/gcloud  # If using gcp, e.g. for gs
        - ~/.mujoco/mjkey.txt:/root/.mujoco/mjkey.txt
-       - ~/github/vikashplus/sac_envs:/root/sac_envs
-       - ~/github/StanfordVL/robosuite:/root/robosuite
-       - ..:/root/softlearning
+       - ..:/root/softlearning-vice
        - ~/ray_results/softlearning-dev-gpu:/root/ray_results
        - ../../dsuite:/root/dsuite
     command:

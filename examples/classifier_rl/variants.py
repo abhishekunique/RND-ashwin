@@ -140,11 +140,11 @@ ALGORITHM_PARAMS_ADDITIONAL = {
             'classifier_lr': 1e-4,
             'classifier_batch_size': 128,
             'n_initial_exploration_steps': int(1e3),
-            'n_classifier_train_steps': 5, # tune.grid_search([1, 5]),
+            'n_classifier_train_steps': 5, # tune.grid_search([2, 5]),
             'classifier_optim_name': 'adam',
             'n_epochs': 200,
             'mixup_alpha': 1.0,
-            'save_training_video_frequency': 5,
+            'save_training_video_frequency': 0,
         }
     },
     'VICEGANTwoGoal': {
@@ -740,7 +740,7 @@ def get_variant_spec_classifier(universe,
 
     # Only use pixels for vision goal classification
     variant_spec['reward_classifier_params']['kwargs']['observation_keys'] = (
-       'pixels', ) 
+       'pixels', )
 
     # variant_spec['reward_classifier_params']['kwargs']['observation_keys'] = (
     #     'object_position', 'object_orientation_cos', 'object_orientation_sin')# , 'goal_index')
@@ -760,7 +760,7 @@ def get_variant_spec_classifier(universe,
             shape=(1, )
         )
     }
-    
+
     if algorithm in ['RAQ', 'VICERAQ']:
         if task in DOOR_TASKS:
             is_goal_key = 'angle_success'
@@ -869,5 +869,5 @@ def get_variant_spec(args):
     if args.checkpoint_replay_pool is not None:
         variant_spec['run_params']['checkpoint_replay_pool'] = (
             args.checkpoint_replay_pool)
-   
+
     return variant_spec

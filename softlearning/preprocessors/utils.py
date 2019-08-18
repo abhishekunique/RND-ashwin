@@ -8,24 +8,23 @@ def get_convnet_preprocessor(name='convnet_preprocessor', **kwargs):
 
     return preprocessor
 
-
 def get_state_estimator_preprocessor(
         name='state_estimator_preprocessor',
         state_estimator_path='/home/justinvyu/dev/softlearning-vice/softlearning/models/state_estimator_model_updated_pool.h5',
         **kwargs
     ):
-    from softlearning.models.state_estimation import state_estimator_model 
+    from softlearning.models.state_estimation import state_estimator_model
     preprocessor = state_estimator_model(**kwargs)
 
     print('Loading model weights...')
     preprocessor.load_weights(state_estimator_path)
 
-    # Set all params to not-trainable 
+    # Set all params to not-trainable
     preprocessor.trainable = False
     preprocessor.compile(optimizer='adam', loss='mean_squared_error')
 
     preprocessor.summary()
-    return preprocessor  
+    return preprocessor
 
 
 def get_feedforward_preprocessor(name='feedforward_preprocessor', **kwargs):
