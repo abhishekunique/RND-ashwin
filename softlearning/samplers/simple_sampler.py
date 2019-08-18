@@ -55,6 +55,10 @@ class SimpleSampler(BaseSampler):
             self._current_observation = self.env.reset()
 
         if self._save_training_video_frequency:
+            try:
+                self._images
+            except Exception:
+                self._images = []
             self._images.append(
                 self.env.render(mode='rgb_array', width=480, height=480))
 

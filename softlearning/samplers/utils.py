@@ -117,7 +117,8 @@ def rollout(env,
                     image = env.render(**render_kwargs)
                 images.append(image)
             else:
-                raise NotImplementedError()
+                image = env.render(**render_kwargs)
+                images.append(image)
 
         if terminal:
             policy.reset()

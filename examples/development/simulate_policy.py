@@ -75,6 +75,9 @@ def simulate_policy(args):
     policy = (
         get_policy_from_variant(variant, evaluation_environment))
     policy.set_weights(picklable['policy_weights'])
+    with open(pickle_path, 'wb') as f:
+        dump_path = os.path.join(checkpoint_path, 'policy_params.pkl')
+        pickle.dump(picklable['policy_weights'], dump_path)
 
     render_kwargs = {**DEFAULT_RENDER_KWARGS, **args.render_kwargs}
 
