@@ -10,7 +10,7 @@ def get_convnet_preprocessor(name='convnet_preprocessor', **kwargs):
 
 def get_state_estimator_preprocessor(
         name='state_estimator_preprocessor',
-        state_estimator_path='/home/justinvyu/dev/softlearning-vice/softlearning/models/state_estimator_model_updated_pool.h5',
+        state_estimator_path='/home/justinvyu/dev/softlearning-vice/softlearning/models/state_estimator_model_random_data_50_epochs.h5',
         **kwargs
     ):
     from softlearning.models.state_estimation import state_estimator_model

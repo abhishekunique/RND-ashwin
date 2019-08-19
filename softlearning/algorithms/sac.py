@@ -532,8 +532,8 @@ class SAC(RLAlgorithm):
                             self._state_estimator.get_weights())
                     Q_target.get_layer('state_estimator_preprocessor').set_weights(
                             self._state_estimator.get_weights())
-
-            # state_estimator = self._policy.preprocessors['pixels']
+  
+            # Evaluate on the current diagnostic batch
             state_estimator = self._state_estimator
             eval_obs = batch['observations']
             # obs_keys_to_estimate = (
@@ -544,21 +544,32 @@ class SAC(RLAlgorithm):
             pixels = eval_obs['pixels']
             # ground_truth_state = np.concatenate(
             #     [eval_obs[key] for key in obs_keys_to_estimate], axis=1)
+            
             from softlearning.models.state_estimation import normalize
             pos = eval_obs['object_position'][:, :2]
             pos = normalize(pos, -0.1, 0.1, -1, 1)
             num_samples = pos.shape[0]
-            ground_truth_state = np.concatenate([
+            labels = np.concatenate([
                 pos,
                 eval_obs['object_orientation_cos'][:, 2].reshape((num_samples, 1)),
                 eval_obs['object_orientation_sin'][:, 2].reshape((num_samples, 1)),
             ], axis=1)
             preds = state_estimator.predict(pixels)
-            diffs = preds - ground_truth_state
-            norms = np.linalg.norm(diffs, axis=1)
+            
+            pos_errors_xy = np.abs(labels[:, :2] - preds[:, :2])
+            pos_errors = np.linalg.norm(pos_errors_xy, axis=1)
+            pos_errors = 15 * pos_errors
+            
+            true_angles = np.arctan2(labels[:, 3], labels[:, 2]) * 180 / np.pi
+            pred_angles = np.arctan2(preds[:, 3], preds[:, 2]) * 180 / np.pi
+            angle_errors = angle_distance(true_angles, pred_angles)
+            
             diagnostics.update({
-                'state_estimator/state_estimation_l2_error_mean': np.mean(
-                    norms
+                'state_estimator/xy_position_error_in_cm': np.mean(
+                    pos_errors
+                ),
+                'state_estimator/angle_error_in_degrees': np.mean(
+                    angle_errors
                 ) 
             })
         
@@ -577,19 +588,6 @@ class SAC(RLAlgorithm):
 
         return diagnostics
 
-    # def training_before_hook(self):
-    #     print('\n TRAINING BEFORE HOOK \n')
-    #     if self._state_estimator is not None:
-    #         print('Training state estimator...')
-            
-    #     # preprocessor = self.policy.preprocessors['pixels']
-    #     # self.preprocessor_weights = preprocessor.get_weights()
-
-    # def training_after_hook(self):
-    #     new_weights = self.policy.preprocessors['pixels'].get_weights
-    #     for weight, new_weight in zip(self.preprocessor_weights, new_weights):
-    #         np.testing.assert_equal(weight, new_weight)
-
     @property
     def tf_saveables(self):
         saveables = {
@@ -605,3 +603,8 @@ class SAC(RLAlgorithm):
             saveables['_alpha_optimizer'] = self._alpha_optimizer
 
         return saveables
+    
+def angle_distance(deg1, deg2):
+    phi = np.abs(deg1 - deg2) % 360
+    distance = np.where(phi > 180, 360 - phi, phi)
+    return distance

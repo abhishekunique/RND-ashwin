@@ -122,7 +122,7 @@ MAX_PATH_LENGTH_PER_UNIVERSE_DOMAIN_TASK = {
             'TurnFreeValve3Fixed-v0': tune.grid_search([50]),
             'TurnFreeValve3RandomReset-v0': 50,
             'TurnFreeValve3ResetFree-v0': tune.grid_search([50]),
-            'TurnFreeValve3ResetFreeSwapGoal-v0': tune.grid_search([50]),
+            'TurnFreeValve3ResetFreeSwapGoal-v0': tune.grid_search([100]),
             'TurnFreeValve3ResetFreeRandomGoal-v0': tune.grid_search([100]),
             'TurnFreeValve3FixedResetSwapGoal-v0': 50,
             'TurnRandomResetSingleGoal-v0': 100,
@@ -560,10 +560,17 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK = {
                 },
                 'camera_settings': {
                     'azimuth': 180,
-                    'distance': 0.32,
-                    'elevation': -45,
-                    'lookat': (0, 0, 0.03)
+                    'distance': 0.35,
+                    'elevation': -55,
+                    'lookat': (0, 0, 0.03),
                 },
+                # Camera setttings for `state_estimator_random_data_50_epochs.h5`
+#                'camera_settings': {
+#                    'azimuth': 180,
+#                    'distance': 0.32,
+#                    'elevation': -45,
+#                    'lookat': (0, 0, 0.03)
+#                },
                 'reward_keys_and_weights': {
                     'object_to_target_position_distance_reward': tune.grid_search([0.1, 0.5]),
                     # 'object_to_target_position_distance_reward': 2,
@@ -1027,7 +1034,7 @@ def get_variant_spec_base(universe, domain, task, policy, algorithm):
         #         'Q_params']['kwargs']['observation_keys'] = DEFAULT_OBSERVATION_KEYS
 
     # TODO: Add this as a command line arg
-    no_object_information = False
+    no_object_information = True
     no_pixel_information = False
     env_kwargs = variant_spec['environment_params']['training']['kwargs']
 
@@ -1072,8 +1079,7 @@ def get_variant_spec_image(universe,
     variant_spec = get_variant_spec_base(
         universe, domain, task, policy, algorithm, *args, **kwargs)
 
-    use_state_estimation = False
-    use_vae = True
+    use_state_estimation = True
     if is_image_env(universe, domain, task, variant_spec):
         if use_state_estimation:
             preprocessor_params = {
@@ -1087,9 +1093,8 @@ def get_variant_spec_image(universe,
                         'object_orientation_sin',
                     ),
                     'input_shape': (32, 32, 3),
-                    # 'input_shape': (64, 64, 3),
-                    # 'state_estimator_path': '/home/justinvyu/dev/softlearning-vice/softlearning/models/state_estimator_model_single_seed.h5',
-                    'state_estimator_path': '/root/softlearning-vice/softlearning/models/state_estimator_random_data_50_epochs.h5'
+                    # 'state_estimator_path': '/root/softlearning-vice/softlearning/models/state_estimator_random_data_50_epochs.h5',
+                    'state_estimator_path': '/root/softlearning-vice/softlearning/models/state_estimator_invisible_claw.h5',
                 }
             }
         else:
