@@ -530,24 +530,23 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK = {
                 ),
                 'reset_fingers': True,
             },
-#            'TurnFreeValve3ResetFreeSwapGoal-v0': {
-#                'reward_keys_and_weights': {
-#                    'object_to_target_position_distance_reward': 2,
-#                    'object_to_target_orientation_distance_reward': 1,
-#                },
-#                'reset_fingers': True,
-#                'observation_keys': (
-#                    'claw_qpos',
-#                    'last_action',
-#                    'object_position',
-#                    'object_orientation_cos',
-#                    'object_orientation_sin',
-#                    'target_z_orientation_cos',
-#                    'target_z_orientation_sin',
-#                    'target_xy_position',
-#                ),
-#
-#            },
+            # 'TurnFreeValve3ResetFreeSwapGoal-v0': {
+            #     'reward_keys_and_weights': {
+            #         'object_to_target_position_distance_reward': 2,
+            #         'object_to_target_orientation_distance_reward': 1,
+            #     },
+            #     'reset_fingers': True,
+            #     'observation_keys': (
+            #         'claw_qpos',
+            #         'last_action',
+            #         'object_position',
+            #         'object_orientation_cos',
+            #         'object_orientation_sin',
+            #         'target_z_orientation_cos',
+            #         'target_z_orientation_sin',
+            #         'target_xy_position',
+            #     ),
+            # },
             'TurnFreeValve3ResetFreeSwapGoal-v0': {
                 'pixel_wrapper_kwargs': {
                     'pixels_only': False,
