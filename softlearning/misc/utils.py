@@ -189,4 +189,3 @@ def angle_distance(deg1, deg2):
     phi = np.abs(deg1 - deg2) % 360
     distance = np.where(phi > 180, 360 - phi, phi)
     return distance
-

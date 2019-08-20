@@ -126,7 +126,7 @@ MUJOCO_LOG.TXT
 
 .mujoco/
 .vscode/
-notebooks/
+# notebooks/
 
 goal_pools/
 !goal_pools/*.py
