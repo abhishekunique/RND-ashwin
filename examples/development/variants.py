@@ -599,13 +599,13 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK = {
                     },
                 },
                 'camera_settings': {
-                    'azimuth': 0,
+                    'azimuth': 180,
                     'distance': 0.35,
-                    'elevation': -45,
+                    'elevation': -55,
                     'lookat': (0, 0, 0.03)
                 },
                 'reward_keys_and_weights': {
-                    'object_to_target_position_distance_reward': tune.grid_search([1]),
+                    'object_to_target_position_distance_reward': tune.grid_search([0.2, 0.5]),
                     # 'object_to_target_position_distance_reward': 2,
                     'object_to_target_orientation_distance_reward': 1,
                 },

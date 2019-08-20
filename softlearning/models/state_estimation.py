@@ -15,7 +15,12 @@ import glob
 import os
 import matplotlib.pyplot as plt
 
-def state_estimator_model(domain, task, obs_keys_to_estimate, input_shape):
+def state_estimator_model(domain,
+                          task,
+                          obs_keys_to_estimate,
+                          input_shape,
+                          num_hidden_units=256,
+                          num_hidden_layers=2):
     """
     Need to pass in the obs_keys that the model will estimate
     """
@@ -36,23 +41,20 @@ def state_estimator_model(domain, task, obs_keys_to_estimate, input_shape):
         'normalization_type': normalization_type,
     }
     preprocessor = convnet_model(name='convnet_preprocessor', **convnet_kwargs)
-  
     inputs = Input(shape=input_shape)
     preprocessed = preprocessor(inputs)
     estimator_outputs = feedforward_model(
-        hidden_layer_sizes=(256, 256),
+        hidden_layer_sizes=(num_hidden_units, ) * num_hidden_layers,
         output_size=output_size,
         output_activation=tf.keras.activations.tanh,
         kernel_regularizer=tf.keras.regularizers.l2(0.001)
     )(preprocessed)
-   
     return PicklableModel(inputs, estimator_outputs, name='state_estimator_preprocessor')
 
 
 def get_dumped_pkl_data(pkl_path):
     with gzip.open(pkl_path, 'rb') as f:
         data = pickle.load(f)
-    
     assert 'pixels' in data and 'states' in data
     return data['pixels'], data['states']
 

@@ -8,6 +8,8 @@ import numpy as np
 from gym import spaces
 from gym import ObservationWrapper
 
+import skimage
+
 STATE_KEY = 'state'
 
 
@@ -99,10 +101,16 @@ class PixelObservationWrapper(ObservationWrapper):
         return pixel_observation
 
     def _get_pixels(self):
-        try:
-            pixels = self.env.get_pixels(**self._render_kwargs)
-        except AttributeError:
-            pixels = self.env.render(**self._render_kwargs)
+        # try:
+        #     pixels = self.env.get_pixels(**self._render_kwargs)
+        # except AttributeError:
+        #     pixels = self.env.render(**self._render_kwargs)
+        width = self._render_kwargs.get('width')
+        height = self._render_kwargs.get('height')
+        pixels = self.env.render(**{**self._render_kwargs,
+            'width': width * 4, 'height': height * 4}).astype(np.uint8)
+        # pixels = self.env.render(**self._render_kwargs)
+        pixels = skimage.transform.resize(pixels, (width, height), anti_aliasing=True)
 
         if self._normalize:
             pixels = (2. / 255. * pixels) - 1.

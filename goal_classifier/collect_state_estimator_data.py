@@ -11,12 +11,14 @@ import gzip
 from softlearning.models.state_estimation import normalize
 
 cur_dir = os.path.dirname(os.path.realpath(__file__))
-directory = cur_dir + "/free_screw_state_estimator_data_invisible_claw_test"
+directory = cur_dir + "/free_screw_state_estimator_data_invisible_claw_11"
+# directory = cur_dir + "/antialiasing"
+
 if not os.path.exists(directory):
     os.makedirs(directory)
 
 def main():
-    NUM_TOTAL_EXAMPLES, ROLLOUT_LENGTH, STEPS_PER_SAMPLE = 500000, 50, 4
+    NUM_TOTAL_EXAMPLES, ROLLOUT_LENGTH, STEPS_PER_SAMPLE = 50000, 50, 4
     SAVE_FREQ = 50000
     pixels = []
     states = []
@@ -46,15 +48,15 @@ def main():
         'observation_keys': (
             'pixels',
             'claw_qpos',
-            'last_action'), 
+            'last_action'),
     }
     env = GymAdapter(
         domain='DClaw',
-        task='TurnFreeValve3ResetFreeSwapGoal-v0',
-#         task='TurnFreeValve3Fixed-v0',
+        # task='TurnFreeValve3ResetFreeSwapGoal-v0',
+        task='TurnFreeValve3Fixed-v0',
         **env_kwargs
     )
-    
+
     num_positives = 0
 
     # reset the environment
@@ -69,11 +71,7 @@ def main():
 
             # env.render()  # render on display
             obs_dict = env.get_obs_dict()
-        
-            #print('\n\n SAMPLE #', num_positives)
 
-            # Add observation if meets criteria
-            
             pixels_obs = observation['pixels']
             pixels.append(pixels_obs)
             xy = normalize(obs_dict['object_xy_position'], -0.1, 0.1, -1, 1)
@@ -85,16 +83,16 @@ def main():
                 xy,
                 cos[None],
                 sin[None]
-            ]) 
+            ])
             states.append(ground_truth_state)
             if images:
-                imageio.imwrite(directory + '/img%i.jpg' % num_positives, pixels_obs)
+                imageio.imwrite(directory + '/img%i.png' % num_positives, pixels_obs)
             num_positives += 1
             if num_positives % 1000 == 0:
                 print("\n---", num_positives, "---")
             t += 1
-    
-            if num_positives % 100 == 0:
+
+            if num_positives % 1000 == 0:
                 print('DUMPING DATA... total # examples:', num_positives)
                 pixels_concat = np.stack(pixels, axis=0)
                 states_concat = np.stack(states, axis=0)
