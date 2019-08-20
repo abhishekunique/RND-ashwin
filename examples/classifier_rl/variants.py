@@ -466,11 +466,17 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_VISION = {
                     }
                 },
                 'camera_settings': {
-                    'azimuth': 0.,
-                    'distance': 0.32,
+                    'azimuth': 45,
+                    'distance': 0.35,
                     'elevation': -45,
                     'lookat': (0, 0, 0.03),
                 },
+                # 'camera_settings': {
+                #     'azimuth': 0.,
+                #     'distance': 0.32,
+                #     'elevation': -45,
+                #     'lookat': (0, 0, 0.03),
+                # },
                 'init_angle_range': (0., 0.),
                 'target_angle_range': (np.pi, np.pi),
                 'observation_keys': (

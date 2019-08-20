@@ -226,6 +226,15 @@ def get_parser(allow_policy_list=False):
         default=5,
         help="Save frequency for training videos.")
 
+    parser.add_argument(
+        '--pixels-preprocessor-type',
+        type=str,
+        default='ConvnetPreprocessor',
+        help="Preprocessor type for pixel observations.",
+        choices=('ConvnetPreprocessor',
+                 'StateEstimatorPreprocessor',
+                 'VAEPreprocessor'))
+
     parser = add_ray_init_args(parser)
     parser = add_ray_tune_args(parser)
 

@@ -35,6 +35,8 @@ class GaussianPolicy(LatentSpacePolicy):
 
         super(GaussianPolicy, self).__init__(*args, **kwargs)
 
+        self.preprocessors = preprocessors
+
         inputs_flat = create_inputs(input_shapes)
         preprocessors_flat = (
             flatten_input_structure(preprocessors)
