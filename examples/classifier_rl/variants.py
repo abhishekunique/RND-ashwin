@@ -746,7 +746,7 @@ def get_variant_spec_classifier(universe,
 
     # Only use pixels for vision goal classification
     variant_spec['reward_classifier_params']['kwargs']['observation_keys'] = (
-       'pixels', ) 
+       'pixels', )
 
     # variant_spec['reward_classifier_params']['kwargs']['observation_keys'] = (
     #     'object_position', 'object_orientation_cos', 'object_orientation_sin')# , 'goal_index')
@@ -766,7 +766,7 @@ def get_variant_spec_classifier(universe,
             shape=(1, )
         )
     }
-    
+
     if algorithm in ['RAQ', 'VICERAQ']:
         if task in DOOR_TASKS:
             is_goal_key = 'angle_success'
@@ -875,5 +875,5 @@ def get_variant_spec(args):
     if args.checkpoint_replay_pool is not None:
         variant_spec['run_params']['checkpoint_replay_pool'] = (
             args.checkpoint_replay_pool)
-   
+
     return variant_spec

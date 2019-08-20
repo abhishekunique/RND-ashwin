@@ -1,6 +1,5 @@
 from copy import deepcopy
 
-
 def get_convnet_preprocessor(name='convnet_preprocessor', **kwargs):
     from softlearning.models.convnet import convnet_model
 
@@ -23,7 +22,7 @@ def get_vae_preprocessor(name='vae_preprocessor', **kwargs):
 
 def get_state_estimator_preprocessor(
         name='state_estimator_preprocessor',
-        state_estimator_path='/home/justinvyu/dev/softlearning-vice/softlearning/models/state_estimator_model_updated_pool.h5',
+        state_estimator_path='/home/justinvyu/dev/softlearning-vice/softlearning/models/state_estimator_model_random_data_50_epochs.h5',
         **kwargs
     ):
     from softlearning.models.state_estimation import state_estimator_model
@@ -32,13 +31,12 @@ def get_state_estimator_preprocessor(
     print('Loading model weights...')
     preprocessor.load_weights(state_estimator_path)
 
-    # Set all params to not-trainable 
+    # Set all params to not-trainable
     preprocessor.trainable = False
     preprocessor.compile(optimizer='adam', loss='mean_squared_error')
 
     preprocessor.summary()
     return preprocessor
-
 
 def get_feedforward_preprocessor(name='feedforward_preprocessor', **kwargs):
     from softlearning.models.feedforward import feedforward_model
@@ -46,7 +44,6 @@ def get_feedforward_preprocessor(name='feedforward_preprocessor', **kwargs):
     preprocessor = feedforward_model(name=name, **kwargs)
 
     return preprocessor
-
 
 PREPROCESSOR_FUNCTIONS = {
     'ConvnetPreprocessor': get_convnet_preprocessor,
@@ -73,7 +70,6 @@ def get_preprocessor_from_params(env, preprocessor_params, *args, **kwargs):
             **kwargs)
 
     return preprocessor
-
 
 def get_preprocessor_from_variant(variant, env, *args, **kwargs):
     preprocessor_params = variant['preprocessor_params']

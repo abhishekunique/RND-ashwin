@@ -8,6 +8,8 @@ import numpy as np
 from gym import spaces
 from gym import ObservationWrapper
 
+import skimage
+
 STATE_KEY = 'state'
 
 
@@ -115,19 +117,20 @@ class PixelObservationWrapper(ObservationWrapper):
 
     def _get_pixels(self):
         pixels = []
-        # try:
-        #     for render_kwargs in self._render_kwargs_per_camera:
-        #         _pixels = self.env.get_pixels(**render_kwargs)
-        #         pixels.append(_pixels)
 
-        # except AttributeError:
-        #     for render_kwargs in self._render_kwargs_per_camera:
-        #         _pixels = self.env.render(**self._render_kwargs)
-        #         pixels.append(_pixels)
+        # Render rgb_array for each camera
         for render_kwargs in self._render_kwargs_per_camera:
-            _pixels = self.env.render(**render_kwargs)
+            width = render_kwargs.get('width')
+            height = render_kwargs.get('height')
+            _pixels = self.env.render(**{**self._render_kwargs,
+                'width': width * 4, 'height': height * 4}).astype(np.uint8)
+            _pixels = skimage.transform.resize(
+                pixels, (width, height), anti_aliasing=True)
+
             pixels.append(_pixels)
-           
+
+        # Stack channel wise
+        assert len(pixels.shape) == 3, 'Invalid image shape, needs to be (W, H, D)'
         pixels = np.concatenate(pixels, axis=2)
 
         if self._normalize:
