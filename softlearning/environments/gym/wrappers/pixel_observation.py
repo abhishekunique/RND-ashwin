@@ -8,6 +8,8 @@ import numpy as np
 from gym import spaces
 from gym import ObservationWrapper
 
+import skimage
+
 STATE_KEY = 'state'
 
 
@@ -18,7 +20,8 @@ class PixelObservationWrapper(ObservationWrapper):
                  pixels_only=True,
                  render_kwargs=None,
                  normalize=False,
-                 observation_key='pixels'):
+                 observation_key='pixels',
+                 camera_ids=(-1,)):
         """Initializes a new pixel Wrapper.
 
         Args:
@@ -48,6 +51,20 @@ class PixelObservationWrapper(ObservationWrapper):
         render_mode = render_kwargs.pop('mode', 'rgb_array')
         assert render_mode == 'rgb_array', render_mode
         render_kwargs['mode'] = 'rgb_array'
+
+        # Specify number of cameras and their ids to render with
+        # The observation will become a depthwise concatenation of all the
+        # images gathered from these specified cameras.
+        self._camera_ids = camera_ids
+        self._render_kwargs_per_camera = [
+            {
+                'mode': 'rgb_array',
+                'width': render_kwargs['width'],
+                'height': render_kwargs['height'],
+                'camera_id': camera_id,
+            }
+            for camera_id in self._camera_ids
+        ]
 
         wrapped_observation_space = env.observation_space
 
@@ -99,13 +116,26 @@ class PixelObservationWrapper(ObservationWrapper):
         return pixel_observation
 
     def _get_pixels(self):
-        try:
-            pixels = self.env.get_pixels(**self._render_kwargs)
-        except AttributeError:
-            pixels = self.env.render(**self._render_kwargs)
+        pixels = []
+
+        # Render rgb_array for each camera
+        for render_kwargs in self._render_kwargs_per_camera:
+            width = render_kwargs.get('width')
+            height = render_kwargs.get('height')
+            _pixels = self.env.render(**{**self._render_kwargs,
+                'width': width * 4, 'height': height * 4}).astype(np.uint8)
+            _pixels = skimage.transform.resize(
+                pixels, (width, height), anti_aliasing=True)
+
+            pixels.append(_pixels)
+
+        # Stack channel wise
+        assert len(pixels.shape) == 3, 'Invalid image shape, needs to be (W, H, D)'
+        pixels = np.concatenate(pixels, axis=2)
 
         if self._normalize:
             pixels = (2. / 255. * pixels) - 1.
+
         return pixels
 
 

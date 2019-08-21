@@ -35,7 +35,7 @@ INDEX_FIELDS = {
 
 
 class FlexibleReplayPool(ReplayPool):
-    def __init__(self, max_size, fields):
+    def __init__(self, max_size, fields, save_env_infos=False):
         super(FlexibleReplayPool, self).__init__()
 
         max_size = int(max_size)
@@ -46,6 +46,7 @@ class FlexibleReplayPool(ReplayPool):
         self.fields_flat = flatten(self.fields)
         self._initialize_data()
 
+        self._save_env_infos = save_env_infos
         self._pointer = 0
         self._size = 0
         self._samples_since_save = 0
@@ -101,6 +102,22 @@ class FlexibleReplayPool(ReplayPool):
         self.add_samples(samples)
 
     def add_samples(self, samples):
+        # Add infos to the fields
+        if not self._save_env_infos:
+            samples = {k: v for k, v in samples.items() if k != "infos"}
+        elif self._size == 0:
+            infos = samples['infos']
+            infos_fields_dict = {
+                info_key: Field(
+                    name=info_key,
+                    dtype=info_value.dtype,
+                    shape=info_value.shape[1:])
+                for info_key, info_value in infos.items()
+            }
+
+            self.fields.update({'infos': infos_fields_dict})
+            self.fields_flat = flatten(self.fields)
+            self._initialize_data()
         samples = flatten(samples)
 
         field_names = tuple(samples.keys())

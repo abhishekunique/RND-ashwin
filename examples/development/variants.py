@@ -2,10 +2,7 @@ from copy import deepcopy
 
 from ray import tune
 import numpy as np
-
-# from sac_envs.envs.dclaw.dclaw3_screw_v2 import NegativeLogLossFn
 from softlearning.misc.utils import get_git_rev, deep_update
-
 
 DEFAULT_KEY = "__DEFAULT_KEY__"
 
@@ -24,6 +21,7 @@ GAUSSIAN_POLICY_PARAMS_BASE = {
         'observation_preprocessors_params': {}
     }
 }
+
 
 ALGORITHM_PARAMS_BASE = {
     'type': 'SAC',
@@ -122,7 +120,7 @@ MAX_PATH_LENGTH_PER_UNIVERSE_DOMAIN_TASK = {
             'TurnFreeValve3Fixed-v0': tune.grid_search([50]),
             'TurnFreeValve3RandomReset-v0': 50,
             'TurnFreeValve3ResetFree-v0': tune.grid_search([50]),
-            'TurnFreeValve3ResetFreeSwapGoal-v0': tune.grid_search([50]),
+            'TurnFreeValve3ResetFreeSwapGoal-v0': tune.grid_search([100]),
             'TurnFreeValve3ResetFreeRandomGoal-v0': tune.grid_search([100]),
             'TurnFreeValve3FixedResetSwapGoal-v0': 50,
             'TurnRandomResetSingleGoal-v0': 100,
@@ -140,6 +138,7 @@ MAX_PATH_LENGTH_PER_UNIVERSE_DOMAIN_TASK = {
         },
     },
 }
+
 
 NUM_EPOCHS_PER_UNIVERSE_DOMAIN_TASK = {
     DEFAULT_KEY: 200,
@@ -194,8 +193,8 @@ NUM_EPOCHS_PER_UNIVERSE_DOMAIN_TASK = {
             DEFAULT_KEY: 100,
         },
         'DClaw': {
-            DEFAULT_KEY: int(1.5e3),
-            # DEFAULT_KEY: 500,
+            # DEFAULT_KEY: int(1.5e3),
+            DEFAULT_KEY: 500,
         },
     },
     'dm_control': {
@@ -416,55 +415,64 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK = {
                 'observation_keys': ('claw_qpos', 'last_action', 'pixels'),
             },
             'TurnRandomDynamics-v0': {},
-            # 'TurnFreeValve3Fixed-v0': {
-            #     'reward_keys': (
-            #         'object_to_target_position_distance_cost',
-            #         'object_to_target_orientation_distance_cost',
-            #     ),
-            #     'init_angle_range': (0, 0),
-            #     'target_angle_range': (0, 0),
-            #     'init_x_pos_range': (0, 0),
-            #     'init_y_pos_range': (0, 0),
-            #     'position_reward_weight': tune.sample_from([50]),
-            # },
             'TurnFreeValve3Fixed-v0': {
-                'camera_settings': {
-                    'azimuth': 0,
-                    'distance': 0.35,
-                    'elevation': -45,
-                    'lookat': (0, 0, 0.03)
-                },
                 'observation_keys': (
                     'claw_qpos',
                     'last_action',
-                    'pixels',
-                    'object_position',
-                    'object_orientation_cos',
-                    'object_orientation_sin',
-                    # 'target_xy_position',
-                    # 'target_z_orientation_cos',
-                    # 'target_z_orientation_sin',
+                    # 'object_xy_position',
+                    # 'object_z_orientation_cos',
+                    # 'object_z_orientation_sin',
+
+                    'object_xy_position_noisy',
+                    'object_z_orientation_cos_noisy',
+                    'object_z_orientation_sin_noisy',
                 ),
-                'pixel_wrapper_kwargs': {
-                    'pixels_only': False,
-                    'normalize': False,
-                    'render_kwargs': {
-                        'camera_id': -1,
-                        'width': 64,
-                        'height': 64
-                    }
-                },
                 'reward_keys_and_weights': {
-                    'object_to_target_position_distance_reward': tune.grid_search([0.1, 1, 2]),
+                    'object_to_target_position_distance_reward': tune.grid_search([0.1, 0.5]),
                     # 'object_to_target_position_distance_reward': tune.grid_search([0.1]),
                     'object_to_target_orientation_distance_reward': 1,
                 },
-                # 'target_qpos': (
-                #     (0.01, 0.01, 0, 0, 0, np.pi / 2),
-                #     (-0.01, -0.01, 0, 0, 0, -np.pi / 2)
-                # ),
             },
-
+#            'TurnFreeValve3Fixed-v0': {
+#                'camera_settings': {
+#                    'azimuth': 180,
+#                    'distance': 0.32,
+#                    'elevation': -45,
+#                    'lookat': (0, 0, 0.03)
+#                },
+#                'observation_keys': (
+#                    'claw_qpos',
+#                    'last_action',
+#                    'pixels',
+#                    'object_xy_position_noisy',
+#                    'object_z_orientation_cos_noisy',
+#                    'object_z_orientation_sin_noisy',
+#                    # 'object_position',
+#                    # 'object_orientation_cos',
+#                    # 'object_orientation_sin',
+#                    # 'target_xy_position',
+#                    # 'target_z_orientation_cos',
+#                    # 'target_z_orientation_sin',
+#                ),
+#                'pixel_wrapper_kwargs': {
+#                    'pixels_only': False,
+#                    'normalize': False,
+#                    'render_kwargs': {
+#                        'camera_id': -1,
+#                        'width': 32,
+#                        'height': 32
+#                    }
+#                },
+#                'reward_keys_and_weights': {
+#                    'object_to_target_position_distance_reward': tune.grid_search([0.1, 0.5]),
+#                    # 'object_to_target_position_distance_reward': tune.grid_search([0.1]),
+#                    'object_to_target_orientation_distance_reward': 1,
+#                },
+#                # 'target_qpos': (
+#                #     (0.01, 0.01, 0, 0, 0, np.pi / 2),
+#                #     (-0.01, -0.01, 0, 0, 0, -np.pi / 2)
+#                # ),
+#            },
             'TurnFreeValve3RandomReset-v0': {
                 'reward_keys': (
                     'object_to_target_position_distance_cost',
@@ -521,29 +529,47 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK = {
             },
             # 'TurnFreeValve3ResetFreeSwapGoal-v0': {
             #     'reward_keys_and_weights': {
-            #         'object_to_target_position_distance_reward': 2,
+            #         'object_to_target_position_distance_reward': 5,
             #         'object_to_target_orientation_distance_reward': 1,
             #     },
             #     'reset_fingers': True,
+            #     'observation_keys': (
+            #         'claw_qpos',
+            #         'last_action',
+            #         'object_position',
+            #         'object_orientation_cos',
+            #         'object_orientation_sin',
+            #         'target_z_orientation_cos',
+            #         'target_z_orientation_sin',
+            #         'target_xy_position',
+            #     ),
             # },
             'TurnFreeValve3ResetFreeSwapGoal-v0': {
                 'pixel_wrapper_kwargs': {
                     'pixels_only': False,
                     'normalize': False,
                     'render_kwargs': {
-                        'width': 64,
-                        'height': 64,
+                        'width': 32,
+                        'height': 32,
                         'camera_id': -1,
                     },
+                    'camera_ids': (-1, 0),
                 },
                 'camera_settings': {
-                    'azimuth': 0,
+                    'azimuth': 180,
                     'distance': 0.35,
-                    'elevation': -45,
-                    'lookat': (0, 0, 0.03)
+                    'elevation': -55,
+                    'lookat': (0, 0, 0.03),
                 },
+                # Camera setttings for `state_estimator_random_data_50_epochs.h5`
+                # 'camera_settings': {
+                #     'azimuth': 180,
+                #     'distance': 0.32,
+                #     'elevation': -45,
+                #     'lookat': (0, 0, 0.03)
+                # },
                 'reward_keys_and_weights': {
-                    'object_to_target_position_distance_reward': tune.grid_search([0.5, 1, 2]),
+                    'object_to_target_position_distance_reward': tune.grid_search([0.1, 0.5]),
                     # 'object_to_target_position_distance_reward': 2,
                     'object_to_target_orientation_distance_reward': 1,
                 },
@@ -571,13 +597,13 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK = {
                     },
                 },
                 'camera_settings': {
-                    'azimuth': 0,
+                    'azimuth': 180,
                     'distance': 0.35,
-                    'elevation': -45,
+                    'elevation': -55,
                     'lookat': (0, 0, 0.03)
                 },
                 'reward_keys_and_weights': {
-                    'object_to_target_position_distance_reward': tune.grid_search([1]),
+                    'object_to_target_position_distance_reward': tune.grid_search([0.2, 0.5]),
                     # 'object_to_target_position_distance_reward': 2,
                     'object_to_target_orientation_distance_reward': 1,
                 },
@@ -591,9 +617,9 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK = {
                     'target_z_orientation_cos',
                     'target_z_orientation_sin',
                     'target_xy_position',
+                    'target_angle',
                 ),
             },
-
             'TurnFreeValve3ResetFreeCurriculum-v0': {
                 'reward_keys': (
                     'object_to_target_position_distance_cost',
@@ -638,16 +664,19 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK = {
             # Lifting Tasks
             'LiftDDFixed-v0': {
                 'reward_keys_and_weights': {
-                    'object_to_target_z_position_distance_reward': 1,    
+                    'object_to_target_z_position_distance_reward': 10,
+                    'object_to_target_xy_position_distance_reward': 0,
+                    'object_to_target_orientation_distance_reward': 0, #5,
                 },
-                # 'reward_keys_and_weights': {
-                #     'object_to_target_z_position_distance_reward': 10,
-                #     'object_to_target_xy_position_distance_reward': 1,
-                #     'object_to_target_orientation_distance_reward': 5,
-                # },
-                'init_qpos_range': [(0, 0, 0, 0, 0, 0)],
-                'target_qpos_range': [(0, 0, 0.05, 0, 0, np.pi)],
+                'init_qpos_range': [(0, 0, 0.041, 1.017, 0, 0)],
+                'target_qpos_range': [(0, 0, 0.05, 0, 0, 0)]
+                # [  # target pos relative to init
+                #      (0, 0, 0, 0, 0, np.pi),
+                #      (0, 0, 0, np.pi, 0, 0), # bgreen side up
+                #      (0, 0, 0, 1.017, 0, 2*np.pi/5), # black side up
+                #  ],
             },
+            # Flipping Tasks
             'FlipEraserFixed-v0': {
                 'reward_keys_and_weights': {
                     'object_to_target_position_distance_reward': 1,
@@ -657,6 +686,12 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK = {
                 'target_qpos_range': [(0, 0, 0, np.pi, 0, 0)],
             },
             'FlipEraserResetFree-v0': {
+                'reward_keys_and_weights': {
+                    'object_to_target_position_distance_reward': 1,
+                    'object_to_target_orientation_distance_reward': 20,
+                },
+            },
+            'FlipEraserResetFreeSwapGoal-v0': {
                 'reward_keys_and_weights': {
                     'object_to_target_position_distance_reward': 1,
                     'object_to_target_orientation_distance_reward': 20,
@@ -835,6 +870,7 @@ NUM_CHECKPOINTS = 10
 SAMPLER_PARAMS_PER_DOMAIN = {
     'DClaw': {
         'type': 'SimpleSampler',
+        # 'type': 'PoolSampler',
         # 'nn_pool_dir': '/mnt/sda/ray_results/gym/DClaw/TurnFreeValve3ResetFree-v0/2019-07-01T12-08-30-smaller_box/id=70000b2d-seed=8699_2019-07-01_12-08-314r_kc234/'
     },
     'DClaw3': {
@@ -866,10 +902,11 @@ def evaluation_environment_params(spec):
         eval_environment_params['task'] = 'TurnFreeValve3ResetFreeSwapGoalEval-v0' #'TurnFreeValve3RandomReset-v0'
         eval_environment_params['kwargs'].update({
             # 'initial_distribution_path': '/mnt/sda/ray_results/gym/DClaw/TurnFreeValve3ResetFree-v0/2019-06-30T18-53-06-baseline_both_push_and_turn_log_rew/id=38872574-seed=6880_2019-06-30_18-53-07whkq1aax/',
-            # 'reset_from_corners': False, 
+            # 'reset_from_corners': False,
         })
         eval_environment_params['kwargs'].pop('reset_fingers')
 
+        }
     elif training_environment_params['task'] == 'TurnFreeValve3ResetFreeCurriculum-v0':
         eval_environment_params['task'] = 'TurnFreeValve3ResetFreeCurriculumEval-v0' #'TurnFreeValve3RandomReset-v0'
         eval_environment_params['kwargs'] = {
@@ -880,6 +917,15 @@ def evaluation_environment_params(spec):
             # 'initial_distribution_path': '/mnt/sda/ray_results/gym/DClaw/TurnFreeValve3ResetFree-v0/2019-06-30T18-53-06-baseline_both_push_and_turn_log_rew/id=38872574-seed=6880_2019-06-30_18-53-07whkq1aax/',
             # 'reset_from_corners': False,
         }
+    elif training_environment_params['task'] == 'FlipEraserResetFreeSwapGoal-v0':
+        eval_environment_params['task'] = 'FlipEraserResetFreeSwapGoalEval-v0' #'TurnFreeValve3RandomReset-v0'
+        eval_environment_params['kwargs'] = {
+            'reward_keys_and_weights': {
+                'object_to_target_position_distance_reward': 1,
+                'object_to_target_orientation_distance_reward': 20,
+            },
+        }
+
     return eval_environment_params
 
 
@@ -934,12 +980,10 @@ def get_variant_spec_base(universe, domain, task, policy, algorithm):
         'replay_pool_params': {
             'type': 'SimpleReplayPool',
             'kwargs': {
-                'max_size': int(1e6),
+                'max_size': int(1.5e6),
             },
-            # 'last_checkpoint_dir': '',
-            'last_checkpoint_dir': '/home/justinvyu/ray_results/gym/DClaw/TurnFreeValve3ResetFreeSwapGoal-v0/2019-08-07T14-57-41-state_gtr_2_goals_with_resets_regular_box_saving_pixels_fixed_env/id=612875d0-seed=9463_2019-08-07_14-57-42op75_8n7',
-            # 'last_checkpoint_dir': '/home/justinvyu/ray_results/gym/DClaw/TurnFreeValve3ResetFreeSwapGoal-v0/2019-08-05T15-41-14-state_gtr_2_goals_with_resets_regular_box_saving_pixels/id=22505fd1-seed=1822_2019-08-05_15-41-164900r5on',
-            # 'last_checkpoint_dir': '/mnt/sda/ray_results/gym/DClaw/TurnFreeValve3ResetFree-v0/2019-07-01T12-08-30-smaller_box/id=70000b2d-seed=8699_2019-07-01_12-08-314r_kc234/', 
+            'last_checkpoint_dir': '',
+            # 'last_checkpoint_dir': '/home/justinvyu/ray_results/gym/DClaw/TurnFreeValve3ResetFreeSwapGoal-v0/2019-08-07T14-57-41-state_gtr_2_goals_with_resets_regular_box_saving_pixels_fixed_env/id=612875d0-seed=9463_2019-08-07_14-57-42op75_8n7',
         },
         'sampler_params': deep_update({
             'type': 'SimpleSampler',
@@ -973,7 +1017,7 @@ def get_variant_spec_base(universe, domain, task, policy, algorithm):
         pass
         # variant_spec['replay_pool_params']['type'] = 'PartialSaveReplayPool'
         # variant_spec['replay_pool_params']['kwargs']['mode'] = 'Bellman_Error'
-        # variant_spec['replay_pool_params']['kwargs']['per_alpha'] = tune.grid_search([0, 0.1, 0.5, 1])
+        # variant_spec['replay_pool_params']['kwargs']['per_alpha'] = tune.grid_search([1, 0.1, 0.5, 1])
         # DEFAULT_OBSERVATION_KEYS = (
         #     'claw_qpos',
         #     'object_position',
@@ -1005,9 +1049,24 @@ def get_variant_spec_base(universe, domain, task, policy, algorithm):
         #     'exploration_policy_params']['kwargs']['observation_keys'] = variant_spec[
         #         'Q_params']['kwargs']['observation_keys'] = DEFAULT_OBSERVATION_KEYS
 
+    # variant_spec['replay_pool_params']['type'] = 'UniformlyReweightedReplayPool'
+    # variant_spec['replay_pool_params']['kwargs'].update({
+    #     'bin_boundaries': (
+    #         np.arange(-0.1, 0.1, 0.01),
+    #         np.arange(-0.1, 0.1, 0.01),
+    #         np.arange(-np.pi, np.pi, 0.2),
+    #     ),
+    #     'bin_keys': (
+    #         ('infos', 'obs/object_xy_position'),
+    #         ('infos', 'obs/object_angle'),
+    #     ),
+    #     'bin_weight_bonus_scaling': 1000,
+    # })
+
     # TODO: Add this as a command line arg
     no_object_information = True
     no_pixel_information = False
+
     env_kwargs = variant_spec['environment_params']['training']['kwargs']
 
     env_obs_keys = env_kwargs['observation_keys']
@@ -1025,6 +1084,9 @@ def get_variant_spec_base(universe, domain, task, policy, algorithm):
         variant_spec['policy_params']['kwargs']['observation_keys'] = variant_spec[
             'exploration_policy_params']['kwargs']['observation_keys'] = variant_spec[
                 'Q_params']['kwargs']['observation_keys'] = non_pixel_obs_keys
+
+    if "ResetFree" not in task:
+        variant_spec['algorithm_params']['kwargs']['save_training_video_frequency'] = 0
 
     return variant_spec
 
@@ -1051,7 +1113,8 @@ def get_variant_spec_image(universe,
     variant_spec = get_variant_spec_base(
         universe, domain, task, policy, algorithm, *args, **kwargs)
 
-    use_state_estimation = True
+    use_state_estimation = False
+    use_vae = False
     if is_image_env(universe, domain, task, variant_spec):
         if use_state_estimation:
             preprocessor_params = {
@@ -1064,10 +1127,14 @@ def get_variant_spec_image(universe,
                         'object_orientation_cos',
                         'object_orientation_sin',
                     ),
-                    # 'input_shape': (32, 32, 3)
-                    'input_shape': (64, 64, 3),
-                    'state_estimator_path': '/home/justinvyu/dev/softlearning-vice/softlearning/models/state_estimator_model_single_seed.h5',
+                    'input_shape': (32, 32, 3),
+                    # 'state_estimator_path': '/root/softlearning-vice/softlearning/models/state_estimator_random_data_50_epochs.h5',
+                    'state_estimator_path': '/root/softlearning-vice/softlearning/models/state_estimator_invisible_claw.h5',
                 }
+            }
+        elif use_vae:
+            preprocessor_params = {
+                'type': 'VAEPreprocessor',
             }
         else:
             preprocessor_params = tune.grid_search([
@@ -1086,6 +1153,7 @@ def get_variant_spec_image(universe,
                 for normalization_type in (None, )
             ])
 
+        # Alternate convnet architecture 
         # 32 x 32 x 3 -> 16 x 16 x 64 -> 8 x 8 x 64 -> 4 x 4 x 32 -> 4 x 4 x 16
         # -> dense layer -> 16 / 8 x 1
         # preprocessor_params = {

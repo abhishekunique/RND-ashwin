@@ -1,9 +1,7 @@
 import os
-import uuid
 from collections import OrderedDict
 from numbers import Number
 
-import skimage
 import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
@@ -11,7 +9,10 @@ from flatten_dict import flatten
 
 from softlearning.models.utils import flatten_input_structure
 from .rl_algorithm import RLAlgorithm
-from softlearning.replay_pools.prioritized_experience_replay_pool import PrioritizedExperienceReplayPool
+from softlearning.replay_pools.prioritized_experience_replay_pool import (
+    PrioritizedExperienceReplayPool
+)
+from softlearning.misc.utils import angle_distance
 
 tfd = tfp.distributions
 
@@ -90,7 +91,6 @@ class SAC(RLAlgorithm):
         self._policy = policy
 
         self._Qs = Qs
-       
         if Q_targets:
             self._Q_targets = Q_targets
         else:
@@ -148,9 +148,7 @@ class SAC(RLAlgorithm):
         self._init_diagnostics_ops()
 
     def _load_goal_classifier(self, goal_classifier_params_directory):
-        import sys
         from goal_classifier.conv import CNN
-        from tensorflow.python.tools.inspect_checkpoint import print_tensors_in_checkpoint_file
 
         # print_tensors_in_checkpoint_file(goal_classifier_params_directory, all_tensors=False, tensor_name='')
         self._goal_classifier = CNN(goal_cond=True)
@@ -322,24 +320,24 @@ class SAC(RLAlgorithm):
 
         self._training_ops.update({'policy_train_op': policy_train_op})
 
-    def _init_diagnostics_ops(self):
-        diagnosables = OrderedDict((
-            ('Q_value', self._Q_values),
-            ('Q_loss', self._Q_losses),
-            ('policy_loss', self._policy_losses),
-            ('alpha', self._alpha)
-        ))
+    # def _init_diagnostics_ops(self):
+    #     diagnosables = OrderedDict((
+    #         ('Q_value', self._Q_values),
+    #         ('Q_loss', self._Q_losses),
+    #         ('policy_loss', self._policy_losses),
+    #         ('alpha', self._alpha)
+    #     ))
 
-        diagnostic_metrics = OrderedDict((
-            ('mean', tf.reduce_mean),
-            ('std', lambda x: tfp.stats.stddev(x, sample_axis=None)),
-        ))
+    #     diagnostic_metrics = OrderedDict((
+    #         ('mean', tf.reduce_mean),
+    #         ('std', lambda x: tfp.stats.stddev(x, sample_axis=None)),
+    #     ))
 
-        self._diagnostics_ops = OrderedDict([
-            (f'{key}-{metric_name}', metric_fn(values))
-            for key, values in diagnosables.items()
-            for metric_name, metric_fn in diagnostic_metrics.items()
-        ])
+    #     self._diagnostics_ops = OrderedDict([
+    #         (f'{key}-{metric_name}', metric_fn(values))
+    #         for key, values in diagnosables.items()
+    #         for metric_name, metric_fn in diagnostic_metrics.items()
+    #     ])
 
     def _init_training(self):
         self._update_target(tau=1.0)
@@ -393,13 +391,17 @@ class SAC(RLAlgorithm):
             from skimage import io
             random_idx = np.random.randint(
                 batch['observations']['pixels'].shape[0])
+            image = batch['observations']['pixels'][random_idx].copy()
+            if image.shape[-1] == 6:
+                img_0, img_1 = np.split(
+                    image, 2, axis=2)
+                image = np.concatenate([img_0, img_1], axis=1)
             image_save_dir = os.path.join(os.getcwd(), 'pixels')
             image_save_path = os.path.join(
                 image_save_dir, f'observation_{iteration}_batch.png')
             if not os.path.exists(image_save_dir):
                 os.makedirs(image_save_dir)
-            io.imsave(image_save_path,
-                      batch['observations']['pixels'][random_idx].copy())
+            io.imsave(image_save_path, image)
 
         feed_dict = {
             placeholders_flat[key]: batch_flat[key]
@@ -492,9 +494,10 @@ class SAC(RLAlgorithm):
             })).items()
         ]))
 
-        if 'pixels' in self._policy.preprocessors and self._state_estimator.name == 'state_estimator_preprocessor':
-            # Train the state estimator
-            if self._train_state_estimator_online: 
+        if 'pixels' in self._policy.preprocessors and \
+                self._state_estimator.name == 'state_estimator_preprocessor':
+            # Train the state estimator on the diagnostic batch
+            if self._train_state_estimator_online:
                 self._state_estimator.trainable = True
                 self._state_estimator.compile(optimizer=self._state_estimator_optimizer, loss='mse')
                 train_obs = batch['observations']
@@ -526,14 +529,14 @@ class SAC(RLAlgorithm):
                 self._state_estimator.trainable = False
 
                 self._state_estimator.compile(optimizer=self._state_estimator_optimizer, loss='mse')
-                # Copy over weights
+                # Copy over weights to the other state estimators
                 for Q, Q_target in zip(self._Qs, self._Q_targets):
                     Q.get_layer('state_estimator_preprocessor').set_weights(
                             self._state_estimator.get_weights())
                     Q_target.get_layer('state_estimator_preprocessor').set_weights(
                             self._state_estimator.get_weights())
 
-            # state_estimator = self._policy.preprocessors['pixels']
+            # Evaluate on the current diagnostic batch
             state_estimator = self._state_estimator
             eval_obs = batch['observations']
             # obs_keys_to_estimate = (
@@ -544,24 +547,34 @@ class SAC(RLAlgorithm):
             pixels = eval_obs['pixels']
             # ground_truth_state = np.concatenate(
             #     [eval_obs[key] for key in obs_keys_to_estimate], axis=1)
+
             from softlearning.models.state_estimation import normalize
             pos = eval_obs['object_position'][:, :2]
             pos = normalize(pos, -0.1, 0.1, -1, 1)
             num_samples = pos.shape[0]
-            ground_truth_state = np.concatenate([
+            labels = np.concatenate([
                 pos,
                 eval_obs['object_orientation_cos'][:, 2].reshape((num_samples, 1)),
                 eval_obs['object_orientation_sin'][:, 2].reshape((num_samples, 1)),
             ], axis=1)
             preds = state_estimator.predict(pixels)
-            diffs = preds - ground_truth_state
-            norms = np.linalg.norm(diffs, axis=1)
+            pos_errors_xy = np.abs(labels[:, :2] - preds[:, :2])
+            pos_errors = np.linalg.norm(pos_errors_xy, axis=1)
+            pos_errors = 15 * pos_errors
+
+            true_angles = np.arctan2(labels[:, 3], labels[:, 2]) * 180 / np.pi
+            pred_angles = np.arctan2(preds[:, 3], preds[:, 2]) * 180 / np.pi
+            angle_errors = angle_distance(true_angles, pred_angles)
+
             diagnostics.update({
-                'state_estimator/state_estimation_l2_error_mean': np.mean(
-                    norms
-                ) 
+                'state_estimator/xy_position_error_in_cm': np.mean(
+                    pos_errors
+                ),
+                'state_estimator/angle_error_in_degrees': np.mean(
+                    angle_errors
+                )
             })
-        
+
         if self._goal_classifier:
             diagnostics.update({
                 'goal_classifier/avg_reward': np.mean(feed_dict[self._rewards_ph])})
@@ -576,19 +589,6 @@ class SAC(RLAlgorithm):
             self._plotter.draw()
 
         return diagnostics
-
-    # def training_before_hook(self):
-    #     print('\n TRAINING BEFORE HOOK \n')
-    #     if self._state_estimator is not None:
-    #         print('Training state estimator...')
-            
-    #     # preprocessor = self.policy.preprocessors['pixels']
-    #     # self.preprocessor_weights = preprocessor.get_weights()
-
-    # def training_after_hook(self):
-    #     new_weights = self.policy.preprocessors['pixels'].get_weights
-    #     for weight, new_weight in zip(self.preprocessor_weights, new_weights):
-    #         np.testing.assert_equal(weight, new_weight)
 
     @property
     def tf_saveables(self):

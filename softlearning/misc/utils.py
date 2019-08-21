@@ -183,3 +183,9 @@ def mixup(features, labels, alpha=0.2):
     labels_convex = lambda_ * labels + (1 - lambda_) * shuffled_labels
 
     return features_convex, labels_convex
+
+
+def angle_distance(deg1, deg2):
+    phi = np.abs(deg1 - deg2) % 360
+    distance = np.where(phi > 180, 360 - phi, phi)
+    return distance
