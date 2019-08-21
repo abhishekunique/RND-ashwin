@@ -117,21 +117,23 @@ class PixelObservationWrapper(ObservationWrapper):
 
     def _get_pixels(self):
         pixels = []
-
         # Render rgb_array for each camera
         for render_kwargs in self._render_kwargs_per_camera:
             width = render_kwargs.get('width')
             height = render_kwargs.get('height')
             _pixels = self.env.render(**{**self._render_kwargs,
-                'width': width * 4, 'height': height * 4}).astype(np.uint8)
+                'width': width * 4, 'height': height * 4})
+            # TODO: Do this anti-aliasing in Mujoco render instead
             _pixels = skimage.transform.resize(
-                pixels, (width, height), anti_aliasing=True)
+                _pixels, (width, height), anti_aliasing=True, preserve_range=True)
+            _pixels = np.rint(_pixels).astype(np.uint8)
 
             pixels.append(_pixels)
 
-        # Stack channel wise
-        assert len(pixels.shape) == 3, 'Invalid image shape, needs to be (W, H, D)'
-        pixels = np.concatenate(pixels, axis=2)
+            assert len(_pixels.shape) == 3, 'Invalid image shape, needs to be (W, H, D)'
+
+        # Stack channel-wise
+        pixels = np.dstack(pixels)
 
         if self._normalize:
             pixels = (2. / 255. * pixels) - 1.

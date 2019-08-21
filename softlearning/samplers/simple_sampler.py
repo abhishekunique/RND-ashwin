@@ -2,13 +2,15 @@ from collections import defaultdict
 
 import numpy as np
 from flatten_dict import flatten, unflatten
-
+import imageio
 from softlearning.models.utils import flatten_input_structure
 from .base_sampler import BaseSampler
 
 
 class SimpleSampler(BaseSampler):
     def __init__(self,
+                 state_estimator=None,
+                 replace_state=False,
                  **kwargs):
         super(SimpleSampler, self).__init__(**kwargs)
 
@@ -22,6 +24,11 @@ class SimpleSampler(BaseSampler):
         self._total_samples = 0
         self._save_training_video_frequency = 0
         self._images = []
+        self._state_estimator = state_estimator
+        self._replace_state = replace_state
+
+        self._num_high_errors = 0
+        self._prefix = np.random.randint(1000)
 
     @property
     def _policy_input(self):
@@ -54,9 +61,44 @@ class SimpleSampler(BaseSampler):
         if self._current_observation is None:
             self._current_observation = self.env.reset()
 
+        if self._state_estimator is not None:
+            assert 'pixels' in self._current_observation, (
+                'State estimator only works for pixel observations')
+            pixels = self._current_observation['pixels'][None]
+            estimated_object_state = self._state_estimator.predict(pixels)[0]
+            xy_pos, z_cos, z_sin = (
+                estimated_object_state[:2],
+                estimated_object_state[2][None],
+                estimated_object_state[3][None]
+            )
+
+            if self._replace_state:
+                self._current_observation.update({
+                    'object_xy_position': xy_pos,
+                    'object_z_orientation_cos': z_cos,
+                    'object_z_orientation_sin': z_sin,
+                })
+            else:
+                self._current_observation.update({
+                    'object_xy_position_pred': xy_pos,
+                    'object_z_orientation_cos_pred': z_cos,
+                    'object_z_orientation_sin_pred': z_sin,
+                    'object_state_pred': estimated_object_state,
+                })
+            from softlearning.models.state_estimation import normalize
+            label = np.concatenate([
+                normalize(self._current_observation['object_xy_position'], -0.1, 0.1, -1, 1),
+                self._current_observation['object_z_orientation_cos'],
+                self._current_observation['object_z_orientation_sin'],
+            ])
+            if np.linalg.norm(label - estimated_object_state) > 0.1:
+                self._num_high_errors += 1
+                imageio.imwrite(f'/tmp/test_obs/{self._prefix}_high_error_{self._num_high_errors}.png',
+                        self._current_observation['pixels'])
+
         if self._save_training_video_frequency:
             self._images.append(
-                self.env.render(mode='rgb_array', width=480, height=480))
+                self.env.render(mode='rgb_array', width=128, height=128))
 
         action = self.policy.actions_np(self._policy_input)[0]
         next_observation, reward, terminal, info = self.env.step(action)

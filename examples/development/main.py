@@ -56,7 +56,6 @@ class ExperimentRunner(tune.Trainable):
 
         replay_pool = self.replay_pool = (
             get_replay_pool_from_variant(variant, training_environment))
-        sampler = self.sampler = get_sampler_from_variant(variant)
         Qs = self.Qs = get_Q_function_from_variant(
             variant, training_environment)
         Q_targets = self.Q_targets = get_Q_function_from_variant(
@@ -64,6 +63,18 @@ class ExperimentRunner(tune.Trainable):
 
         policy = self.policy = get_policy_from_variant(
             variant, training_environment)
+
+        try:
+            if self.policy.preprocessors['pixels'].name == 'state_estimator_preprocessor':
+                state_estimator = self.policy.preprocessors['pixels']
+            else:
+                state_estimator = None
+        except:
+            state_estimator = None
+
+        sampler = self.sampler = get_sampler_from_variant(
+            variant,
+            state_estimator=state_estimator)
 
         last_checkpoint_dir = variant['replay_pool_params']['last_checkpoint_dir']
         if last_checkpoint_dir:
@@ -84,11 +95,6 @@ class ExperimentRunner(tune.Trainable):
         initial_exploration_policy = self.initial_exploration_policy = (
             get_policy_from_params(
                 variant['exploration_policy_params'], training_environment))
-        
-        try:
-            state_estimator = self.policy.preprocessors['pixels']
-        except:
-            state_estimator = None
 
         self.algorithm = get_algorithm_from_variant(
             variant=self._variant,

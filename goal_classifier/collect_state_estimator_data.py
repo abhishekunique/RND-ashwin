@@ -11,8 +11,7 @@ import gzip
 from softlearning.models.state_estimation import normalize
 
 cur_dir = os.path.dirname(os.path.realpath(__file__))
-directory = cur_dir + "/free_screw_state_estimator_data_invisible_claw_11"
-# directory = cur_dir + "/antialiasing"
+directory = cur_dir + "/free_screw_state_estimator_data_invisible_claw_5"
 
 if not os.path.exists(directory):
     os.makedirs(directory)
@@ -88,11 +87,11 @@ def main():
             if images:
                 imageio.imwrite(directory + '/img%i.png' % num_positives, pixels_obs)
             num_positives += 1
-            if num_positives % 1000 == 0:
+            if num_positives % 100 == 0:
                 print("\n---", num_positives, "---")
             t += 1
 
-            if num_positives % 1000 == 0:
+            if num_positives % 5000 == 0:
                 print('DUMPING DATA... total # examples:', num_positives)
                 pixels_concat = np.stack(pixels, axis=0)
                 states_concat = np.stack(states, axis=0)

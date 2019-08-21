@@ -58,14 +58,24 @@ def rollout(env,
             policy,
             path_length,
             sampler_class=simple_sampler.SimpleSampler,
+            sampler_kwargs=None,
             callback=None,
             render_kwargs=None,
             break_on_terminal=True):
     pool = replay_pools.SimpleReplayPool(env, max_size=path_length)
-    sampler = sampler_class(
-        max_path_length=path_length,
-        min_pool_size=None,
-        batch_size=None)
+    if sampler_kwargs:
+        sampler = sampler_class(
+            max_path_length=path_length,
+            min_pool_size=None,
+            batch_size=None
+            **sampler_kwargs)
+    else:
+        sampler = sampler_class(
+            max_path_length=path_length,
+            min_pool_size=None,
+            batch_size=None)
+
+
     sampler.initialize(env, policy, pool)
 
     render_mode = (render_kwargs or {}).get('mode', None)

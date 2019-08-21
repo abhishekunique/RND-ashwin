@@ -6,7 +6,13 @@ from softlearning.misc.utils import get_git_rev, deep_update
 
 DEFAULT_KEY = "__DEFAULT_KEY__"
 
+# M = number of hidden units per layer
+# N = number of hidden layers
+
 M = 256
+# N = tune.sample_from([1, 2, 4])
+N = 1
+
 REPARAMETERIZE = True
 
 NUM_COUPLING_LAYERS = 2
@@ -15,7 +21,7 @@ NUM_COUPLING_LAYERS = 2
 GAUSSIAN_POLICY_PARAMS_BASE = {
     'type': 'GaussianPolicy',
     'kwargs': {
-        'hidden_layer_sizes': (M, M),
+        'hidden_layer_sizes': (M, ) * N,
         'squash': True,
         'observation_keys': None,
         'observation_preprocessors_params': {}
@@ -120,7 +126,8 @@ MAX_PATH_LENGTH_PER_UNIVERSE_DOMAIN_TASK = {
             'TurnFreeValve3Fixed-v0': tune.grid_search([50]),
             'TurnFreeValve3RandomReset-v0': 50,
             'TurnFreeValve3ResetFree-v0': tune.grid_search([50]),
-            'TurnFreeValve3ResetFreeSwapGoal-v0': tune.grid_search([100]),
+            'TurnFreeValve3ResetFreeSwapGoal-v0': tune.grid_search([50]),
+            'TurnFreeValve3ResetFreeSwapGoalEval-v0': tune.grid_search([50]),
             'TurnFreeValve3ResetFreeRandomGoal-v0': tune.grid_search([100]),
             'TurnFreeValve3FixedResetSwapGoal-v0': 50,
             'TurnRandomResetSingleGoal-v0': 100,
@@ -193,8 +200,8 @@ NUM_EPOCHS_PER_UNIVERSE_DOMAIN_TASK = {
             DEFAULT_KEY: 100,
         },
         'DClaw': {
-            # DEFAULT_KEY: int(1.5e3),
-            DEFAULT_KEY: 500,
+            DEFAULT_KEY: int(1.5e3),
+            # DEFAULT_KEY: 500,
         },
     },
     'dm_control': {
@@ -529,16 +536,19 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK = {
             },
             # 'TurnFreeValve3ResetFreeSwapGoal-v0': {
             #     'reward_keys_and_weights': {
-            #         'object_to_target_position_distance_reward': 5,
+            #         'object_to_target_position_distance_reward': tune.grid_search([1, 2]),
             #         'object_to_target_orientation_distance_reward': 1,
             #     },
             #     'reset_fingers': True,
             #     'observation_keys': (
             #         'claw_qpos',
             #         'last_action',
-            #         'object_position',
-            #         'object_orientation_cos',
-            #         'object_orientation_sin',
+            #         'object_xy_position',
+            #         'object_z_orientation_cos',
+            #         'object_z_orientation_sin',
+            #         # 'object_position',
+            #         # 'object_orientation_cos',
+            #         # 'object_orientation_sin',
             #         'target_z_orientation_cos',
             #         'target_z_orientation_sin',
             #         'target_xy_position',
@@ -553,7 +563,7 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK = {
                         'height': 32,
                         'camera_id': -1,
                     },
-                    'camera_ids': (-1, 0),
+                    # 'camera_ids': (-1, 0),
                 },
                 'camera_settings': {
                     'azimuth': 180,
@@ -569,7 +579,7 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK = {
                 #     'lookat': (0, 0, 0.03)
                 # },
                 'reward_keys_and_weights': {
-                    'object_to_target_position_distance_reward': tune.grid_search([0.1, 0.5]),
+                    'object_to_target_position_distance_reward': tune.grid_search([0.5, 2]),
                     # 'object_to_target_position_distance_reward': 2,
                     'object_to_target_orientation_distance_reward': 1,
                 },
@@ -578,12 +588,12 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK = {
                     'claw_qpos',
                     'last_action',
                     'pixels',
-                    'object_position',
-                    'object_orientation_cos',
-                    'object_orientation_sin',
+                    'object_xy_position',
+                    'object_z_orientation_cos',
+                    'object_z_orientation_sin',
+                    'target_xy_position',
                     'target_z_orientation_cos',
                     'target_z_orientation_sin',
-                    'target_xy_position',
                 ),
             },
             'TurnFreeValve3ResetFreeSwapGoalEval-v0': {
@@ -603,7 +613,7 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK = {
                     'lookat': (0, 0, 0.03)
                 },
                 'reward_keys_and_weights': {
-                    'object_to_target_position_distance_reward': tune.grid_search([0.2, 0.5]),
+                    'object_to_target_position_distance_reward': tune.grid_search([0.5, 2]),
                     # 'object_to_target_position_distance_reward': 2,
                     'object_to_target_orientation_distance_reward': 1,
                 },
@@ -614,10 +624,9 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK = {
                     'object_position',
                     'object_orientation_cos',
                     'object_orientation_sin',
+                    'target_xy_position',
                     'target_z_orientation_cos',
                     'target_z_orientation_sin',
-                    'target_xy_position',
-                    'target_angle',
                 ),
             },
             'TurnFreeValve3ResetFreeCurriculum-v0': {
@@ -906,7 +915,6 @@ def evaluation_environment_params(spec):
         })
         eval_environment_params['kwargs'].pop('reset_fingers')
 
-        }
     elif training_environment_params['task'] == 'TurnFreeValve3ResetFreeCurriculum-v0':
         eval_environment_params['task'] = 'TurnFreeValve3ResetFreeCurriculumEval-v0' #'TurnFreeValve3RandomReset-v0'
         eval_environment_params['kwargs'] = {
@@ -966,7 +974,7 @@ def get_variant_spec_base(universe, domain, task, policy, algorithm):
         'Q_params': {
             'type': 'double_feedforward_Q_function',
             'kwargs': {
-                'hidden_layer_sizes': (M, M),
+                'hidden_layer_sizes': (M, ) * N,
                 'observation_keys': tune.sample_from(lambda spec: (
                     spec.get('config', spec)
                     ['policy_params']
@@ -1128,8 +1136,11 @@ def get_variant_spec_image(universe,
                         'object_orientation_sin',
                     ),
                     'input_shape': (32, 32, 3),
+                    'num_hidden_units': 256,
+                    'num_hidden_layers': 2,
                     # 'state_estimator_path': '/root/softlearning-vice/softlearning/models/state_estimator_random_data_50_epochs.h5',
-                    'state_estimator_path': '/root/softlearning-vice/softlearning/models/state_estimator_invisible_claw.h5',
+                    # 'state_estimator_path': '/root/softlearning-vice/softlearning/models/state_estimator_invisible_claw.h5',
+                    'state_estimator_path': '/home/justinvyu/dev/softlearning-vice/softlearning/models/state_estimators/state_estimator_fixed_antialias.h5'
                 }
             }
         elif use_vae:
@@ -1169,7 +1180,7 @@ def get_variant_spec_image(universe,
         #     },
         # }
 
-        variant_spec['policy_params']['kwargs']['hidden_layer_sizes'] = (M, M)
+        variant_spec['policy_params']['kwargs']['hidden_layer_sizes'] = (M, ) * N
         variant_spec['policy_params']['kwargs'][
             'observation_preprocessors_params'] = {
                 'pixels': deepcopy(preprocessor_params)

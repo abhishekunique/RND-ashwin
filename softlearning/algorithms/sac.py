@@ -13,6 +13,7 @@ from softlearning.replay_pools.prioritized_experience_replay_pool import (
     PrioritizedExperienceReplayPool
 )
 from softlearning.misc.utils import angle_distance
+from softlearning.models.state_estimation import normalize
 
 tfd = tfp.distributions
 
@@ -495,6 +496,7 @@ class SAC(RLAlgorithm):
         ]))
 
         if 'pixels' in self._policy.preprocessors and \
+                self._state_estimator is not None and \
                 self._state_estimator.name == 'state_estimator_preprocessor':
             # Train the state estimator on the diagnostic batch
             if self._train_state_estimator_online:
@@ -506,7 +508,6 @@ class SAC(RLAlgorithm):
                 #     'object_orientation_cos',
                 #     'object_orientation_sin',
                 # )
-                from softlearning.models.state_estimation import normalize
                 pos = train_obs['object_position'][:, :2]
                 pos = normalize(pos, -0.1, 0.1, -1, 1)
                 num_samples = pos.shape[0]
@@ -537,7 +538,13 @@ class SAC(RLAlgorithm):
                             self._state_estimator.get_weights())
 
             # Evaluate on the current diagnostic batch
-            state_estimator = self._state_estimator
+            state_estimators = [
+                self._state_estimator,
+                self._Qs[0].get_layer('state_estimator_preprocessor'),
+                self._Qs[1].get_layer('state_estimator_preprocessor')
+            ]
+            state_estimator_descriptors = ('policy', 'Q0', 'Q1')
+            # state_estimator = self._state_estimator
             eval_obs = batch['observations']
             # obs_keys_to_estimate = (
             #     'object_position',
@@ -548,32 +555,43 @@ class SAC(RLAlgorithm):
             # ground_truth_state = np.concatenate(
             #     [eval_obs[key] for key in obs_keys_to_estimate], axis=1)
 
+            # pos = eval_obs['object_position'][:, :2]
+
+            assert 'object_xy_position' in eval_obs
+            pos = eval_obs['object_xy_position']
             from softlearning.models.state_estimation import normalize
-            pos = eval_obs['object_position'][:, :2]
             pos = normalize(pos, -0.1, 0.1, -1, 1)
             num_samples = pos.shape[0]
+            assert 'object_z_orientation_cos' in eval_obs and 'object_z_orientation_sin' in eval_obs
             labels = np.concatenate([
                 pos,
-                eval_obs['object_orientation_cos'][:, 2].reshape((num_samples, 1)),
-                eval_obs['object_orientation_sin'][:, 2].reshape((num_samples, 1)),
+                eval_obs['object_z_orientation_cos'].reshape((num_samples, 1)),
+                eval_obs['object_z_orientation_sin'].reshape((num_samples, 1))
+                # eval_obs['object_orientation_cos'][:, 2].reshape((num_samples, 1)),
+                # eval_obs['object_orientation_sin'][:, 2].reshape((num_samples, 1)),
             ], axis=1)
-            preds = state_estimator.predict(pixels)
-            pos_errors_xy = np.abs(labels[:, :2] - preds[:, :2])
-            pos_errors = np.linalg.norm(pos_errors_xy, axis=1)
-            pos_errors = 15 * pos_errors
+            preds_per_state_estimator = [
+                state_estimator.predict(pixels)
+                for state_estimator in state_estimators
+            ]
 
             true_angles = np.arctan2(labels[:, 3], labels[:, 2]) * 180 / np.pi
-            pred_angles = np.arctan2(preds[:, 3], preds[:, 2]) * 180 / np.pi
-            angle_errors = angle_distance(true_angles, pred_angles)
+            for preds, desc in zip(preds_per_state_estimator, state_estimator_descriptors):
+                pos_errors_xy = np.abs(labels[:, :2] - preds[:, :2])
+                pos_errors = np.linalg.norm(pos_errors_xy, axis=1)
+                pos_errors = 15 * pos_errors
 
-            diagnostics.update({
-                'state_estimator/xy_position_error_in_cm': np.mean(
-                    pos_errors
-                ),
-                'state_estimator/angle_error_in_degrees': np.mean(
-                    angle_errors
-                )
-            })
+                pred_angles = np.arctan2(preds[:, 3], preds[:, 2]) * 180 / np.pi
+                angle_errors = angle_distance(true_angles, pred_angles)
+
+                diagnostics.update({
+                    f'state_estimator/{desc}/xy_position_error_in_cm': np.mean(
+                        pos_errors
+                    ),
+                    f'state_estimator/{desc}/angle_error_in_degrees_policy': np.mean(
+                        angle_errors
+                    )
+                })
 
         if self._goal_classifier:
             diagnostics.update({
