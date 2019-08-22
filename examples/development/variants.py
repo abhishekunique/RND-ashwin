@@ -11,7 +11,7 @@ DEFAULT_KEY = "__DEFAULT_KEY__"
 
 M = 256
 # N = tune.sample_from([1, 2, 4])
-N = 1
+N = 2
 
 REPARAMETERIZE = True
 
@@ -1081,7 +1081,7 @@ def get_variant_spec_base(universe, domain, task, policy, algorithm):
     if no_object_information and "pixel_wrapper_kwargs" in env_kwargs.keys() and \
        "device_path" not in env_kwargs.keys():
         non_image_obs_keys = tuple(key for key in env_obs_keys if key != 'pixels')
-        variant_spec['replay_pool_params']['kwargs']['obs_save_keys'] = non_image_obs_keys
+        # variant_spec['replay_pool_params']['kwargs']['obs_save_keys'] = non_image_obs_keys
 
         non_object_obs_keys = tuple(key for key in env_obs_keys if 'object' not in key)
         variant_spec['policy_params']['kwargs']['observation_keys'] = variant_spec[
@@ -1093,7 +1093,7 @@ def get_variant_spec_base(universe, domain, task, policy, algorithm):
             'exploration_policy_params']['kwargs']['observation_keys'] = variant_spec[
                 'Q_params']['kwargs']['observation_keys'] = non_pixel_obs_keys
 
-    if "ResetFree" not in task:
+    if 'ResetFree' not in task:
         variant_spec['algorithm_params']['kwargs']['save_training_video_frequency'] = 0
 
     return variant_spec
@@ -1121,7 +1121,7 @@ def get_variant_spec_image(universe,
     variant_spec = get_variant_spec_base(
         universe, domain, task, policy, algorithm, *args, **kwargs)
 
-    use_state_estimation = False
+    use_state_estimation = True
     use_vae = False
     if is_image_env(universe, domain, task, variant_spec):
         if use_state_estimation:
@@ -1140,7 +1140,7 @@ def get_variant_spec_image(universe,
                     'num_hidden_layers': 2,
                     # 'state_estimator_path': '/root/softlearning-vice/softlearning/models/state_estimator_random_data_50_epochs.h5',
                     # 'state_estimator_path': '/root/softlearning-vice/softlearning/models/state_estimator_invisible_claw.h5',
-                    'state_estimator_path': '/home/justinvyu/dev/softlearning-vice/softlearning/models/state_estimators/state_estimator_fixed_antialias.h5'
+                    'state_estimator_path': '/root/softlearning-vice/softlearning/models/state_estimators/state_estimator_fixed_antialias.h5'
                 }
             }
         elif use_vae:
@@ -1164,7 +1164,7 @@ def get_variant_spec_image(universe,
                 for normalization_type in (None, )
             ])
 
-        # Alternate convnet architecture 
+        # Alternate convnet architecture
         # 32 x 32 x 3 -> 16 x 16 x 64 -> 8 x 8 x 64 -> 4 x 4 x 32 -> 4 x 4 x 16
         # -> dense layer -> 16 / 8 x 1
         # preprocessor_params = {

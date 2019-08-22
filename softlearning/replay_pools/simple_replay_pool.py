@@ -9,6 +9,7 @@ class SimpleReplayPool(FlexibleReplayPool):
                  environment,
                  *args,
                  obs_save_keys=(),
+                 extra_obs_keys_and_fields={},
                  extra_fields=None,
                  **kwargs):
         extra_fields = extra_fields or {}
@@ -53,6 +54,8 @@ class SimpleReplayPool(FlexibleReplayPool):
                 shape=(1, )),
             **extra_fields
         }
+        fields['observations'].update(extra_obs_keys_and_fields)
+        self._obs_save_keys += tuple(extra_obs_keys_and_fields.keys())
 
         super(SimpleReplayPool, self).__init__(
             *args, fields=fields, **kwargs)

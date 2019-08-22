@@ -5,7 +5,7 @@ from flatten_dict import flatten, unflatten
 import imageio
 from softlearning.models.utils import flatten_input_structure
 from .base_sampler import BaseSampler
-
+import os
 
 class SimpleSampler(BaseSampler):
     def __init__(self,
@@ -80,10 +80,10 @@ class SimpleSampler(BaseSampler):
                 })
             else:
                 self._current_observation.update({
-                    'object_xy_position_pred': xy_pos,
-                    'object_z_orientation_cos_pred': z_cos,
-                    'object_z_orientation_sin_pred': z_sin,
-                    'object_state_pred': estimated_object_state,
+                    # 'object_xy_position_pred': xy_pos,
+                    # 'object_z_orientation_cos_pred': z_cos,
+                    # 'object_z_orientation_sin_pred': z_sin,
+                    'object_state_prediction': estimated_object_state,
                 })
             from softlearning.models.state_estimation import normalize
             label = np.concatenate([
@@ -92,9 +92,14 @@ class SimpleSampler(BaseSampler):
                 self._current_observation['object_z_orientation_sin'],
             ])
             if np.linalg.norm(label - estimated_object_state) > 0.1:
-                self._num_high_errors += 1
-                imageio.imwrite(f'/tmp/test_obs/{self._prefix}_high_error_{self._num_high_errors}.png',
+                errors_dir = os.path.join(os.getcwd(), 'high_error_pixels')
+                if not os.path.exists(errors_dir):
+                    os.mkdir(errors_dir)
+
+                imageio.imwrite(os.path.join(errors_dir, f'{self._prefix}_high_error_{self._num_high_errors}.png'),
                         self._current_observation['pixels'])
+
+                self._num_high_errors += 1
 
         if self._save_training_video_frequency:
             self._images.append(

@@ -4,7 +4,7 @@ import copy
 import glob
 import pickle
 import sys
-
+import numpy as np
 
 import tensorflow as tf
 from ray import tune
@@ -67,6 +67,17 @@ class ExperimentRunner(tune.Trainable):
         try:
             if self.policy.preprocessors['pixels'].name == 'state_estimator_preprocessor':
                 state_estimator = self.policy.preprocessors['pixels']
+
+                from softlearning.replay_pools.flexible_replay_pool import Field
+                replay_pool = self.replay_pool = (
+                    get_replay_pool_from_variant(variant, training_environment,
+                        extra_obs_keys_and_fields={
+                            'object_state_prediction': Field(
+                                name='object_state_prediction',
+                                dtype=np.float32,
+                                shape=(4,)
+                            )
+                        }))
             else:
                 state_estimator = None
         except:
