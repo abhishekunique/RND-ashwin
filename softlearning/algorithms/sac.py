@@ -70,8 +70,8 @@ class SAC(RLAlgorithm):
             lr (`float`): Learning rate used for the function approximators.
             discount (`float`): Discount factor for Q-function updates.
             tau (`float`): Soft value function target update weight.
-            target_update_interval ('int'): Frequency at which target network
-                updates occur in iterations.
+            target_update_interval ('int', [grad_steps]): Frequency at which target network
+                updates occur.
             reparameterize ('bool'): If True, we use a gradient estimator for
                 the policy derived using the reparameterization trick. We use
                 a likelihood ratio based estimator otherwise.
@@ -433,25 +433,6 @@ class SAC(RLAlgorithm):
         }
         # (TODO) Implement relabeling of terminal flags
         return new_batch
-
-    def _init_diagnostics_ops(self):
-        self._diagnostics_ops = {
-            **{
-                f'{key}-{metric_name}': metric_fn(values)
-                for key, values in (
-                        ('Q_values', self._Q_values),
-                        ('Q_losses', self._Q_losses),
-                        ('policy_losses', self._policy_losses))
-                for metric_name, metric_fn in (
-                        ('mean', tf.reduce_mean),
-                        ('std', lambda x: tfp.stats.stddev(
-                            x, sample_axis=None)))
-            },
-            'alpha': self._alpha,
-            'global_step': self.global_step,
-        }
-
-        return self._diagnostics_ops
 
     def get_diagnostics(self,
                         iteration,

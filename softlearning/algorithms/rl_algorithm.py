@@ -30,7 +30,7 @@ class RLAlgorithm(Checkpointable):
 
     def __init__(
             self,
-            sampler,
+            sampler=None,
             n_epochs=1000,
             train_every_n_steps=1,
             n_train_repeat=1,
@@ -63,7 +63,8 @@ class RLAlgorithm(Checkpointable):
         """
         self._save_training_video_frequency = save_training_video_frequency
         self.sampler = sampler
-        self.sampler.set_save_training_video_frequency(save_training_video_frequency)
+        if sampler:
+            self.sampler.set_save_training_video_frequency(save_training_video_frequency)
 
         self._n_epochs = n_epochs
         self._n_train_repeat = n_train_repeat
@@ -252,10 +253,13 @@ class RLAlgorithm(Checkpointable):
 
         self._training_before_hook()
 
+        import time
         for self._epoch in gt.timed_for(range(self._epoch, self._n_epochs)):
             self._epoch_before_hook()
             gt.stamp('epoch_before_hook')
             start_samples = self.sampler._total_samples
+
+            sample_times = []
             for i in count():
                 samples_now = self.sampler._total_samples
                 self._timestep = samples_now - start_samples
@@ -266,15 +270,18 @@ class RLAlgorithm(Checkpointable):
 
                 self._timestep_before_hook()
                 gt.stamp('timestep_before_hook')
-
+                t0 = time.time()
                 self._do_sampling(timestep=self._total_timestep)
                 gt.stamp('sample')
+                sample_times.append(time.time() - t0)
                 if self.ready_to_train:
                     self._do_training_repeats(timestep=self._total_timestep)
                 gt.stamp('train')
 
                 self._timestep_after_hook()
                 gt.stamp('timestep_after_hook')
+
+            print("Average Sample Time: ", np.mean(np.array(sample_times)))
 
             training_paths = self._training_paths()
             # self.sampler.get_last_n_paths(
