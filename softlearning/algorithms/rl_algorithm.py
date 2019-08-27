@@ -46,6 +46,7 @@ class RLAlgorithm(Checkpointable):
             session=None,
             training_video_save_frequency=0,
             n_training_videos_to_save=None,
+            random_epoch_freq=0,
     ):
         """
         Args:
@@ -101,6 +102,7 @@ class RLAlgorithm(Checkpointable):
         self._epoch = 0
         self._timestep = 0
         self._num_train_steps = 0
+        self._random_epoch_freq = random_epoch_freq
 
     def _build(self):
         self._training_ops = {}
@@ -200,10 +202,21 @@ class RLAlgorithm(Checkpointable):
     def _epoch_before_hook(self):
         """Hook called at the beginning of each epoch."""
         self._train_steps_this_epoch = 0
+        if self._random_epoch_freq and self._epoch % self._random_epoch_freq == 0:
+            self.sampler.initialize(
+                self._training_environment,
+                self._initial_exploration_policy,
+                self._pool
+            )
 
     def _epoch_after_hook(self, *args, **kwargs):
         """Hook called at the end of each epoch."""
-        pass
+        if self._random_epoch_freq and self._epoch % self._random_epoch_freq == 0:
+            self.sampler.initialize(
+                self._training_environment,
+                self._policy,
+                self._pool
+            )
 
     def _training_batch(self, batch_size=None):
         return self.sampler.random_batch(batch_size)
