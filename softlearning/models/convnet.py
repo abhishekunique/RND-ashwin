@@ -16,6 +16,10 @@ tfpl = tfp.layers
 tfd = tfp.distributions
 tfb = tfp.bijectors
 
+POOLING_TYPES = {
+    'avg_pool': layers.AvgPool2D,
+    'max_pool': layers.MaxPool2D,
+}
 
 def convnet_model(
         conv_filters=(64, 64, 64),
@@ -58,8 +62,10 @@ def convnet_model(
                          if isinstance(activation, str)
                          else activation())]
 
-        if downsampling_type == 'pool' and conv_stride > 1:
-            block_parts += [getattr(layers, 'AvgPool2D')(
+        # if downsampling_type == 'pool' and conv_stride > 1:
+        if downsampling_type in POOLING_TYPES:
+            block_parts += [POOLING_TYPES[downsampling_type](
+            # block_parts += [getattr(layers, 'AvgPool2D')(
                 pool_size=conv_stride, strides=conv_stride)]
 
         block = tfk.Sequential(block_parts, name='conv_block')

@@ -67,7 +67,7 @@ def rollout(env,
         sampler = sampler_class(
             max_path_length=path_length,
             min_pool_size=None,
-            batch_size=None
+            batch_size=None,
             **sampler_kwargs)
     else:
         sampler = sampler_class(

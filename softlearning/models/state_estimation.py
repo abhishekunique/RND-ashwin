@@ -24,7 +24,7 @@ def state_estimator_model(domain,
     """
     Need to pass in the obs_keys that the model will estimate
     """
-    env = GymAdapter(domain=domain, task=task)
+    # env = GymAdapter(domain=domain, task=task)
 #    output_sizes = OrderedDict(
 #        (key, value)
 #        for key, value in env.observation_shape.items()
@@ -40,14 +40,18 @@ def state_estimator_model(domain,
         'conv_strides': (2, ) * num_layers,
         'normalization_type': normalization_type,
     }
-    preprocessor = convnet_model(name='convnet_preprocessor', **convnet_kwargs)
-    inputs = Input(shape=input_shape)
+    preprocessor = convnet_model(name='convnet_preprocessor_state_est', **convnet_kwargs)
+    inputs = Input(
+        shape=input_shape,
+        name='pixels',
+        dtype=tf.uint8)
     preprocessed = preprocessor(inputs)
     estimator_outputs = feedforward_model(
         hidden_layer_sizes=(num_hidden_units, ) * num_hidden_layers,
         output_size=output_size,
         output_activation=tf.keras.activations.tanh,
-        kernel_regularizer=tf.keras.regularizers.l2(0.001)
+        kernel_regularizer=tf.keras.regularizers.l2(0.001),
+        name='feedforward_state_est'
     )(preprocessed)
     return PicklableModel(inputs, estimator_outputs, name='state_estimator_preprocessor')
 
