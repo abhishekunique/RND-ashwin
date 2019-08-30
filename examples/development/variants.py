@@ -138,6 +138,7 @@ MAX_PATH_LENGTH_PER_UNIVERSE_DOMAIN_TASK = {
 
             # Lifting Tasks
             'LiftDDFixed-v0': tune.grid_search([50]),
+            'LiftDDResetFree-v0': tune.grid_search([50]),
 
             # Flipping Tasks
             'FlipEraserFixed-v0': tune.grid_search([50]),
@@ -224,33 +225,224 @@ NUM_EPOCHS_PER_UNIVERSE_DOMAIN_TASK = {
     }
 }
 
-
-ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK = {
+ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_STATE = {
     'gym': {
-        'Swimmer': {  # 2 DoF
+        'DClaw': {
+            'PoseStatic-v0': {},
+            'PoseDynamic-v0': {},
+            'TurnFixed-v0': {
+                'reward_keys': (
+                    'object_to_target_angle_dist_cost',
+                ),
+                'init_object_pos_range': (0, 0),
+                'target_pos_range': (np.pi, np.pi),
+                'device_path': '/dev/ttyUSB0',
+
+            },
+            'TurnRandom-v0': {},
+            'TurnResetFree-v0': {
+                'reward_keys': (
+                    'object_to_target_angle_dist_cost',
+                ),
+                'reset_fingers': True,
+            },
+            'TurnResetFreeSwapGoal-v0': {
+                'reward_keys': (
+                    'object_to_target_angle_dist_cost',
+                ),
+                'reset_fingers': True,
+            },
+            'TurnResetFreeRandomGoal-v0': {
+                'reward_keys': (
+                    'object_to_target_angle_dist_cost',
+                ),
+                'reset_fingers': True,
+            },
+            'TurnRandomDynamics-v0': {},
+            'TurnFreeValve3Fixed-v0': {
+                'observation_keys': (
+                    'claw_qpos',
+                    'last_action',
+                    # 'object_xy_position',
+                    # 'object_z_orientation_cos',
+                    # 'object_z_orientation_sin',
+
+                    'object_xy_position_noisy',
+                    'object_z_orientation_cos_noisy',
+                    'object_z_orientation_sin_noisy',
+                ),
+                'reward_keys_and_weights': {
+                    'object_to_target_position_distance_reward': tune.grid_search([0.1, 0.5]),
+                    # 'object_to_target_position_distance_reward': tune.grid_search([0.1]),
+                    'object_to_target_orientation_distance_reward': 1,
+                },
+            },
+            'TurnFreeValve3RandomReset-v0': {
+                'reward_keys': (
+                    'object_to_target_position_distance_cost',
+                    'object_to_target_orientation_distance_cost',
+                ),
+                'initial_distribution_path': '', #'/mnt/sda/ray_results/gym/DClaw/TurnFreeValve3ResetFree-v0/2019-06-30T18-53-06-baseline_both_push_and_turn_log_rew/id=38872574-seed=6880_2019-06-30_18-53-07whkq1aax/',
+                'reset_from_corners': True,
+            },
+            'TurnFreeValve3ResetFreeRandomGoal-v0': {
+                'observation_keys': (
+                    'claw_qpos',
+                    'object_position',
+                    'object_orientation_cos',
+                    'object_orientation_sin',
+                    'last_action',
+                    'target_orientation',
+                    'object_to_target_relative_position',
+                ),
+                'reward_keys': (
+                    'object_to_target_position_distance_cost',
+                    'object_to_target_orientation_distance_cost',
+                ),
+                'reset_fingers': True,
+            },
+            'TurnFreeValve3ResetFreeSwapGoal-v0': {
+                'reward_keys_and_weights': {
+                    'object_to_target_position_distance_reward': tune.grid_search([1, 2]),
+                    'object_to_target_orientation_distance_reward': 1,
+                },
+                'reset_fingers': True,
+                'observation_keys': (
+                    'claw_qpos',
+                    'last_action',
+                    'object_xy_position',
+                    'object_z_orientation_cos',
+                    'object_z_orientation_sin',
+                    # 'object_position',
+                    # 'object_orientation_cos',
+                    # 'object_orientation_sin',
+                    'target_z_orientation_cos',
+                    'target_z_orientation_sin',
+                    'target_xy_position',
+                ),
+            },
+            'TurnFreeValve3ResetFreeCurriculum-v0': {
+                'reward_keys': (
+                    'object_to_target_position_distance_cost',
+                    'object_to_target_orientation_distance_cost',
+                ),
+                'reset_fingers': False,
+            },
+            'XYTurnValve3Fixed-v0': {
+                'reward_keys': (
+                    'object_to_target_position_distance_cost',
+                    'object_to_target_orientation_distance_cost',
+                    'eef_to_object_xy_distance_cost',
+                ),
+            },
+            'XYTurnValve3RandomReset-v0': {
+                'reward_keys': (
+                    'object_to_target_position_distance_cost',
+                    'object_to_target_orientation_distance_cost',
+                    'eef_to_object_xy_distance_cost',
+                ),
+                'num_goals': 1,
+            },
+            'XYTurnValve3Random-v0': {
+                'reward_keys': (
+                    'object_to_target_position_distance_cost',
+                    'object_to_target_orientation_distance_cost',
+                    'eef_to_object_xy_distance_cost',
+                ),
+            },
+            'XYTurnValve3ResetFree-v0': {
+                'reward_keys': (
+                    'object_to_target_position_distance_cost',
+                    'object_to_target_orientation_distance_cost',
+                    'eef_to_object_xy_distance_cost',
+                ),
+                'reset_fingers': tune.grid_search([True, False]),
+                'reset_arm': False,
+            },
+            'ScrewFixed-v0': {},
+            'ScrewRandom-v0': {},
+            'ScrewRandomDynamics-v0': {},
+
+            # Lifting Tasks
+            'LiftDDFixed-v0': {
+                'reward_keys_and_weights': {
+                    'object_to_target_z_position_distance_reward': 10,
+                    'object_to_target_xy_position_distance_reward': 0,
+                    'object_to_target_orientation_distance_reward': 0, #5,
+                },
+                'init_qpos_range': [(0, 0, 0.041, 1.017, 0, 0)],
+                'target_qpos_range': [(0, 0, 0.05, 0, 0, 0)]
+                # [  # target pos relative to init
+                #      (0, 0, 0, 0, 0, np.pi),
+                #      (0, 0, 0, np.pi, 0, 0), # bgreen side up
+                #      (0, 0, 0, 1.017, 0, 2*np.pi/5), # black side up
+                #  ],
+            },
+            'LiftDDResetFree-v0': {
+                'reward_keys_and_weights': {
+                    'object_to_target_z_position_distance_reward': 10,
+                    'object_to_target_xy_position_distance_reward': 0,
+                    'object_to_target_orientation_distance_reward': 0,
+                },
+                # 'init_qpos_range': [(0, 0, 0.041, 1.017, 0, 0)],
+                'init_qpos_range': (
+                    (0, 0, 0.041, -np.pi, -np.pi, -np.pi),
+                    (0, 0, 0.041, np.pi, np.pi, np.pi),
+                ),
+                'target_qpos_range': [(0, 0, 0.05, 0, 0, 0)],
+            },
+
+            # Flipping Tasks
+            'FlipEraserFixed-v0': {
+                'reward_keys_and_weights': {
+                    'object_to_target_position_distance_reward': 1,
+                    'object_to_target_orientation_distance_reward': 20,
+                },
+                'init_qpos_range': [(0, 0, 0, 0, 0, 0)],
+                'target_qpos_range': [(0, 0, 0, np.pi, 0, 0)],
+            },
+            'FlipEraserResetFree-v0': {
+                'reward_keys_and_weights': {
+                    'object_to_target_position_distance_reward': 1,
+                    'object_to_target_orientation_distance_reward': 20,
+                },
+            },
+            'FlipEraserResetFreeSwapGoal-v0': {
+                'reward_keys_and_weights': {
+                    'object_to_target_position_distance_reward': 1,
+                    'object_to_target_orientation_distance_reward': 20,
+                },
+            },
+        }
+    }
+}
+
+ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_VISION = {
+    'gym': {
+        'swimmer': {  # 2 dof
         },
-        'Hopper': {  # 3 DoF
+        'hopper': {  # 3 dof
         },
-        'HalfCheetah': {  # 6 DoF
+        'halfcheetah': {  # 6 dof
         },
-        'Walker2d': {  # 6 DoF
+        'walker2d': {  # 6 dof
         },
-        'Ant': {  # 8 DoF
-            'Parameterizable-v3': {
+        'ant': {  # 8 dof
+            'parameterizable-v3': {
                 'healthy_reward': 0.0,
                 'healthy_z_range': (-np.inf, np.inf),
                 'exclude_current_positions_from_observation': False,
             }
         },
-        'Humanoid': {  # 17 DoF
-            'Parameterizable-v3': {
+        'humanoid': {  # 17 dof
+            'parameterizable-v3': {
                 'healthy_reward': 0.0,
                 'healthy_z_range': (-np.inf, np.inf),
                 'exclude_current_positions_from_observation': False,
             }
         },
-        'Pusher2d': {  # 3 DoF
-            'Default-v0': {
+        'pusher2d': {  # 3 dof
+            'default-v0': {
                 'eef_to_puck_distance_cost_coeff': tune.grid_search([2.0]),
                 'goal_to_puck_distance_cost_coeff': 1.0,
                 'ctrl_cost_coeff': 0.0,
@@ -262,10 +454,10 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK = {
                 'num_goals': 2,
                 'swap_goal_upon_completion': False,
                 'reset_mode': "random",
-                #'initial_distribution_path': "/mnt/sda/ray_results/gym/Pusher2d/Default-v0/2019-06-16T14-59-35-reset-free_single_goal_save_pool/ExperimentRunner_2_her_iters=0,n_initial_exploration_steps=2000,n_train_repeat=1,evaluation={'domain': 'Pusher2d', 'task': 'Defaul_2019-06-16_14-59-36umz5wb9o/",
+                #'initial_distribution_path': "/mnt/sda/ray_results/gym/pusher2d/default-v0/2019-06-16t14-59-35-reset-free_single_goal_save_pool/experimentrunner_2_her_iters=0,n_initial_exploration_steps=2000,n_train_repeat=1,evaluation={'domain': 'pusher2d', 'task': 'defaul_2019-06-16_14-59-36umz5wb9o/",
                 # 'pixel_wrapper_kwargs': {
                 #     # 'observation_key': 'pixels',
-                #     # 'pixels_only': True,
+                #     # 'pixels_only': true,
                 #     'render_kwargs': {
                 #         'width': 32,
                 #         'height': 32,
@@ -273,21 +465,21 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK = {
                 #     },
                 # },
             },
-            'DefaultReach-v0': {
+            'defaultreach-v0': {
                 'arm_goal_distance_cost_coeff': 1.0,
                 'arm_object_distance_cost_coeff': 0.0,
             },
-            'ImageDefault-v0': {
+            'imagedefault-v0': {
                 'image_shape': (32, 32, 3),
                 'arm_object_distance_cost_coeff': 0.0,
                 'goal_object_distance_cost_coeff': 3.0,
             },
-            'ImageReach-v0': {
+            'imagereach-v0': {
                 'image_shape': (32, 32, 3),
                 'arm_goal_distance_cost_coeff': 1.0,
                 'arm_object_distance_cost_coeff': 0.0,
             },
-            'BlindReach-v0': {
+            'blindreach-v0': {
                 'image_shape': (32, 32, 3),
                 'arm_goal_distance_cost_coeff': 1.0,
                 'arm_object_distance_cost_coeff': 0.0,
@@ -323,83 +515,7 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK = {
                     'Stack',
             )
         },
-        'DClaw3': {
-            'ScrewV2-v0': {
-                # 'object_target_distance_reward_fn': NegativeLogLossFn(0),
-                'pose_difference_cost_coeff': 0,
-                'joint_velocity_cost_coeff': 0,
-                'joint_acceleration_cost_coeff': 0,
-                'target_initial_velocity_range': (0, 0),
-                'target_initial_position_range': (np.pi, np.pi),
-                'object_initial_velocity_range': (0, 0),
-                'object_initial_position_range': (-np.pi, np.pi),
-            },
-            'ImageScrewV2-v0': {
-                'image_shape': (32, 32, 3),
-                # 'object_target_distance_reward_fn': NegativeLogLossFn(0),
-                'pose_difference_cost_coeff': 0,
-                'joint_velocity_cost_coeff': 0,
-                'joint_acceleration_cost_coeff': 0,
-                'target_initial_velocity_range': (0, 0),
-                'target_initial_position_range': (np.pi, np.pi),
-                'object_initial_velocity_range': (0, 0),
-                'object_initial_position_range': (-np.pi, np.pi),
-            }
-        },
-        'HardwareDClaw3': {
-            'ScrewV2-v0': {
-                # 'object_target_distance_reward_fn': NegativeLogLossFn(0),
-                'pose_difference_cost_coeff': 0,
-                'joint_velocity_cost_coeff': 0,
-                'joint_acceleration_cost_coeff': 0,
-                'target_initial_velocity_range': (0, 0),
-                'target_initial_position_range': (np.pi, np.pi),
-                'object_initial_velocity_range': (0, 0),
-                'object_initial_position_range': (-np.pi, np.pi),
-            },
-            'ImageScrewV2-v0': {
-                'image_shape': (32, 32, 3),
-                # 'object_target_distance_reward_fn': NegativeLogLossFn(0),
-                'pose_difference_cost_coeff': 0,
-                'joint_velocity_cost_coeff': 0,
-                'joint_acceleration_cost_coeff': 0,
-                'target_initial_velocity_range': (0, 0),
-                'target_initial_position_range': (np.pi, np.pi),
-                'object_initial_velocity_range': (0, 0),
-                'object_initial_position_range': (-np.pi, np.pi),
-            },
-        },
         'DClaw': {
-            'PoseStatic-v0': {},
-            'PoseDynamic-v0': {},
-            'TurnFixed-v0': {
-                'reward_keys': (
-                    'object_to_target_angle_dist_cost',
-                ),
-                'init_object_pos_range': (0, 0),
-                'target_pos_range': (np.pi, np.pi),
-                'device_path': '/dev/ttyUSB0',
-
-            },
-            'TurnRandom-v0': {},
-            'TurnResetFree-v0': {
-                'reward_keys': (
-                    'object_to_target_angle_dist_cost',
-                ),
-                'reset_fingers': True,
-            },
-            'TurnResetFreeSwapGoal-v0': {
-                'reward_keys': (
-                    'object_to_target_angle_dist_cost',
-                ),
-                'reset_fingers': True,
-            },
-            'TurnResetFreeRandomGoal-v0': {
-                'reward_keys': (
-                    'object_to_target_angle_dist_cost',
-                ),
-                'reset_fingers': True,
-            },
             'TurnRandomResetSingleGoal-v0': {
                 'initial_object_pos_range': (-np.pi, np.pi),
                 'reward_keys': ('object_to_target_angle_dist_cost', ),
@@ -421,73 +537,46 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK = {
                 },
                 'observation_keys': ('claw_qpos', 'last_action', 'pixels'),
             },
-            'TurnRandomDynamics-v0': {},
-            'TurnFreeValve3Fixed-v0': {
-                'observation_keys': (
-                    'claw_qpos',
-                    'last_action',
-                    # 'object_xy_position',
-                    # 'object_z_orientation_cos',
-                    # 'object_z_orientation_sin',
-
-                    'object_xy_position_noisy',
-                    'object_z_orientation_cos_noisy',
-                    'object_z_orientation_sin_noisy',
-                ),
-                'reward_keys_and_weights': {
-                    'object_to_target_position_distance_reward': tune.grid_search([0.1, 0.5]),
-                    # 'object_to_target_position_distance_reward': tune.grid_search([0.1]),
-                    'object_to_target_orientation_distance_reward': 1,
-                },
-            },
-#            'TurnFreeValve3Fixed-v0': {
-#                'camera_settings': {
-#                    'azimuth': 180,
-#                    'distance': 0.32,
-#                    'elevation': -45,
-#                    'lookat': (0, 0, 0.03)
-#                },
-#                'observation_keys': (
-#                    'claw_qpos',
-#                    'last_action',
-#                    'pixels',
-#                    'object_xy_position_noisy',
-#                    'object_z_orientation_cos_noisy',
-#                    'object_z_orientation_sin_noisy',
-#                    # 'object_position',
-#                    # 'object_orientation_cos',
-#                    # 'object_orientation_sin',
-#                    # 'target_xy_position',
-#                    # 'target_z_orientation_cos',
-#                    # 'target_z_orientation_sin',
-#                ),
-#                'pixel_wrapper_kwargs': {
-#                    'pixels_only': False,
-#                    'normalize': False,
-#                    'render_kwargs': {
-#                        'camera_id': -1,
-#                        'width': 32,
-#                        'height': 32
-#                    }
-#                },
-#                'reward_keys_and_weights': {
-#                    'object_to_target_position_distance_reward': tune.grid_search([0.1, 0.5]),
-#                    # 'object_to_target_position_distance_reward': tune.grid_search([0.1]),
-#                    'object_to_target_orientation_distance_reward': 1,
-#                },
-#                # 'target_qpos': (
-#                #     (0.01, 0.01, 0, 0, 0, np.pi / 2),
-#                #     (-0.01, -0.01, 0, 0, 0, -np.pi / 2)
-#                # ),
-#            },
-            'TurnFreeValve3RandomReset-v0': {
-                'reward_keys': (
-                    'object_to_target_position_distance_cost',
-                    'object_to_target_orientation_distance_cost',
-                ),
-                'initial_distribution_path': '', #'/mnt/sda/ray_results/gym/DClaw/TurnFreeValve3ResetFree-v0/2019-06-30T18-53-06-baseline_both_push_and_turn_log_rew/id=38872574-seed=6880_2019-06-30_18-53-07whkq1aax/',
-                'reset_from_corners': True,
-            },
+           'TurnFreeValve3Fixed-v0': {
+               'camera_settings': {
+                   'azimuth': 180,
+                   'distance': 0.32,
+                   'elevation': -45,
+                   'lookat': (0, 0, 0.03)
+               },
+               'observation_keys': (
+                   'claw_qpos',
+                   'last_action',
+                   'pixels',
+                   'object_xy_position_noisy',
+                   'object_z_orientation_cos_noisy',
+                   'object_z_orientation_sin_noisy',
+                   # 'object_position',
+                   # 'object_orientation_cos',
+                   # 'object_orientation_sin',
+                   # 'target_xy_position',
+                   # 'target_z_orientation_cos',
+                   # 'target_z_orientation_sin',
+               ),
+               'pixel_wrapper_kwargs': {
+                   'pixels_only': False,
+                   'normalize': False,
+                   'render_kwargs': {
+                       'camera_id': -1,
+                       'width': 32,
+                       'height': 32
+                   }
+               },
+               'reward_keys_and_weights': {
+                   'object_to_target_position_distance_reward': tune.grid_search([0.1, 0.5]),
+                   # 'object_to_target_position_distance_reward': tune.grid_search([0.1]),
+                   'object_to_target_orientation_distance_reward': 1,
+               },
+               # 'target_qpos': (
+               #     (0.01, 0.01, 0, 0, 0, np.pi / 2),
+               #     (-0.01, -0.01, 0, 0, 0, -np.pi / 2)
+               # ),
+           },
             'TurnFreeValve3ResetFree-v0': {
                 'reward_keys': (
                     'object_to_target_position_distance_cost',
@@ -519,41 +608,7 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK = {
 
             },
             'TurnFreeValve3ResetFreeRandomGoal-v0': {
-                'observation_keys': (
-                    'claw_qpos',
-                    'object_position',
-                    'object_orientation_cos',
-                    'object_orientation_sin',
-                    'last_action',
-                    'target_orientation',
-                    'object_to_target_relative_position',
-                ),
-                'reward_keys': (
-                    'object_to_target_position_distance_cost',
-                    'object_to_target_orientation_distance_cost',
-                ),
-                'reset_fingers': True,
             },
-            # 'TurnFreeValve3ResetFreeSwapGoal-v0': {
-            #     'reward_keys_and_weights': {
-            #         'object_to_target_position_distance_reward': tune.grid_search([1, 2]),
-            #         'object_to_target_orientation_distance_reward': 1,
-            #     },
-            #     'reset_fingers': True,
-            #     'observation_keys': (
-            #         'claw_qpos',
-            #         'last_action',
-            #         'object_xy_position',
-            #         'object_z_orientation_cos',
-            #         'object_z_orientation_sin',
-            #         # 'object_position',
-            #         # 'object_orientation_cos',
-            #         # 'object_orientation_sin',
-            #         'target_z_orientation_cos',
-            #         'target_z_orientation_sin',
-            #         'target_xy_position',
-            #     ),
-            # },
             'TurnFreeValve3ResetFreeSwapGoal-v0': {
                 'pixel_wrapper_kwargs': {
                     'pixels_only': False,
@@ -579,8 +634,8 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK = {
                 #     'lookat': (0, 0, 0.03)
                 # },
                 'reward_keys_and_weights': {
-                    'object_to_target_position_distance_reward': tune.grid_search([0.5, 2]),
-                    # 'object_to_target_position_distance_reward': 2,
+                    # 'object_to_target_position_distance_reward': tune.grid_search([0.5, 2]),
+                    'object_to_target_position_distance_reward': 0.5,
                     'object_to_target_orientation_distance_reward': 1,
                 },
                 'reset_fingers': True,
@@ -629,84 +684,79 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK = {
                     'target_z_orientation_sin',
                 ),
             },
-            'TurnFreeValve3ResetFreeCurriculum-v0': {
-                'reward_keys': (
-                    'object_to_target_position_distance_cost',
-                    'object_to_target_orientation_distance_cost',
-                ),
-                'reset_fingers': False,
-            },
-            'XYTurnValve3Fixed-v0': {
-                'reward_keys': (
-                    'object_to_target_position_distance_cost',
-                    'object_to_target_orientation_distance_cost',
-                    'eef_to_object_xy_distance_cost',
-                ),
-            },
-            'XYTurnValve3RandomReset-v0': {
-                'reward_keys': (
-                    'object_to_target_position_distance_cost',
-                    'object_to_target_orientation_distance_cost',
-                    'eef_to_object_xy_distance_cost',
-                ),
-                'num_goals': 1,
-            },
-            'XYTurnValve3Random-v0': {
-                'reward_keys': (
-                    'object_to_target_position_distance_cost',
-                    'object_to_target_orientation_distance_cost',
-                    'eef_to_object_xy_distance_cost',
-                ),
-            },
-            'XYTurnValve3ResetFree-v0': {
-                'reward_keys': (
-                    'object_to_target_position_distance_cost',
-                    'object_to_target_orientation_distance_cost',
-                    'eef_to_object_xy_distance_cost',
-                ),
-                'reset_fingers': tune.grid_search([True, False]),
-                'reset_arm': False,
-            },
-            'ScrewFixed-v0': {},
-            'ScrewRandom-v0': {},
-            'ScrewRandomDynamics-v0': {},
             # Lifting Tasks
             'LiftDDFixed-v0': {
                 'reward_keys_and_weights': {
                     'object_to_target_z_position_distance_reward': 10,
                     'object_to_target_xy_position_distance_reward': 0,
-                    'object_to_target_orientation_distance_reward': 0, #5,
+                    'object_to_target_orientation_distance_reward': 0,
                 },
-                'init_qpos_range': [(0, 0, 0.041, 1.017, 0, 0)],
-                'target_qpos_range': [(0, 0, 0.05, 0, 0, 0)]
-                # [  # target pos relative to init
-                #      (0, 0, 0, 0, 0, np.pi),
-                #      (0, 0, 0, np.pi, 0, 0), # bgreen side up
-                #      (0, 0, 0, 1.017, 0, 2*np.pi/5), # black side up
-                #  ],
+                'init_qpos_range': (
+                    (0, 0, 0.041, -np.pi, -np.pi, -np.pi),
+                    (0, 0, 0.041, np.pi, np.pi, np.pi),
+                ),
+                # 'init_qpos_range': (
+                #     (-0.04, -0.04, 0.041, 1.017, 0, 0),
+                #     (0.04, 0.04, 0.041, 1.017, 0, 0)
+                # ),
+                'target_qpos_range': [(0, 0, 0.05, 0, 0, 0)],
+                'pixel_wrapper_kwargs': {
+                    'pixels_only': False,
+                    'normalize': False,
+                    'render_kwargs': {
+                        'width': 32,
+                        'height': 32,
+                        'camera_id': -1,
+                    }
+                },
+                'camera_settings': {
+                    'azimuth': 180,
+                    'distance': 0.26,
+                    'elevation': -32,
+                    'lookat': (0, 0, 0.06)
+                },
+                'observation_keys': (
+                    'pixels', 'claw_qpos', 'last_action',
+                    'object_position',
+                    'object_quaternion',
+                ),
+                'reset_policy_checkpoint_path': None,
             },
-            # Flipping Tasks
-            'FlipEraserFixed-v0': {
+            'LiftDDResetFree-v0': {
                 'reward_keys_and_weights': {
-                    'object_to_target_position_distance_reward': 1,
-                    'object_to_target_orientation_distance_reward': 20,
+                    'object_to_target_z_position_distance_reward': 10,
+                    'object_to_target_xy_position_distance_reward': 0,
+                    'object_to_target_orientation_distance_reward': 0,
                 },
-                'init_qpos_range': [(0, 0, 0, 0, 0, 0)],
-                'target_qpos_range': [(0, 0, 0, np.pi, 0, 0)],
-            },
-            'FlipEraserResetFree-v0': {
-                'reward_keys_and_weights': {
-                    'object_to_target_position_distance_reward': 1,
-                    'object_to_target_orientation_distance_reward': 20,
+                'init_qpos_range': (
+                    (0, 0, 0.041, -np.pi, -np.pi, -np.pi),
+                    (0, 0, 0.041, np.pi, np.pi, np.pi),
+                ),
+                'target_qpos_range': [(0, 0, 0.05, 0, 0, 0)],
+                'pixel_wrapper_kwargs': {
+                    'pixels_only': False,
+                    'normalize': False,
+                    'render_kwargs': {
+                        'width': 32,
+                        'height': 32,
+                        'camera_id': -1,
+                    }
                 },
-            },
-            'FlipEraserResetFreeSwapGoal-v0': {
-                'reward_keys_and_weights': {
-                    'object_to_target_position_distance_reward': 1,
-                    'object_to_target_orientation_distance_reward': 20,
+                'camera_settings': {
+                    'azimuth': 180,
+                    'distance': 0.26,
+                    'elevation': -32,
+                    'lookat': (0, 0, 0.06)
                 },
+                'observation_keys': (
+                    'pixels', 'claw_qpos', 'last_action',
+                    'object_position',
+                    'object_quaternion',
+                ),
+                'reset_policy_checkpoint_path': None,
             },
 
+            # Flipping Tasks
         },
     },
     'dm_control': {
@@ -750,57 +800,6 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK = {
             },
         },
     },
-    'robosuite': {
-        'InvisibleArm': {
-            'FreeFloatManipulation': {
-                'has_renderer': False,
-                'has_offscreen_renderer': True,
-                'use_camera_obs': False,
-                'camera_name': 'agentview',
-                'use_object_obs': True,
-                'object_to_eef_reward_weight': 10,
-                'object_to_target_reward_weight': 1,
-                'orientation_reward_weight': 0.0,
-                'control_freq': 10,
-                'fixed_arm': False,
-                'fixed_claw': True,
-                'objects_type': 'screw',
-                'observation_keys': (
-                    'joint_pos',
-                    'joint_vel',
-                    'gripper_qpos',
-                    'gripper_qvel',
-                    'eef_pos',
-                    'eef_quat',
-                    # 'robot-state',
-                    # 'custom-cube_position',
-                    # 'custom-cube_quaternion',
-                    # 'custom-cube_to_eef_pos',
-                    # 'custom-cube_to_eef_quat',
-                    # 'custom-cube-visual_position',
-                    # 'custom-cube-visual_quaternion',
-                    'screw_position',
-                    'screw_quaternion',
-                    'screw_to_eef_pos',
-                    'screw_to_eef_quat',
-                    'screw-visual_position',
-                    'screw-visual_quaternion',
-                ),
-                'target_x_range': [-1, 1],
-                'target_y_range': [-1, 1],
-                'target_z_rotation_range': [np.pi, np.pi],
-                'num_goals': tune.grid_search([0]),
-                'initial_x_range': (0, 0),
-                'initial_y_range': (0, 0),
-                'initial_z_rotation_range': (np.pi/8, np.pi/8),
-                'num_starts': -1,
-                'camera_width': 480,
-                'camera_height': 480,
-                'render_collision_mesh': True,
-                'render_visual_mesh': False,
-            },
-        },
-    }
 }
 
 
@@ -867,10 +866,14 @@ def get_algorithm_params(universe, domain, task):
     return algorithm_params
 
 
-def get_environment_params(universe, domain, task):
+def get_environment_params(universe, domain, task, from_pixels):
+    if from_pixels:
+        params = ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_VISION
+    else:
+        params = ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_STATE
+
     environment_params = (
-        ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK
-        .get(universe, {}).get(domain, {}).get(task, {}))
+        params.get(universe, {}).get(domain, {}).get(task, {}))
 
     return environment_params
 
@@ -937,7 +940,7 @@ def evaluation_environment_params(spec):
     return eval_environment_params
 
 
-def get_variant_spec_base(universe, domain, task, policy, algorithm):
+def get_variant_spec_base(universe, domain, task, policy, algorithm, from_pixels):
     algorithm_params = deep_update(
         ALGORITHM_PARAMS_BASE,
         get_algorithm_params(universe, domain, task),
@@ -951,7 +954,7 @@ def get_variant_spec_base(universe, domain, task, policy, algorithm):
                 'domain': domain,
                 'task': task,
                 'universe': universe,
-                'kwargs': get_environment_params(universe, domain, task),
+                'kwargs': get_environment_params(universe, domain, task, from_pixels),
             },
             'evaluation': tune.sample_from(lambda spec: evaluation_environment_params(spec)),
             #     spec.get('config', spec)
@@ -1072,14 +1075,12 @@ def get_variant_spec_base(universe, domain, task, policy, algorithm):
     # })
 
     # TODO: Add this as a command line arg
-    no_object_information = True
     no_pixel_information = False
 
     env_kwargs = variant_spec['environment_params']['training']['kwargs']
-
-    env_obs_keys = env_kwargs['observation_keys']
-    if no_object_information and "pixel_wrapper_kwargs" in env_kwargs.keys() and \
+    if from_pixels and "pixel_wrapper_kwargs" in env_kwargs.keys() and \
        "device_path" not in env_kwargs.keys():
+        env_obs_keys = env_kwargs['observation_keys']
         non_image_obs_keys = tuple(key for key in env_obs_keys if key != 'pixels')
         # variant_spec['replay_pool_params']['kwargs']['obs_save_keys'] = non_image_obs_keys
 
@@ -1116,12 +1117,13 @@ def get_variant_spec_image(universe,
                            task,
                            policy,
                            algorithm,
+                           from_pixels,
                            *args,
                            **kwargs):
     variant_spec = get_variant_spec_base(
-        universe, domain, task, policy, algorithm, *args, **kwargs)
+        universe, domain, task, policy, algorithm, from_pixels,  *args, **kwargs)
 
-    use_state_estimation = True
+    use_state_estimation = False
     use_vae = False
     if is_image_env(universe, domain, task, variant_spec):
         if use_state_estimation:
@@ -1140,7 +1142,7 @@ def get_variant_spec_image(universe,
                     'num_hidden_layers': 2,
                     # 'state_estimator_path': '/root/softlearning-vice/softlearning/models/state_estimator_random_data_50_epochs.h5',
                     # 'state_estimator_path': '/root/softlearning-vice/softlearning/models/state_estimator_invisible_claw.h5',
-                    'state_estimator_path': '/root/softlearning-vice/softlearning/models/state_estimators/state_estimator_fixed_antialias.h5'
+                    'state_estimator_path': '/home/justinvyu/dev/softlearning-vice/softlearning/models/state_estimators/state_estimator_fixed_antialias.h5'
                 }
             }
         elif use_vae:
@@ -1152,17 +1154,45 @@ def get_variant_spec_image(universe,
                 {
                     'type': 'ConvnetPreprocessor',
                     'kwargs': {
-                        'conv_filters': (64, ) * num_layers,
-                        'conv_kernel_sizes': (3, ) * num_layers,
-                        'conv_strides': (2, ) * num_layers,
-                        # 'normalization_type': 'layer',
+                        'conv_filters': (8, 16, 32),
+                        'conv_kernel_sizes': (3, ) * 3,
+                        'conv_strides': (2, ) * 3,
                         'normalization_type': normalization_type,
                         'downsampling_type': 'conv',
                     },
                 }
-                for num_layers in (4, )
                 for normalization_type in (None, )
             ])
+
+            # preprocessor_params = tune.grid_search([
+            #     {
+            #         'type': 'ConvnetPreprocessor',
+            #         'kwargs': {
+            #             'conv_filters': (8, 16, 32),
+            #             'conv_kernel_sizes': (3, 3, 3),
+            #             'conv_strides': (2, 2, 2),
+            #             'normalization_type': normalization_type,
+            #             'downsampling_type': downsampling_type,
+            #         },
+            #     }
+            #     for normalization_type in ('batch', None)
+            #     for downsampling_type in ('max_pool', )
+            # ])
+            # preprocessor_params = tune.grid_search([
+            #     {
+            #         'type': 'ConvnetPreprocessor',
+            #         'kwargs': {
+            #             'conv_filters': (64, ) * num_layers,
+            #             'conv_kernel_sizes': (3, ) * num_layers,
+            #             'conv_strides': (2, ) * num_layers,
+            #             # 'normalization_type': 'layer',
+            #             'normalization_type': normalization_type,
+            #             'downsampling_type': 'conv',
+            #         },
+            #     }
+            #     for num_layers in (4, )
+            #     for normalization_type in (None, )
+            # ])
 
         # Alternate convnet architecture
         # 32 x 32 x 3 -> 16 x 16 x 64 -> 8 x 8 x 64 -> 4 x 4 x 32 -> 4 x 4 x 16
@@ -1210,8 +1240,10 @@ def get_variant_spec_image(universe,
 def get_variant_spec(args):
     universe, domain, task = args.universe, args.domain, args.task
 
+    from_pixels = args.from_pixels
+
     variant_spec = get_variant_spec_image(
-        universe, domain, task, args.policy, args.algorithm)
+        universe, domain, task, args.policy, args.algorithm, from_pixels)
 
     if args.checkpoint_replay_pool is not None:
         variant_spec['run_params']['checkpoint_replay_pool'] = (

@@ -140,7 +140,7 @@ ALGORITHM_PARAMS_ADDITIONAL = {
             'classifier_lr': 1e-4,
             'classifier_batch_size': 128,
             'n_initial_exploration_steps': int(1e3),
-            'n_classifier_train_steps': 5, # tune.grid_search([2, 5]),
+            'n_classifier_train_steps': 2, # tune.grid_search([2, 5]),
             'classifier_optim_name': 'adam',
             'n_epochs': 200,
             'mixup_alpha': 1.0,
@@ -346,6 +346,18 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_STATE = {
                     'object_to_target_orientation_distance_cost': 1,
                 },
             },
+            'LiftDDFixed-v0': {
+                'reset_policy_checkpoint_path': None,
+                'init_qpos_range': (
+                    (0, 0, 0.041, 1.017, 0, 0),
+                    (0, 0, 0.041, 1.017, 0, 0),
+                    # (0, 0, 0.041, -np.pi, -np.pi, -np.pi),
+                    # (0, 0, 0.041, np.pi, np.pi, np.pi),
+                ),
+                'target_qpos_range': [
+                    (0, 0, 0.04, 0, 0, 0)
+                ],
+            }
         }
     },
 }
@@ -574,6 +586,38 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_VISION = {
                     'object_orientation_cos'
                 ),
             },
+            'LiftDDFixed-v0': {
+                'pixel_wrapper_kwargs': {
+                    'pixels_only': False,
+                    'normalize': False,
+                    'render_kwargs': {
+                        'width': 32,
+                        'height': 32,
+                        'camera_id': -1,
+                    }
+                },
+                'camera_settings': {
+                    'azimuth': 180,
+                    'distance': 0.32,
+                    'elevation': -10,
+                    'lookat': (0, 0, 0.06)
+                },
+                'observation_keys': (
+                    'pixels', 'claw_qpos', 'last_action',
+                    'object_position',
+                    'object_quaternion',
+                ),
+                'reset_policy_checkpoint_path': None,
+                'init_qpos_range': (
+                    (0, 0, 0.041, 1.017, 0, 0),
+                    (0, 0, 0.041, 1.017, 0, 0),
+                    # (0, 0, 0.041, -np.pi, -np.pi, -np.pi),
+                    # (0, 0, 0.041, np.pi, np.pi, np.pi),
+                ),
+                'target_qpos_range': [
+                    (0, 0, 0.04, 0, 0, 0)
+                ],
+            }
         }
     },
 }
@@ -681,7 +725,7 @@ def get_variant_spec_base(universe, domain, task, task_eval,
         'replay_pool_params': {
             'type': 'SimpleReplayPool',
             'kwargs': {
-                'max_size': int(3e5), #int(1e6)
+                'max_size': int(1e6)
             }
         },
         'sampler_params': {
@@ -745,8 +789,8 @@ def get_variant_spec_classifier(universe,
     # TODO: Abstract this
 
     # Only use pixels for vision goal classification
-    variant_spec['reward_classifier_params']['kwargs']['observation_keys'] = (
-       'pixels', )
+    # variant_spec['reward_classifier_params']['kwargs']['observation_keys'] = (
+    #    'pixels', )
 
     # variant_spec['reward_classifier_params']['kwargs']['observation_keys'] = (
     #     'object_position', 'object_orientation_cos', 'object_orientation_sin')# , 'goal_index')
@@ -822,19 +866,35 @@ def get_variant_spec(args):
     variant_spec['algorithm_params']['kwargs']['n_epochs'] = n_epochs
 
     if is_image_env(universe, domain, task, variant_spec):
+        # preprocessor_params = tune.grid_search([
+        #     {
+        #         'type': 'ConvnetPreprocessor',
+        #         'kwargs': {
+        #             'conv_filters': (num_filters, ) * num_layers,
+        #             'conv_kernel_sizes': (3, ) * num_layers,
+        #             'conv_strides': (2, ) * num_layers,
+        #             'normalization_type': normalization_type,
+        #             'downsampling_type': 'conv',
+        #         },
+        #     }
+        #     for num_layers in (4, )
+        #     for normalization_type in (None, )
+        #     for num_filters in (64, 8)
+        # ]) 
         preprocessor_params = tune.grid_search([
             {
                 'type': 'ConvnetPreprocessor',
                 'kwargs': {
-                    'conv_filters': (64, ) * num_layers,
+                    'conv_filters': (num_filters, ) * num_layers,
                     'conv_kernel_sizes': (3, ) * num_layers,
                     'conv_strides': (2, ) * num_layers,
                     'normalization_type': normalization_type,
                     'downsampling_type': 'conv',
                 },
             }
-            for num_layers in (4, )
+            for num_layers in (3, )
             for normalization_type in (None, )
+            for num_filters in (8, )
         ])
 
         variant_spec['policy_params']['kwargs']['hidden_layer_sizes'] = (M, M)
