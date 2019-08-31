@@ -1154,11 +1154,14 @@ def get_variant_spec_image(universe,
                 {
                     'type': 'ConvnetPreprocessor',
                     'kwargs': {
-                        'conv_filters': (8, 16, 32),
+                        'conv_filters': (64, 32, 16),
                         'conv_kernel_sizes': (3, ) * 3,
-                        'conv_strides': (2, ) * 3,
+                        'conv_strides': (2, 1, 1),
                         'normalization_type': normalization_type,
                         'downsampling_type': 'conv',
+                        'output_kwargs': {
+                            'type': 'spatial_softmax',
+                        }
                     },
                 }
                 for normalization_type in (None, )

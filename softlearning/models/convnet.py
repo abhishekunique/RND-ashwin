@@ -21,6 +21,13 @@ POOLING_TYPES = {
     'max_pool': layers.MaxPool2D,
 }
 
+OUTPUT_TYPES = (
+    'spatial_softmax',
+    'dense',
+    'flatten'
+)
+DEFAULT_OUTPUT_KWARGS = {'type': 'flatten'}
+
 def convnet_model(
         conv_filters=(64, 64, 64),
         conv_kernel_sizes=(3, 3, 3),
@@ -31,8 +38,7 @@ def convnet_model(
         downsampling_type='conv',
         activation=layers.LeakyReLU,
         name="convnet",
-        use_dense_layer_output=False,
-        dense_layer_output_size=16,
+        output_kwargs=None,
         *args,
         **kwargs):
     normalization_layer = {
@@ -80,8 +86,44 @@ def convnet_model(
         x = (tf.image.convert_image_dtype(x, tf.float32) - 0.5) * 2.0
         return x
 
-    if use_dense_layer_output:
-        output_layer = tfkl.Dense(dense_layer_output_size)
+    output_kwargs = output_kwargs or DEFAULT_OUTPUT_KWARGS
+    output_type = output_kwargs.pop('type')
+    if output_type == 'spatial_softmax':
+        def spatial_softmax(x):
+            # Create learnable temperature parameter `alpha`
+            alpha = tf.Variable(1., dtype=tf.float32, name='softmax_alpha')
+            width, height, channels = x.shape[1:]
+            softmax_attention = tf.math.softmax(x / alpha)
+            # Create matrices where all xs/ys are the same value acros
+            # the row/col. These will be multiplied by the softmax distr
+            # to get the 2D expectation.
+            pos_x, pos_y = tf.meshgrid(
+                tf.linspace(-1., 1., num=width),
+                tf.linspace(-1., 1., num=height),
+                indexing='ij'
+            )
+            # Reshape to a column vector to satisfy multiply broadcast.
+            pos_x, pos_y = (
+                tf.reshape(pos_x, [-1, 1]),
+                tf.reshape(pos_y, [-1, 1])
+            )
+            # Vectorize the feature maps, split by channels still
+            softmax_attention = tf.reshape(
+                softmax_attention, [-1, width * height, channels])
+
+            expected_x = tf.math.reduce_sum(
+                pos_x * softmax_attention, axis=[1], keepdims=True)
+            expected_y = tf.math.reduce_sum(
+                pos_y * softmax_attention, axis=[1], keepdims=True)
+            expected_xy = tf.concat([expected_x, expected_y], axis=1)
+            feature_keypoints = tf.reshape(expected_xy, [-1, 2 * channels])
+
+            return feature_keypoints
+
+        output_layer = tfkl.Lambda(spatial_softmax)
+    elif output_type == 'dense':
+        # TODO: Implement this with `feedforward` network
+        pass
     else:
         output_layer = tfkl.Flatten()
 
@@ -92,7 +134,6 @@ def convnet_model(
             for (conv_filter, conv_kernel_size, conv_stride) in
             zip(conv_filters, conv_kernel_sizes, conv_strides)
         ],
-        tfkl.Flatten(),
         output_layer,
     ), name=name)
     return model
