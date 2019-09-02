@@ -170,10 +170,6 @@ def get_parser(allow_policy_list=False):
         type=str,
         default=DEFAULT_DOMAIN)
     parser.add_argument('--task', type=str, default=DEFAULT_TASK)
-    parser.add_argument(
-        '--from-pixels',
-        type=lambda x: bool(strtobool(x)),
-        default=True)
 
     parser.add_argument(
         '--checkpoint-replay-pool',
@@ -230,14 +226,17 @@ def get_parser(allow_policy_list=False):
         default=5,
         help="Save frequency for training videos.")
 
+    from softlearning.preprocessors.utils import PREPROCESSOR_FUNCTIONS
     parser.add_argument(
-        '--pixels-preprocessor-type',
+        '--preprocessor-type',
         type=str,
         default='ConvnetPreprocessor',
-        help="Preprocessor type for pixel observations.",
-        choices=('ConvnetPreprocessor',
-                 'StateEstimatorPreprocessor',
-                 'VAEPreprocessor'))
+        help="Preprocessor type for observations.",
+        choices=list(PREPROCESSOR_FUNCTIONS.keys()))
+    parser.add_argument(
+        '--vision',
+        type=lambda x: bool(strtobool(x)),
+        default=True)
 
     parser = add_ray_init_args(parser)
     parser = add_ray_tune_args(parser)

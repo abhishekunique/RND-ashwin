@@ -866,8 +866,8 @@ def get_algorithm_params(universe, domain, task):
     return algorithm_params
 
 
-def get_environment_params(universe, domain, task, from_pixels):
-    if from_pixels:
+def get_environment_params(universe, domain, task, from_vision):
+    if from_vision:
         params = ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_VISION
     else:
         params = ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_STATE
@@ -940,7 +940,7 @@ def evaluation_environment_params(spec):
     return eval_environment_params
 
 
-def get_variant_spec_base(universe, domain, task, policy, algorithm, from_pixels):
+def get_variant_spec_base(universe, domain, task, policy, algorithm, from_vision):
     algorithm_params = deep_update(
         ALGORITHM_PARAMS_BASE,
         get_algorithm_params(universe, domain, task),
@@ -954,7 +954,7 @@ def get_variant_spec_base(universe, domain, task, policy, algorithm, from_pixels
                 'domain': domain,
                 'task': task,
                 'universe': universe,
-                'kwargs': get_environment_params(universe, domain, task, from_pixels),
+                'kwargs': get_environment_params(universe, domain, task, from_vision),
             },
             'evaluation': tune.sample_from(lambda spec: evaluation_environment_params(spec)),
             #     spec.get('config', spec)
@@ -1078,7 +1078,7 @@ def get_variant_spec_base(universe, domain, task, policy, algorithm, from_pixels
     no_pixel_information = False
 
     env_kwargs = variant_spec['environment_params']['training']['kwargs']
-    if from_pixels and "pixel_wrapper_kwargs" in env_kwargs.keys() and \
+    if from_vision and "pixel_wrapper_kwargs" in env_kwargs.keys() and \
        "device_path" not in env_kwargs.keys():
         env_obs_keys = env_kwargs['observation_keys']
         non_image_obs_keys = tuple(key for key in env_obs_keys if key != 'pixels')
@@ -1111,107 +1111,92 @@ def is_image_env(universe, domain, task, variant_spec):
                 variant_spec['environment_params']['training']['kwargs'])
             or (universe, domain, task) in IMAGE_ENVS)
 
+STATE_PREPROCESSOR_PARAMS = {
+    'ReplicationPreprocessor': {
+        'type': 'ReplicationPreprocessor',
+        'kwargs': {
+            # 'n': tune.grid_search([10, 20, 50]),
+            # 'n': tune.sample_from(lambda spec: [10, 20, 50]),
+            'n': 100,
+            'scale_factor': 1,
+        }
+    },
+    'RandomNNPreprocessor': {
+        'type': 'RandomNNPreprocessor',
+        'kwargs': {
+            'hidden_layer_sizes': (32, 32),
+            'activation': 'linear',
+            'output_activation': 'linear',
+        }
+    },
+    'RandomMatrixPreprocessor': {
+        'type': 'RandomMatrixPreprocessor',
+        'kwargs': {
+            'output_size_scale_factor': 1,
+            'coefficient_range': (-1., 1.),
+        }
+    },
+}
+
+PIXELS_PREPROCESSOR_PARAMS = {
+    'StateEstimatorPreprocessor': {
+        'type': 'StateEstimatorPreprocessor',
+        'kwargs': {
+            # 'domain': domain,
+            # 'task': task,
+            # 'obs_keys_to_estimate': (
+            #     'object_position',
+            #     'object_orientation_cos',
+            #     'object_orientation_sin',
+            # ),
+            'input_shape': (32, 32, 3),
+            'num_hidden_units': 256,
+            'num_hidden_layers': 2,
+            'state_estimator_path': '/home/justinvyu/dev/softlearning-vice/softlearning/models/state_estimators/state_estimator_fixed_antialias.h5'
+        }
+    },
+    'VAEPreprocessor': {
+        'type': 'VAEPreprocessor',
+    },
+    'ConvnetPreprocessor': tune.grid_search([
+        {
+            'type': 'ConvnetPreprocessor',
+            'kwargs': {
+                'conv_filters': (64, 32, 16),
+                'conv_kernel_sizes': (3, ) * 3,
+                'conv_strides': (2, 1, 1),
+                'normalization_type': normalization_type,
+                'downsampling_type': 'conv',
+                'output_kwargs': {
+                    'type': 'spatial_softmax',
+                }
+            },
+        }
+        for normalization_type in (None, )
+    ]),
+}
 
 def get_variant_spec_image(universe,
                            domain,
                            task,
                            policy,
                            algorithm,
-                           from_pixels,
+                           from_vision,
+                           preprocessor_type,
                            *args,
                            **kwargs):
     variant_spec = get_variant_spec_base(
-        universe, domain, task, policy, algorithm, from_pixels,  *args, **kwargs)
+        universe,
+        domain,
+        task,
+        policy,
+        algorithm,
+        from_vision,
+        *args, **kwargs)
 
-    use_state_estimation = False
-    use_vae = False
     if is_image_env(universe, domain, task, variant_spec):
-        if use_state_estimation:
-            preprocessor_params = {
-                'type': 'StateEstimatorPreprocessor',
-                'kwargs': {
-                    'domain': domain,
-                    'task': task,
-                    'obs_keys_to_estimate': (
-                        'object_position',
-                        'object_orientation_cos',
-                        'object_orientation_sin',
-                    ),
-                    'input_shape': (32, 32, 3),
-                    'num_hidden_units': 256,
-                    'num_hidden_layers': 2,
-                    # 'state_estimator_path': '/root/softlearning-vice/softlearning/models/state_estimator_random_data_50_epochs.h5',
-                    # 'state_estimator_path': '/root/softlearning-vice/softlearning/models/state_estimator_invisible_claw.h5',
-                    'state_estimator_path': '/home/justinvyu/dev/softlearning-vice/softlearning/models/state_estimators/state_estimator_fixed_antialias.h5'
-                }
-            }
-        elif use_vae:
-            preprocessor_params = {
-                'type': 'VAEPreprocessor',
-            }
-        else:
-            preprocessor_params = tune.grid_search([
-                {
-                    'type': 'ConvnetPreprocessor',
-                    'kwargs': {
-                        'conv_filters': (64, 32, 16),
-                        'conv_kernel_sizes': (3, ) * 3,
-                        'conv_strides': (2, 1, 1),
-                        'normalization_type': normalization_type,
-                        'downsampling_type': 'conv',
-                        'output_kwargs': {
-                            'type': 'spatial_softmax',
-                        }
-                    },
-                }
-                for normalization_type in (None, )
-            ])
-
-            # preprocessor_params = tune.grid_search([
-            #     {
-            #         'type': 'ConvnetPreprocessor',
-            #         'kwargs': {
-            #             'conv_filters': (8, 16, 32),
-            #             'conv_kernel_sizes': (3, 3, 3),
-            #             'conv_strides': (2, 2, 2),
-            #             'normalization_type': normalization_type,
-            #             'downsampling_type': downsampling_type,
-            #         },
-            #     }
-            #     for normalization_type in ('batch', None)
-            #     for downsampling_type in ('max_pool', )
-            # ])
-            # preprocessor_params = tune.grid_search([
-            #     {
-            #         'type': 'ConvnetPreprocessor',
-            #         'kwargs': {
-            #             'conv_filters': (64, ) * num_layers,
-            #             'conv_kernel_sizes': (3, ) * num_layers,
-            #             'conv_strides': (2, ) * num_layers,
-            #             # 'normalization_type': 'layer',
-            #             'normalization_type': normalization_type,
-            #             'downsampling_type': 'conv',
-            #         },
-            #     }
-            #     for num_layers in (4, )
-            #     for normalization_type in (None, )
-            # ])
-
-        # Alternate convnet architecture
-        # 32 x 32 x 3 -> 16 x 16 x 64 -> 8 x 8 x 64 -> 4 x 4 x 32 -> 4 x 4 x 16
-        # -> dense layer -> 16 / 8 x 1
-        # preprocessor_params = {
-        #     'type': 'ConvnetPreprocessor',
-        #     'kwargs': {
-        #         'conv_filters': (64, 64, 32, 16),
-        #         'conv_kernel_sizes': (3, ) * 4,
-        #         'conv_strides': (2, 2, 2, 1),
-        #         'normalization_type': None,
-        #         'downsampling_type': 'conv',
-        #         'use_dense_layer_output': True,
-        #         'dense_layer_output_size': 16,
-        #     },
-        # }
+        assert preprocessor_type in PIXELS_PREPROCESSOR_PARAMS
+        preprocessor_params = PIXELS_PREPROCESSOR_PARAMS[preprocessor_type]
 
         variant_spec['policy_params']['kwargs']['hidden_layer_sizes'] = (M, ) * N
         variant_spec['policy_params']['kwargs'][
@@ -1236,6 +1221,38 @@ def get_variant_spec_image(universe,
                     ['observation_preprocessors_params']
                 )))
             )
+    else:
+        # Assign preprocessor to all parts of the state
+        assert preprocessor_type in STATE_PREPROCESSOR_PARAMS
+        preprocessor_params = STATE_PREPROCESSOR_PARAMS[preprocessor_type]
+        obs_keys = variant_spec['environment_params']['training']['kwargs']['observation_keys']
+
+        variant_spec['policy_params']['kwargs']['hidden_layer_sizes'] = (M, ) * N
+        variant_spec['policy_params']['kwargs'][
+            'observation_preprocessors_params'] = {
+                key: deepcopy(preprocessor_params)
+                for key in obs_keys
+            }
+
+        variant_spec['Q_params']['kwargs']['hidden_layer_sizes'] = (
+            tune.sample_from(lambda spec: (deepcopy(
+                spec.get('config', spec)
+                ['policy_params']
+                ['kwargs']
+                ['hidden_layer_sizes']
+            )))
+        )
+        variant_spec['Q_params']['kwargs'][
+            'observation_preprocessors_params'] = (
+                tune.sample_from(lambda spec: (deepcopy(
+                    spec.get('config', spec)
+                    ['policy_params']
+                    ['kwargs']
+                    ['observation_preprocessors_params']
+                )))
+            )
+
+
 
     return variant_spec
 
@@ -1243,10 +1260,17 @@ def get_variant_spec_image(universe,
 def get_variant_spec(args):
     universe, domain, task = args.universe, args.domain, args.task
 
-    from_pixels = args.from_pixels
+    from_vision = args.vision
+    preprocessor_type = args.preprocessor_type
 
     variant_spec = get_variant_spec_image(
-        universe, domain, task, args.policy, args.algorithm, from_pixels)
+        universe,
+        domain,
+        task,
+        args.policy,
+        args.algorithm,
+        from_vision,
+        preprocessor_type)
 
     if args.checkpoint_replay_pool is not None:
         variant_spec['run_params']['checkpoint_replay_pool'] = (

@@ -38,6 +38,25 @@ def get_state_estimator_preprocessor(
     preprocessor.summary()
     return preprocessor
 
+def get_replication_preprocessor(name='replication_preprocessor', **kwargs):
+    from .replication_preprocessor import replication_preprocessor
+    preprocessor = replication_preprocessor(name=name, **kwargs)
+    return preprocessor
+
+def get_random_nn_preprocessor(name='random_nn_preprocessor', **kwargs):
+    from softlearning.models.feedforward import feedforward_model
+    preprocessor = feedforward_model(name=name, **kwargs)
+    # Don't update weights in this random NN
+
+    import ipdb; ipdb.set_trace()
+    preprocessor = tf.stop_gradient(preprocessor)
+    return preprocessor
+
+def get_random_matrix_preprocessor(name='random_matrix_preprocessor', **kwargs):
+    from .random_matrix_preprocessor import random_matrix_preprocessor
+    preprocessor = random_matrix_preprocessor(name=name, **kwargs)
+    return preprocessor
+
 def get_feedforward_preprocessor(name='feedforward_preprocessor', **kwargs):
     from softlearning.models.feedforward import feedforward_model
 
@@ -50,6 +69,9 @@ PREPROCESSOR_FUNCTIONS = {
     'FeedforwardPreprocessor': get_feedforward_preprocessor,
     'StateEstimatorPreprocessor': get_state_estimator_preprocessor,
     'VAEPreprocessor': get_vae_preprocessor,
+    'ReplicationPreprocessor': get_replication_preprocessor,
+    'RandomNNPreprocessor': get_random_nn_preprocessor,
+    'RandomMatrixPreprocessor': get_random_matrix_preprocessor,
     None: lambda *args, **kwargs: None
 }
 
