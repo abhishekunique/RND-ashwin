@@ -53,6 +53,10 @@ class SAC(RLAlgorithm):
             save_full_state=False,
             save_eval_paths=False,
             per_alpha=1,
+            rnd_networks=(),
+            rnd_lr=1e-4,
+            rnd_int_rew_coeff=0,
+            rnd_gamma=0.99,
             **kwargs,
     ):
         """
@@ -118,6 +122,16 @@ class SAC(RLAlgorithm):
         self._save_full_state = save_full_state
         self._save_eval_paths = save_eval_paths
         self._goal_classifier_params_directory = goal_classifier_params_directory
+        self._rnd_int_rew_coeff = 0
+        if rnd_networks:
+            self._rnd_target = rnd_networks[0]
+            self._rnd_predictor = rnd_networks[1]
+            self._rnd_lr = rnd_lr
+            self._rnd_int_rew_coeff = rnd_int_rew_coeff
+            self._rnd_gamma = rnd_gamma
+            self._running_int_rew_std = 0
+            # self._rnd_gamma = 1
+            # self._running_int_rew_std = 1
         self._build()
 
     def _build(self):
@@ -127,6 +141,8 @@ class SAC(RLAlgorithm):
         else:
             self._goal_classifier = None
 
+        if self._rnd_int_rew_coeff:
+            self._init_rnd_update()
         self._init_actor_update()
         self._init_critic_update()
         self._init_diagnostics_ops()
@@ -148,8 +164,10 @@ class SAC(RLAlgorithm):
         # Things to try:
         # - random goal
         # - single goal
-        feed_dict = {self._goal_classifier.images: images,
-            self._goal_classifier.goals: goals}
+        feed_dict = {
+            self._goal_classifier.images: images,
+            self._goal_classifier.goals: goals
+        }
         # lid_pos = observations[:, -2]
         goal_probs = self._session.run(self._goal_classifier.pred_probs, feed_dict=feed_dict)[:, 1].reshape((-1, 1))
         return goal_probs
@@ -175,11 +193,19 @@ class SAC(RLAlgorithm):
 
         terminals = tf.cast(self._placeholders['terminals'], next_values.dtype)
 
+        if self._rnd_int_rew_coeff:
+            self._int_reward = tf.clip_by_value(
+                self._rnd_int_rew_coeff * self._rnd_errors / self._placeholders['rnd']['running_int_rew_std'],
+                0, 1000
+            )
+            self._reward = reward = self._reward_scale * self._placeholders['rewards'] + self._int_reward
+        else:
+            reward = self._reward_scale * self._placeholders['rewards']
+
         Q_target = td_target(
-            reward=self._reward_scale * self._placeholders['rewards'],
+            reward=reward,
             discount=self._discount,
             next_value=(1 - terminals) * next_values)
-
         return tf.stop_gradient(Q_target)
 
     def _init_critic_update(self):
@@ -306,6 +332,34 @@ class SAC(RLAlgorithm):
 
         self._training_ops.update({'policy_train_op': policy_train_op})
 
+    def _init_rnd_update(self):
+        self._placeholders.update({
+            'rnd': {
+                'running_int_rew_std': tf.compat.v1.placeholder(
+                    tf.float32, shape=(), name='running_int_rew_std')
+            }
+        })
+        policy_inputs = flatten_input_structure({
+            name: self._placeholders['observations'][name]
+            for name in self._policy.observation_keys
+        })
+
+        targets = tf.stop_gradient(self._rnd_target(policy_inputs))
+        predictions = self._rnd_predictor(policy_inputs)
+
+        self._rnd_errors = tf.expand_dims(tf.reduce_mean(
+            tf.math.squared_difference(targets, predictions), axis=-1), 1)
+        self._rnd_loss = tf.reduce_mean(self._rnd_errors)
+        self._rnd_error_std = tf.math.reduce_std(self._rnd_errors)
+        self._rnd_optimizer = tf.compat.v1.train.AdamOptimizer(
+            learning_rate=self._rnd_lr,
+            name="policy_optimizer")
+        rnd_train_op = self._rnd_optimizer.minimize(
+            loss=self._rnd_loss)
+        self._training_ops.update(
+            {'rnd_train_op': rnd_train_op}
+        )
+
     def _init_diagnostics_ops(self):
         diagnosables = OrderedDict((
             ('Q_value', self._Q_values),
@@ -314,9 +368,16 @@ class SAC(RLAlgorithm):
             ('alpha', self._alpha)
         ))
 
+        if self._rnd_int_rew_coeff:
+            diagnosables['rnd_reward'] = self._int_reward
+            diagnosables['rnd_error'] = self._rnd_errors
+            diagnosables['running_rnd_reward_std'] = self._placeholders['rnd']['running_int_rew_std']
+
         diagnostic_metrics = OrderedDict((
             ('mean', tf.reduce_mean),
             ('std', lambda x: tfp.stats.stddev(x, sample_axis=None)),
+            ('max', tf.math.reduce_max),
+            ('min', tf.math.reduce_min),
         ))
 
         self._diagnostics_ops = OrderedDict([
@@ -343,6 +404,11 @@ class SAC(RLAlgorithm):
         """Runs the operations for updating training and target ops."""
         feed_dict = self._get_feed_dict(iteration, batch)
         self._session.run(self._training_ops, feed_dict)
+        if self._rnd_int_rew_coeff:
+            int_rew_std = np.maximum(np.std(self._session.run(self._int_reward, feed_dict)), 1e-3)
+            self._running_int_rew_std = self._running_int_rew_std * self._rnd_gamma + int_rew_std * (1-self._rnd_gamma)
+        else:
+            self._session.run(self._training_ops, feed_dict)
 
         if self._her_iters:
             # Q: Is it better to build a large batch and take one grad step, or
@@ -405,34 +471,37 @@ class SAC(RLAlgorithm):
         if iteration is not None:
             feed_dict[self._placeholders['iteration']] = iteration
 
+        if self._rnd_int_rew_coeff:
+            feed_dict[self._placeholders['rnd']['running_int_rew_std']] = self._running_int_rew_std
+
         return feed_dict
 
-    def _get_goal_resamp_batch(self, batch):
-        new_goal = self._base_env.sample_goal()
-        old_goal = self._base_env.get_goal()
-        batch_obs = batch['observations']
-        batch_act = batch['actions']
-        batch_next_obs = batch['next_observations']
+    # def _get_goal_resamp_batch(self, batch):
+    #     new_goal = self._base_env.sample_goal()
+    #     old_goal = self._base_env.get_goal()
+    #     batch_obs = batch['observations']
+    #     batch_act = batch['actions']
+    #     batch_next_obs = batch['next_observations']
 
-        new_batch_obs = self._base_env.relabel_obs_w_goal(batch_obs, new_goal)
-        new_batch_next_obs = self._base_env.relabel_obs_w_goal(batch_next_obs, new_goal)
+    #     new_batch_obs = self._base_env.relabel_obs_w_goal(batch_obs, new_goal)
+    #     new_batch_next_obs = self._base_env.relabel_obs_w_goal(batch_next_obs, new_goal)
 
-        if self._base_env.use_super_state_reward():
-            batch_super_obs = batch['super_observations']
-            new_batch_super_obs = super(self._base_env).relabel_obs_w_goal(batch_super_obs, new_goal)
-            new_batch_rew = np.expand_dims(self._base_env.compute_rewards(new_batch_super_obs, batch_act)[0], 1)
-        else:
-            new_batch_rew = np.expand_dims(self._base_env.compute_rewards(new_batch_obs, batch_act)[0], 1)
+    #     if self._base_env.use_super_state_reward():
+    #         batch_super_obs = batch['super_observations']
+    #         new_batch_super_obs = super(self._base_env).relabel_obs_w_goal(batch_super_obs, new_goal)
+    #         new_batch_rew = np.expand_dims(self._base_env.compute_rewards(new_batch_super_obs, batch_act)[0], 1)
+    #     else:
+    #         new_batch_rew = np.expand_dims(self._base_env.compute_rewards(new_batch_obs, batch_act)[0], 1)
 
-        new_batch = {
-            'rewards': new_batch_rew,
-            'observations': new_batch_obs,
-            'actions': batch['actions'],
-            'next_observations': new_batch_next_obs,
-            'terminals': batch['terminals'],
-        }
-        # (TODO) Implement relabeling of terminal flags
-        return new_batch
+    #     new_batch = {
+    #         'rewards': new_batch_rew,
+    #         'observations': new_batch_obs,
+    #         'actions': batch['actions'],
+    #         'next_observations': new_batch_next_obs,
+    #         'terminals': batch['terminals'],
+    #     }
+    #     # (TODO) Implement relabeling of terminal flags
+    #     return new_batch
 
     def get_diagnostics(self,
                         iteration,
