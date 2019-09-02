@@ -41,6 +41,19 @@ ALGORITHM_PARAMS_BASE = {
             'height': 480,
             'mode': 'rgb_array',
         },
+        'rnd_int_rew_coeff': 5,
+    },
+    'rnd_params': {
+        'convnet_params': {
+            'conv_filters': (16, 32, 64),
+            'conv_kernel_sizes': (3, 3, 3),
+            'conv_strides': (2, 2, 2),
+            'normalization_type': None,
+        },
+        'fc_params': {
+            'hidden_layer_sizes': (256, 256),
+            'output_size': 512,
+        },
     }
 }
 
