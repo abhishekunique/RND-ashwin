@@ -9,6 +9,8 @@ from softlearning.misc.get_multigoal_example_pools import (
     get_example_pools_from_variant)
 import dsuite
 
+DEFAULT_KEY = '__DEFAULT_KEY__'
+
 M = 256
 REPARAMETERIZE = True
 
@@ -46,8 +48,8 @@ POLICY_PARAMS_FOR_DOMAIN.update({
     'gaussian': POLICY_PARAMS_FOR_DOMAIN['GaussianPolicy'],
 })
 
-DEFAULT_MAX_PATH_LENGTH = 100
 MAX_PATH_LENGTH_PER_DOMAIN = {
+    DEFAULT_KEY: 100,
     'DClaw': 100,
     # 'DClaw': tune.grid_search([50, 100, 150]), # 100, # 50
 }
@@ -281,8 +283,21 @@ GOALS_PER_UNIVERSE_DOMAIN_TASK = {
     }
 }
 
-CLASSIFIER_PARAMS_PER_UNIVERSE_DOMAIN_TASK = {
+CLASSIFIER_PARAMS_BASE = {
+    'type': 'feedforward_classifier',
+    'kwargs': {
+        'hidden_layer_sizes': (M, M),
+    }
 
+}
+CLASSIFIER_PARAMS_PER_UNIVERSE_DOMAIN_TASK = {
+    'gym': {
+        'DClaw': {
+            **dict.fromkeys(['LiftDDFixed-v0', 'LiftDDResetFree-v0'], {
+                'observation_keys': ('pixels', 'claw_qpos')
+            })
+        }
+    }
 }
 
 ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_STATE = {
@@ -631,8 +646,8 @@ def get_policy_params(universe, domain, task):
     return policy_params
 
 def get_max_path_length(universe, domain, task):
-    max_path_length = MAX_PATH_LENGTH_PER_DOMAIN.get(
-        domain, DEFAULT_MAX_PATH_LENGTH)
+    max_path_length = MAX_PATH_LENGTH_PER_DOMAIN.get(domain) or \
+        MAX_PATH_LENGTH_PER_DOMAIN[DEFAULT_KEY]
     return max_path_length
 
 def get_environment_params(universe, domain, task, from_pixels):
@@ -644,6 +659,13 @@ def get_environment_params(universe, domain, task, from_pixels):
     environment_params = (
         params.get(universe, {}).get(domain, {}).get(task, {}))
     return environment_params
+
+def get_classifier_params(universe, domain, task):
+    classifier_params = CLASSIFIER_PARAMS_BASE.copy()
+    classifier_params['kwargs'].update(
+        CLASSIFIER_PARAMS_PER_UNIVERSE_DOMAIN_TASK.get(
+            universe, {}).get(domain, {}).get(task, {}))
+    return classifier_params
 
 def get_checkpoint_frequency(spec):
     config = spec.get('config', spec)
@@ -677,7 +699,6 @@ def get_variant_spec_base(universe, domain, task, task_eval,
     variant_spec = {
         'git_sha': get_git_rev(),
         'num_goals': 2, # TODO: Separate classifier_rl with multigoal
-        # 'num_goals': 4,
         'environment_params': {
             'training': {
                 'domain': domain,
@@ -778,20 +799,7 @@ def get_variant_spec_classifier(universe,
     variant_spec = get_variant_spec_base(
         universe, domain, task, task_eval, policy, algorithm, from_pixels, *args, **kwargs)
 
-    classifier_layer_size = L = 256
-    variant_spec['reward_classifier_params'] = {
-        'type': 'feedforward_classifier',
-        'kwargs': {
-            'hidden_layer_sizes': (L, L),
-            }
-        }
-
-    # TODO: Abstract this
-
-    # Only use pixels for vision goal classification
-    # variant_spec['reward_classifier_params']['kwargs']['observation_keys'] = (
-    #    'pixels', )
-
+    variant_spec['reward_classifier_params'] = get_classifier_params(universe, domain, task)
     # variant_spec['reward_classifier_params']['kwargs']['observation_keys'] = (
     #     'object_position', 'object_orientation_cos', 'object_orientation_sin')# , 'goal_index')
 
