@@ -1162,9 +1162,9 @@ PIXELS_PREPROCESSOR_PARAMS = {
         {
             'type': 'ConvnetPreprocessor',
             'kwargs': {
-                'conv_filters': (64, 32, 16),
-                'conv_kernel_sizes': (3, ) * 3,
-                'conv_strides': (2, 1, 1),
+                'conv_filters': (16, 32, 64, 32),
+                'conv_kernel_sizes': (3, ) * 4,
+                'conv_strides': (2, 2, 1, 1),
                 'normalization_type': normalization_type,
                 'downsampling_type': 'conv',
                 'output_kwargs': {

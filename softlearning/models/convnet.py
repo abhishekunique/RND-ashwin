@@ -28,6 +28,7 @@ OUTPUT_TYPES = (
 )
 DEFAULT_OUTPUT_KWARGS = {'type': 'flatten'}
 
+
 def convnet_model(
         conv_filters=(64, 64, 64),
         conv_kernel_sizes=(3, 3, 3),
@@ -70,9 +71,11 @@ def convnet_model(
 
         # if downsampling_type == 'pool' and conv_stride > 1:
         if downsampling_type in POOLING_TYPES:
-            block_parts += [POOLING_TYPES[downsampling_type](
-            # block_parts += [getattr(layers, 'AvgPool2D')(
-                pool_size=conv_stride, strides=conv_stride)]
+            block_parts += [
+                POOLING_TYPES[downsampling_type](
+                    pool_size=conv_stride, strides=conv_stride
+                )
+            ]
 
         block = tfk.Sequential(block_parts, name='conv_block')
         return block
@@ -93,7 +96,17 @@ def convnet_model(
             # Create learnable temperature parameter `alpha`
             alpha = tf.Variable(1., dtype=tf.float32, name='softmax_alpha')
             width, height, channels = x.shape[1:]
-            softmax_attention = tf.math.softmax(x / alpha)
+            x_flattened = tf.reshape(
+                x, [-1, width * height, channels])
+            softmax_attention = tf.math.softmax(x_flattened / alpha, axis=1)
+            # TODO: Fix this; redundant, since I'm going to reflatten it later
+            softmax_attention = tf.reshape(
+                softmax_attention, [-1, width, height, channels])
+            return softmax_attention
+
+        def calculate_expectation(distributions):
+            width, height, channels = distributions.shape[1:]
+
             # Create matrices where all xs/ys are the same value acros
             # the row/col. These will be multiplied by the softmax distr
             # to get the 2D expectation.
@@ -107,20 +120,58 @@ def convnet_model(
                 tf.reshape(pos_x, [-1, 1]),
                 tf.reshape(pos_y, [-1, 1])
             )
-            # Vectorize the feature maps, split by channels still
-            softmax_attention = tf.reshape(
-                softmax_attention, [-1, width * height, channels])
+
+            distributions = tf.reshape(
+                distributions, [-1, width * height, channels])
 
             expected_x = tf.math.reduce_sum(
-                pos_x * softmax_attention, axis=[1], keepdims=True)
+                pos_x * distributions, axis=[1], keepdims=True)
             expected_y = tf.math.reduce_sum(
-                pos_y * softmax_attention, axis=[1], keepdims=True)
+                pos_y * distributions, axis=[1], keepdims=True)
             expected_xy = tf.concat([expected_x, expected_y], axis=1)
             feature_keypoints = tf.reshape(expected_xy, [-1, 2 * channels])
-
             return feature_keypoints
 
-        output_layer = tfkl.Lambda(spatial_softmax)
+        # def spatial_softmax(x):
+        #     # Create learnable temperature parameter `alpha`
+        #     alpha = tf.Variable(1., dtype=tf.float32, name='softmax_alpha')
+        #     width, height, channels = x.shape[1:]
+        #     # softmax_attention = tf.math.softmax(x / alpha)
+        #     # Create matrices where all xs/ys are the same value acros
+        #     # the row/col. These will be multiplied by the softmax distr
+        #     # to get the 2D expectation.
+        #     pos_x, pos_y = tf.meshgrid(
+        #         tf.linspace(-1., 1., num=width),
+        #         tf.linspace(-1., 1., num=height),
+        #         indexing='ij'
+        #     )
+        #     # Reshape to a column vector to satisfy multiply broadcast.
+        #     pos_x, pos_y = (
+        #         tf.reshape(pos_x, [-1, 1]),
+        #         tf.reshape(pos_y, [-1, 1])
+        #     )
+        #     # Vectorize the feature maps, split by channels still
+        #     # softmax_attention = tf.reshape(
+        #     #     softmax_attention, [-1, width * height, channels])
+        #     x_flattened = tf.reshape(
+        #         x, [-1, width * height, channels])
+        #     softmax_attention = tf.math.softmax(x_flattened / alpha, axis=1)
+
+        #     expected_x = tf.math.reduce_sum(
+        #         pos_x * softmax_attention, axis=[1], keepdims=True)
+        #     expected_y = tf.math.reduce_sum(
+        #         pos_y * softmax_attention, axis=[1], keepdims=True)
+        #     expected_xy = tf.concat([expected_x, expected_y], axis=1)
+        #     feature_keypoints = tf.reshape(expected_xy, [-1, 2 * channels])
+
+        #     return feature_keypoints
+
+        # output_layer = tfkl.Lambda(spatial_softmax)
+
+        output_layer = tfk.Sequential([
+            tfkl.Lambda(spatial_softmax),
+            tfkl.Lambda(calculate_expectation)
+        ])
     elif output_type == 'dense':
         # TODO: Implement this with `feedforward` network
         pass
