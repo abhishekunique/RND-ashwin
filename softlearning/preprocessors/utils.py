@@ -7,17 +7,20 @@ def get_convnet_preprocessor(name='convnet_preprocessor', **kwargs):
 
     return preprocessor
 
-def get_vae_preprocessor(name='vae_preprocessor', **kwargs):
-    from softlearning.models.vae import CVAE
-    preprocessor = CVAE()
-
-    path = '/home/justinvyu/dev/softlearning-vice/softlearning/models/vae_weights'
-    encoder_weights_path, decoder_weights_path = (
-        path + 'encoder_weights.h5',
-        path + 'decoder_weights.h5'
-    )
-    preprocessor.load_weights(encoder_weights_path, decoder_weights_path)
-
+def get_vae_preprocessor(name='vae_preprocessor',
+                         encoder_path=None,
+                         decoder_path=None,
+                         **kwargs):
+    from softlearning.models.vae import VAE
+    assert encoder_path is not None and decoder_path is not None, (
+        "Must specify paths for the encoder/deocder models.")
+    vae = VAE(**kwargs)
+    vae.encoder.load_weights(encoder_path)
+    vae.decoder.load_weights(decoder_path)
+    
+    preprocessor = vae.get_encoder(trainable=False, name=name)
+#     preprocessor.trainable = False
+    
     return preprocessor
 
 def get_state_estimator_preprocessor(
