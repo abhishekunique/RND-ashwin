@@ -263,17 +263,20 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_STATE = {
                 'observation_keys': (
                     'claw_qpos',
                     'last_action',
-                    # 'object_xy_position',
-                    # 'object_z_orientation_cos',
-                    # 'object_z_orientation_sin',
-
-                    'object_xy_position_noisy',
-                    'object_z_orientation_cos_noisy',
-                    'object_z_orientation_sin_noisy',
+                    'object_xy_position',
+                    'object_z_orientation_cos',
+                    'object_z_orientation_sin',
+                    'target_xy_position',
+                    'target_z_orientation_cos',
+                    'target_z_orientation_sin',
                 ),
+                'init_qpos_range': (
+                    (-0.025, -0.025, 0, 0, 0, -np.pi),
+                    (0.025, 0.025, 0, 0, 0, np.pi)
+                ),
+                'target_qpos_range': [(0, 0, 0, 0, 0, np.pi)],
                 'reward_keys_and_weights': {
-                    'object_to_target_position_distance_reward': tune.grid_search([0.1, 0.5]),
-                    # 'object_to_target_position_distance_reward': tune.grid_search([0.1]),
+                    'object_to_target_position_distance_reward': tune.grid_search([1]),
                     'object_to_target_orientation_distance_reward': 1,
                 },
             },
@@ -303,7 +306,8 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_STATE = {
             },
             'TurnFreeValve3ResetFreeSwapGoal-v0': {
                 'reward_keys_and_weights': {
-                    'object_to_target_position_distance_reward': tune.grid_search([1, 2]),
+                    # 'object_to_target_position_distance_reward': tune.grid_search([1, 2]),
+                    'object_to_target_position_distance_reward': tune.grid_search([2]),
                     'object_to_target_orientation_distance_reward': 1,
                 },
                 'reset_fingers': True,
@@ -313,9 +317,23 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_STATE = {
                     'object_xy_position',
                     'object_z_orientation_cos',
                     'object_z_orientation_sin',
-                    # 'object_position',
-                    # 'object_orientation_cos',
-                    # 'object_orientation_sin',
+                    'target_z_orientation_cos',
+                    'target_z_orientation_sin',
+                    'target_xy_position',
+                ),
+            },
+            'TurnFreeValve3ResetFreeSwapGoalEval-v0': {
+                'reward_keys_and_weights': {
+                    # 'object_to_target_position_distance_reward': tune.grid_search([1, 2]),
+                    'object_to_target_position_distance_reward': tune.grid_search([2]),
+                    'object_to_target_orientation_distance_reward': 1,
+                },
+                'observation_keys': (
+                    'claw_qpos',
+                    'last_action',
+                    'object_xy_position',
+                    'object_z_orientation_cos',
+                    'object_z_orientation_sin',
                     'target_z_orientation_cos',
                     'target_z_orientation_sin',
                     'target_xy_position',
@@ -725,7 +743,7 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_VISION = {
             'LiftDDResetFree-v0': {
                 'reward_keys_and_weights': {
                     'object_to_target_z_position_distance_reward': 10,
-                    'object_to_target_xy_position_distance_reward': 0,
+                    'object_to_target_xy_position_distance_reward': tune.grid_search([1, 2]),
                     'object_to_target_orientation_distance_reward': 0,
                 },
                 'init_qpos_range': (
@@ -1115,9 +1133,7 @@ STATE_PREPROCESSOR_PARAMS = {
     'ReplicationPreprocessor': {
         'type': 'ReplicationPreprocessor',
         'kwargs': {
-            # 'n': tune.grid_search([10, 20, 50]),
-            # 'n': tune.sample_from(lambda spec: [10, 20, 50]),
-            'n': 100,
+            'n': 0,
             'scale_factor': 1,
         }
     },

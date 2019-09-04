@@ -11,11 +11,9 @@ def replication_preprocessor(
         n=1,
         scale_factor=1,
         name='replication_preprocessor'):
-    # def cast_and_concat(x):
-    #     x = nest.map_structure(training_utils.cast_if_floating_dtype, x)
-    #     x = nest.flatten(x)
-    #     x = tf.concat(x, axis=-1)
-    #     return x
+
+    if n == 0:
+        return tfkl.Flatten()
 
     def replicate_and_scale(x):
         x = tf.tile(x, [1, n])
