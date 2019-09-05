@@ -44,6 +44,7 @@ class SACClassifierMultiGoal(SAC):
     def _build(self):
         super(SACClassifierMultiGoal, self)._build()
         self._init_classifier_update()
+        self._init_classifier_reward()
 
     def _init_placeholders(self):
         super(SACClassifierMultiGoal, self)._init_placeholders()
@@ -103,6 +104,37 @@ class SACClassifierMultiGoal(SAC):
         ]
 
         self._classifier_training_ops = self._get_classifier_training_ops()
+
+    def _init_classifier_reward(self):
+        classifier_inputs = flatten_input_structure({
+            name: self._placeholders['observations'][name]
+            for name in self._classifiers[0].observation_keys
+        })
+
+        observation_logits_per_classifier = [
+            classifier(classifier_inputs) for classifier in self._classifiers]
+
+        # DEBUG
+        # self._observation_logits_per_classifier = observation_logits_per_classifier
+        goal_indices = self._placeholders['observations']['goal_index']
+        goal_index_masks = [
+            tf.equal(goal_indices, goal)
+            for goal in range(self._num_goals)
+        ]
+
+        # DEBUG
+        # self._goal_index_masks = goal_index_masks
+
+        # Replace the correct classification logits for the repsective goals
+        observation_logits = observation_logits_per_classifier[0]
+        for goal in range(1, self._num_goals):
+            observation_logits = tf.where(
+               goal_index_masks[goal],
+               x=observation_logits_per_classifier[goal],
+               y=observation_logits
+            )
+
+        self._ext_reward = self._reward_t = observation_logits
 
     def _get_classifier_feed_dicts(self):
         # Sample N x the normal amount of observations, where N is
@@ -180,37 +212,6 @@ class SACClassifierMultiGoal(SAC):
         ]
 
         return feed_dicts
-
-    def _init_classifier_reward(self):
-        classifier_inputs = flatten_input_structure({
-            name: self._placeholders['observations'][name]
-            for name in self._classifiers[0].observation_keys
-        })
-
-        observation_logits_per_classifier = [
-            classifier(classifier_inputs) for classifier in self._classifiers]
-
-        # DEBUG
-        # self._observation_logits_per_classifier = observation_logits_per_classifier
-        goal_indices = self._placeholders['observations']['goal_index']
-        goal_index_masks = [
-            tf.equal(goal_indices, goal)
-            for goal in range(self._num_goals)
-        ]
-
-        # DEBUG
-        # self._goal_index_masks = goal_index_masks
-
-        # Replace the correct classification logits for the repsective goals
-        observation_logits = observation_logits_per_classifier[0]
-        for goal in range(1, self._num_goals):
-            observation_logits = tf.where(
-               goal_index_masks[goal],
-               x=observation_logits_per_classifier[goal],
-               y=observation_logits
-            )
-
-        self._ext_reward = self._reward_t = observation_logits
 
     def _epoch_after_hook(self, *args, **kwargs):
         if self._epoch == 0:
