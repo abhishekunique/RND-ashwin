@@ -41,7 +41,7 @@ ALGORITHM_PARAMS_BASE = {
             'height': 480,
             'mode': 'rgb_array',
         },
-        'rnd_int_rew_coeff': 5,
+        'rnd_int_rew_coeff': tune.sample_from([1]),
     },
     'rnd_params': {
         'convnet_params': {

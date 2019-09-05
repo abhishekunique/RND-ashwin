@@ -194,11 +194,13 @@ class SAC(RLAlgorithm):
         terminals = tf.cast(self._placeholders['terminals'], next_values.dtype)
 
         if self._rnd_int_rew_coeff:
-            self._int_reward = tf.clip_by_value(
-                self._rnd_int_rew_coeff * self._rnd_errors / self._placeholders['rnd']['running_int_rew_std'],
+            self._unscaled_int_reward = tf.clip_by_value(
+                self._rnd_errors / self._placeholders['rnd']['running_int_rew_std'],
                 0, 1000
             )
-            self._reward = reward = self._reward_scale * self._placeholders['rewards'] + self._int_reward
+            self._int_reward = self._rnd_int_rew_coeff * self._unscaled_int_reward
+            self._ext_reward = self._reward_scale * self._placeholders['rewards']
+            self._reward = reward = self._ext_reward + self._int_reward
         else:
             reward = self._reward_scale * self._placeholders['rewards']
 
@@ -370,6 +372,7 @@ class SAC(RLAlgorithm):
 
         if self._rnd_int_rew_coeff:
             diagnosables['rnd_reward'] = self._int_reward
+            diagnosables['ext_reward'] = self._ext_reward
             diagnosables['rnd_error'] = self._rnd_errors
             diagnosables['running_rnd_reward_std'] = self._placeholders['rnd']['running_int_rew_std']
 
@@ -405,7 +408,7 @@ class SAC(RLAlgorithm):
         feed_dict = self._get_feed_dict(iteration, batch)
         self._session.run(self._training_ops, feed_dict)
         if self._rnd_int_rew_coeff:
-            int_rew_std = np.maximum(np.std(self._session.run(self._int_reward, feed_dict)), 1e-3)
+            int_rew_std = np.maximum(np.std(self._session.run(self._unscaled_int_reward, feed_dict)), 1e-3)
             self._running_int_rew_std = self._running_int_rew_std * self._rnd_gamma + int_rew_std * (1-self._rnd_gamma)
         else:
             self._session.run(self._training_ops, feed_dict)
