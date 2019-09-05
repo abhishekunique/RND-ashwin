@@ -25,55 +25,13 @@ class VICE(SACClassifier):
     # TODO Avi This class has  a lot of code repeated from SACClassifier due
     # to labels having different dimensions in the two classes, but this can
     # likely be fixed
-    def _get_Q_target(self):
-        policy_inputs = flatten_input_structure({
-            name: self._placeholders['next_observations'][name]
-            for name in self._policy.observation_keys
-        })
-        next_actions = self._policy.actions(policy_inputs)
-        next_log_pis = self._policy.log_pis(policy_inputs, next_actions)
-
-        next_Q_observations = {
-            name: self._placeholders['next_observations'][name]
-            for name in self._Qs[0].observation_keys
-        }
-        next_Q_inputs = flatten_input_structure(
-            {**next_Q_observations, 'actions': next_actions})
-        next_Qs_values = tuple(Q(next_Q_inputs) for Q in self._Q_targets)
-
-        min_next_Q = tf.reduce_min(next_Qs_values, axis=0)
-        next_values = min_next_Q - self._alpha * next_log_pis
-
+    def _init_classifier_reward(self):
         classifier_inputs = flatten_input_structure({
             name: self._placeholders['observations'][name]
             for name in self._classifier.observation_keys
         })
         observation_log_p = self._classifier(classifier_inputs)
-        curr_policy_inputs = flatten_input_structure({
-            name: self._placeholders['observations'][name]
-            for name in self._policy.observation_keys
-        })
-
-        # Calculate log probability of the actions taken
-        # curr_actions = self._placeholders['actions']
-        # curr_log_pis = self._policy.log_pis(curr_policy_inputs, curr_actions)
- 
-        # self._classifier_log_p_t = observation_log_p
-        # self._log_pi_t = curr_log_pis
-        self._reward_t = observation_log_p 
-        # self._reward_t = observation_log_p - curr_log_pis
-
-        # log_pi_log_p_concat = tf.concat([curr_log_pis, observation_log_p], axis=1)
-        # self._discriminator_output_t = tf.compat.v1.math.softmax(log_pi_log_p_concat)
-
-        terminals = tf.cast(self._placeholders['terminals'], next_values.dtype)
-
-        Q_target = td_target(
-            reward=self._reward_scale * self._reward_t,
-            discount=self._discount,
-            next_value=(1 - terminals) * next_values)
-
-        return Q_target
+        self._reward_t = self._ext_reward = observation_log_p
 
     def _get_classifier_feed_dict(self):
         negatives = self.sampler.random_batch(

@@ -193,19 +193,20 @@ class SAC(RLAlgorithm):
 
         terminals = tf.cast(self._placeholders['terminals'], next_values.dtype)
 
+        self._ext_reward = self._reward_scale * self._placeholders['rewards']
+
         if self._rnd_int_rew_coeff:
             self._unscaled_int_reward = tf.clip_by_value(
                 self._rnd_errors / self._placeholders['rnd']['running_int_rew_std'],
                 0, 1000
             )
             self._int_reward = self._rnd_int_rew_coeff * self._unscaled_int_reward
-            self._ext_reward = self._reward_scale * self._placeholders['rewards']
-            self._reward = reward = self._ext_reward + self._int_reward
         else:
-            reward = self._reward_scale * self._placeholders['rewards']
+            self._int_reward = 0
+        self._total_reward = self._ext_reward + self._int_reward
 
         Q_target = td_target(
-            reward=reward,
+            reward=self._total_reward,
             discount=self._discount,
             next_value=(1 - terminals) * next_values)
         return tf.stop_gradient(Q_target)
@@ -373,6 +374,7 @@ class SAC(RLAlgorithm):
         if self._rnd_int_rew_coeff:
             diagnosables['rnd_reward'] = self._int_reward
             diagnosables['ext_reward'] = self._ext_reward
+            diagnosables['total_reward'] = self._ext_reward
             diagnosables['rnd_error'] = self._rnd_errors
             diagnosables['running_rnd_reward_std'] = self._placeholders['rnd']['running_int_rew_std']
 

@@ -37,6 +37,7 @@ class SACClassifier(SAC):
     def _build(self):
         super(SACClassifier, self)._build()
         self._init_classifier_update()
+        self._init_classifier_reward()
 
     def _init_placeholders(self):
         super(SACClassifier, self)._init_placeholders()
@@ -46,25 +47,7 @@ class SACClassifier(SAC):
             name='labels',
         )
 
-    def _get_Q_target(self):
-        policy_inputs = flatten_input_structure({
-            name: self._placeholders['next_observations'][name]
-            for name in self._policy.observation_keys
-        })
-        next_actions = self._policy.actions(policy_inputs)
-        next_log_pis = self._policy.log_pis(policy_inputs, next_actions)
-
-        next_Q_observations = {
-            name: self._placeholders['next_observations'][name]
-            for name in self._Qs[0].observation_keys
-        }
-        next_Q_inputs = flatten_input_structure(
-            {**next_Q_observations, 'actions': next_actions})
-        next_Qs_values = tuple(Q(next_Q_inputs) for Q in self._Q_targets)
-
-        min_next_Q = tf.reduce_min(next_Qs_values, axis=0)
-        next_values = min_next_Q - self._alpha * next_log_pis
-
+    def _init_classifier_reward(self):
         classifier_inputs = flatten_input_structure({
             name: self._placeholders['observations'][name]
             for name in self._classifier.observation_keys
@@ -79,14 +62,7 @@ class SACClassifier(SAC):
             raise NotImplementedError(
                 f"Unknown reward type: {self._reward_type}")
 
-        terminals = tf.cast(self._placeholders['terminals'], next_values.dtype)
-
-        Q_target = td_target(
-            reward=self._reward_scale * self._reward_t,
-            discount=self._discount,
-            next_value=(1 - terminals) * next_values)
-
-        return Q_target
+        self._ext_reward = self._reward_t
 
     def _get_classifier_training_op(self):
         if self._classifier_optim_name == 'adam':

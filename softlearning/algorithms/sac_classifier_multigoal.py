@@ -181,7 +181,6 @@ class SACClassifierMultiGoal(SAC):
 
         return feed_dicts
 
-
     def _get_Q_target(self):
         policy_inputs = flatten_input_structure({
             name: self._placeholders['next_observations'][name]
