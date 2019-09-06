@@ -613,8 +613,40 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_VISION = {
                 },
                 'camera_settings': {
                     'azimuth': 180,
-                    'distance': 0.32,
-                    'elevation': -10,
+                    'distance': 0.26,
+                    'elevation': -32,
+                    'lookat': (0, 0, 0.06)
+                },
+                'observation_keys': (
+                    'pixels', 'claw_qpos', 'last_action',
+                    'object_position',
+                    'object_quaternion',
+                ),
+                'reset_policy_checkpoint_path': None,
+                'init_qpos_range': (
+                    (0, 0, 0.041, 1.017, 0, 0),
+                    (0, 0, 0.041, 1.017, 0, 0),
+                    # (0, 0, 0.041, -np.pi, -np.pi, -np.pi),
+                    # (0, 0, 0.041, np.pi, np.pi, np.pi),
+                ),
+                'target_qpos_range': [
+                    (0, 0, 0.04, 0, 0, 0)
+                ],
+            },
+            'LiftDDResetFree-v0': {
+                'pixel_wrapper_kwargs': {
+                    'pixels_only': False,
+                    'normalize': False,
+                    'render_kwargs': {
+                        'width': 32,
+                        'height': 32,
+                        'camera_id': -1,
+                    }
+                },
+                'camera_settings': {
+                    'azimuth': 180,
+                    'distance': 0.26,
+                    'elevation': -32,
                     'lookat': (0, 0, 0.06)
                 },
                 'observation_keys': (
@@ -893,16 +925,17 @@ def get_variant_spec(args):
             {
                 'type': 'ConvnetPreprocessor',
                 'kwargs': {
-                    'conv_filters': (num_filters, ) * num_layers,
-                    'conv_kernel_sizes': (3, ) * num_layers,
-                    'conv_strides': (2, ) * num_layers,
+                    'conv_filters': (64, 32, 16),
+                    'conv_kernel_sizes': (3, ) * 3,
+                    'conv_strides': (2, 1, 1),
                     'normalization_type': normalization_type,
                     'downsampling_type': 'conv',
+                    'output_kwargs': {
+                        'type': 'spatial_softmax'
+                    }
                 },
             }
-            for num_layers in (3, )
             for normalization_type in (None, )
-            for num_filters in (8, )
         ])
 
         variant_spec['policy_params']['kwargs']['hidden_layer_sizes'] = (M, M)

@@ -51,7 +51,8 @@ def get_goal_example_from_variant(variant):
     elif task in PICK_TASKS:
         goal_examples = generate_pick_goal_examples(total_goal_examples, env, variant['task'])
     elif task in GOAL_IMAGE_PATH_PER_ENVIRONMENT.keys():
-        path = goal_directory + GOAL_IMAGE_PATH_PER_ENVIRONMENT[task] + 'positives.pkl'
+        env_path = os.path.join(goal_directory, GOAL_IMAGE_PATH_PER_ENVIRONMENT[task])
+        path = os.path.join(env_path, 'positives.pkl')
         with open(path, 'rb') as file:
             goal_examples = pickle.load(file)
     else:
