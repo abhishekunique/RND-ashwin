@@ -44,7 +44,6 @@ class SACClassifierMultiGoal(SAC):
     def _build(self):
         super(SACClassifierMultiGoal, self)._build()
         self._init_classifier_update()
-        self._init_classifier_reward()
 
     def _init_placeholders(self):
         super(SACClassifierMultiGoal, self)._init_placeholders()
@@ -83,7 +82,7 @@ class SACClassifierMultiGoal(SAC):
                 in zip(self._classifier_losses_t,
                        self._classifier_optimizers,
                        self._classifiers)
-       ]
+        ]
 
         return classifier_training_ops
 
@@ -94,7 +93,7 @@ class SACClassifierMultiGoal(SAC):
         })
 
         goal_logits = [classifier(classifier_inputs)
-            for classifier in self._classifiers]
+                       for classifier in self._classifiers]
 
         self._classifier_losses_t = [
             tf.reduce_mean(
@@ -105,7 +104,7 @@ class SACClassifierMultiGoal(SAC):
 
         self._classifier_training_ops = self._get_classifier_training_ops()
 
-    def _init_classifier_reward(self):
+    def _init_external_reward(self):
         classifier_inputs = flatten_input_structure({
             name: self._placeholders['observations'][name]
             for name in self._classifiers[0].observation_keys

@@ -25,7 +25,7 @@ class VICE(SACClassifier):
     # TODO Avi This class has  a lot of code repeated from SACClassifier due
     # to labels having different dimensions in the two classes, but this can
     # likely be fixed
-    def _init_classifier_reward(self):
+    def _init_external_reward(self):
         classifier_inputs = flatten_input_structure({
             name: self._placeholders['observations'][name]
             for name in self._classifier.observation_keys
