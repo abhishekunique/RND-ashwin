@@ -13,14 +13,12 @@ def get_vae_preprocessor(name='vae_preprocessor',
                          **kwargs):
     from softlearning.models.vae import VAE
     assert encoder_path is not None and decoder_path is not None, (
-        "Must specify paths for the encoder/deocder models.")
+        "Must specify paths for the encoder/decoder models.")
     vae = VAE(**kwargs)
     vae.encoder.load_weights(encoder_path)
     vae.decoder.load_weights(decoder_path)
-    
     preprocessor = vae.get_encoder(trainable=False, name=name)
 #     preprocessor.trainable = False
-    
     return preprocessor
 
 def get_state_estimator_preprocessor(

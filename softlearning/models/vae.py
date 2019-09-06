@@ -5,12 +5,37 @@ tfk = tf.keras
 tfkl = tf.keras.layers
 
 
+def log_normal_pdf(sample, mean, logvar, raxis=1):
+    log2pi = tf.math.log(2. * np.pi)
+    return tf.reduce_sum(
+        -.5 * ((sample - mean) ** 2. * tf.exp(-logvar) + logvar + log2pi),
+        axis=raxis)
+
+def compute_elbo_loss(model, x, beta=1.0):
+    mean, logvar = model.encode(x)
+    z = model.reparameterize(mean, logvar)
+    x_logit = model.decode(z)
+
+    # Cross entropy reconstruction loss assumes that the pixels
+    # are all independent Bernoulli r.v.s
+    # Need to preprocess the label, so the output will be normalized.
+    cross_ent = tf.nn.sigmoid_cross_entropy_with_logits(
+        logits=x_logit, labels=model.preprocess(x))
+    # Sum across all pixels (row/col) + channels
+    logpx_z = -tf.reduce_sum(cross_ent, axis=[1, 2, 3])
+    # Calculate the KL divergence (difference between log of unit normal prior and posterior)
+    logpz = log_normal_pdf(z, 0., 0.) # Prior PDF
+    logqz_x = log_normal_pdf(z, mean, logvar) # Posterior
+    reconstruction_loss = logpx_z
+    kl_divergence = logpz - logqz_x
+    loss = reconstruction_loss + beta * kl_divergence
+    return -tf.reduce_mean(loss)
+
 class VAE(tfk.Model):
     def __init__(self, image_shape, latent_dim=16):
         super().__init__()
         self.image_shape = image_shape
         self.latent_dim = latent_dim
-        
         self.encoder = self.create_encoder_model()
         self.decoder = self.create_decoder_model()
 
@@ -18,8 +43,8 @@ class VAE(tfk.Model):
         # Turn integers into floats normalized between [0, 1]
         x = tf.image.convert_image_dtype(x, tf.float32)
         return x
-        
-    def create_encoder_model(self, 
+
+    def create_encoder_model(self,
                              image_shape=None,
                              latent_dim=None,
                              trainable=True,

@@ -7,6 +7,17 @@ from softlearning.utils.tensorflow import nest
 from softlearning.preprocessors.utils import get_preprocessor_from_params
 
 
+def get_vae(encoder_path=None, decoder_path=None, **kwargs):
+    from softlearning.models.vae import VAE
+    assert encoder_path is not None and decoder_path is not None, (
+        "Must specify paths for the encoder/decoder models.")
+    vae = VAE(**kwargs)
+    vae.encoder.load_weights(encoder_path)
+    vae.decoder.load_weights(decoder_path)
+    vae.encoder.trainable = False
+    vae.decoder.trainable = False
+    return vae
+
 def get_reward_classifier_from_variant(variant, env, *args, **kwargs):
     from .vice_models import create_feedforward_reward_classifier_function
 

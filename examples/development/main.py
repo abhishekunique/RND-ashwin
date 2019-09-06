@@ -107,6 +107,17 @@ class ExperimentRunner(tune.Trainable):
             get_policy_from_params(
                 variant['exploration_policy_params'], training_environment))
 
+        # VAE
+        if self.policy.preprocessors['pixels'].name == 'vae_preprocessor':
+            from softlearning.models.utils import get_vae
+            vae = get_vae(**variant['policy_params']
+                                   ['kwargs']
+                                   ['observation_preprocessors_params']
+                                   ['pixels']
+                                   ['kwargs'])
+        else:
+            vae = None
+
         self.algorithm = get_algorithm_from_variant(
             variant=self._variant,
             training_environment=training_environment,
@@ -118,7 +129,8 @@ class ExperimentRunner(tune.Trainable):
             pool=replay_pool,
             sampler=sampler,
             session=self._session,
-            state_estimator=state_estimator)
+            state_estimator=state_estimator,
+            vae=vae)
 
         if isinstance(replay_pool, PrioritizedExperienceReplayPool) and \
            replay_pool._mode == 'Bellman_Error':

@@ -62,6 +62,8 @@ class SAC(RLAlgorithm):
             state_estimator_iters=None,
             train_state_estimator_online=False,
 
+            vae=None,
+
             **kwargs,
     ):
         """
@@ -130,10 +132,15 @@ class SAC(RLAlgorithm):
         self._save_eval_paths = save_eval_paths
         self._goal_classifier_params_directory = goal_classifier_params_directory
 
+        # State estimator
         self._state_estimator = state_estimator
         self._state_estimator_iters = state_estimator_iters
         self._train_state_estimator_online = train_state_estimator_online
         self._state_estimator_optimizer = tf.keras.optimizers.Adam(learning_rate=3e-4)
+
+        # VAE
+        self._vae = vae
+        self._preprocessed_Q_inputs = self._Qs[0].preprocessed_inputs_fn
 
         self._build()
 
@@ -494,6 +501,45 @@ class SAC(RLAlgorithm):
                 for name in self._policy.observation_keys
             })).items()
         ]))
+        if self._vae:
+            eval_pixels = feed_dict[self._placeholders['observations']['pixels']]
+            inputs = (
+                feed_dict[self._placeholders['actions']],
+                feed_dict[self._placeholders['observations']['claw_qpos']],
+                feed_dict[self._placeholders['observations']['last_action']],
+                eval_pixels,
+                feed_dict[self._placeholders['observations']['target_xy_position']],
+                feed_dict[self._placeholders['observations']['target_z_orientation_cos']],
+                feed_dict[self._placeholders['observations']['target_z_orientation_sin']],
+            )
+            test_feed_dict = {
+                input_ph: input_np
+                for input_ph, input_np in zip(self._preprocessed_Q_inputs.inputs, inputs)
+            }
+            preprocessed_inputs = self._session.run(self._preprocessed_Q_inputs.output, feed_dict=test_feed_dict)
+            encoded_pixels = preprocessed_inputs[3]
+
+            n_images_to_save = 10
+            decoded = self._session.run(
+                self._vae.decode(encoded_pixels, apply_sigmoid=True))
+            sample_idx = np.random.choice(decoded.shape[0], size=n_images_to_save)
+            concat = np.concatenate([
+                eval_pixels[sample_idx].astype(np.float32) / 255.,
+                decoded[sample_idx]], axis=2)
+            import os
+            import imageio
+            image_save_dir = os.path.join(os.getcwd(), 'vae_reconstructions')
+            if not os.path.exists(image_save_dir):
+                    os.makedirs(image_save_dir)
+
+            for i in range(n_images_to_save):
+                image_save_path = os.path.join(
+                    image_save_dir, f'vae_reconstruction_{iteration}_{i}.png')
+                imageio.imwrite(image_save_path, concat[i])
+
+            from softlearning.models.vae import compute_elbo_loss
+            loss = self._session.run(compute_elbo_loss(self._vae, eval_pixels))
+            diagnostics.update({'vae/elbo_loss_mean': np.mean(loss)})
 
         if 'pixels' in self._policy.preprocessors and \
                 self._state_estimator is not None and \
