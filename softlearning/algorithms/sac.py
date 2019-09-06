@@ -123,6 +123,7 @@ class SAC(RLAlgorithm):
         self._save_eval_paths = save_eval_paths
         self._goal_classifier_params_directory = goal_classifier_params_directory
         self._rnd_int_rew_coeff = 0
+
         if rnd_networks:
             self._rnd_target = rnd_networks[0]
             self._rnd_predictor = rnd_networks[1]
@@ -141,6 +142,7 @@ class SAC(RLAlgorithm):
         else:
             self._goal_classifier = None
 
+        self._init_external_reward()
         if self._rnd_int_rew_coeff:
             self._init_rnd_update()
         self._init_actor_update()
@@ -172,6 +174,9 @@ class SAC(RLAlgorithm):
         goal_probs = self._session.run(self._goal_classifier.pred_probs, feed_dict=feed_dict)[:, 1].reshape((-1, 1))
         return goal_probs
 
+    def _init_external_reward(self):
+        self._ext_reward = self._reward_scale * self._placeholders['rewards']
+
     def _get_Q_target(self):
         policy_inputs = flatten_input_structure({
             name: self._placeholders['next_observations'][name]
@@ -192,8 +197,6 @@ class SAC(RLAlgorithm):
         next_values = min_next_Q - self._alpha * next_log_pis
 
         terminals = tf.cast(self._placeholders['terminals'], next_values.dtype)
-
-        self._ext_reward = self._reward_scale * self._placeholders['rewards']
 
         if self._rnd_int_rew_coeff:
             self._unscaled_int_reward = tf.clip_by_value(
@@ -373,10 +376,10 @@ class SAC(RLAlgorithm):
 
         if self._rnd_int_rew_coeff:
             diagnosables['rnd_reward'] = self._int_reward
-            diagnosables['ext_reward'] = self._ext_reward
-            diagnosables['total_reward'] = self._ext_reward
             diagnosables['rnd_error'] = self._rnd_errors
             diagnosables['running_rnd_reward_std'] = self._placeholders['rnd']['running_int_rew_std']
+        diagnosables['ext_reward'] = self._ext_reward
+        diagnosables['total_reward'] = self._total_reward
 
         diagnostic_metrics = OrderedDict((
             ('mean', tf.reduce_mean),
