@@ -52,6 +52,7 @@ class SAC(RLAlgorithm):
             goal_classifier_params_directory=None,
             save_full_state=False,
             save_eval_paths=False,
+            normalize_ext_reward_gamma=1,
             per_alpha=1,
             rnd_networks=(),
             rnd_lr=1e-4,
@@ -122,6 +123,8 @@ class SAC(RLAlgorithm):
         self._save_full_state = save_full_state
         self._save_eval_paths = save_eval_paths
         self._goal_classifier_params_directory = goal_classifier_params_directory
+        self._normalize_ext_reward_gamma = normalize_ext_reward_gamma
+        self._running_ext_rew_std = 1
         self._rnd_int_rew_coeff = 0
 
         if rnd_networks:
@@ -200,7 +203,7 @@ class SAC(RLAlgorithm):
 
         if self._rnd_int_rew_coeff:
             self._unscaled_int_reward = tf.clip_by_value(
-                self._rnd_errors / self._placeholders['rnd']['running_int_rew_std'],
+                self._rnd_errors / self._placeholders['reward']['running_int_rew_std'],
                 0, 1000
             )
             self._int_reward = self._rnd_int_rew_coeff * self._unscaled_int_reward
@@ -340,7 +343,7 @@ class SAC(RLAlgorithm):
 
     def _init_rnd_update(self):
         self._placeholders.update({
-            'rnd': {
+            'reward': {
                 'running_int_rew_std': tf.compat.v1.placeholder(
                     tf.float32, shape=(), name='running_int_rew_std')
             }
@@ -377,8 +380,9 @@ class SAC(RLAlgorithm):
         if self._rnd_int_rew_coeff:
             diagnosables['rnd_reward'] = self._int_reward
             diagnosables['rnd_error'] = self._rnd_errors
-            diagnosables['running_rnd_reward_std'] = self._placeholders['rnd']['running_int_rew_std']
+            diagnosables['running_rnd_reward_std'] = self._placeholders['reward']['running_int_rew_std']
         diagnosables['ext_reward'] = self._ext_reward
+        diagnosables['running_ext_reward_std'] = self._placeholders['reward']['running_ext_rew_std']
         diagnosables['total_reward'] = self._total_reward
 
         diagnostic_metrics = OrderedDict((
@@ -417,6 +421,10 @@ class SAC(RLAlgorithm):
             self._running_int_rew_std = self._running_int_rew_std * self._rnd_gamma + int_rew_std * (1-self._rnd_gamma)
         else:
             self._session.run(self._training_ops, feed_dict)
+
+        if self._normalize_ext_reward_gamma != 1:
+            ext_rew_std = np.maximum(np.std(self._session.run(self._ext_reward, feed_dict)), 1e-3)
+            self._running_ext_rew_std = self._running_ext_rew_std * self._ext_rew_gamma + ext_rew_std * (1-self._ext_rew_gamma)
 
         if self._her_iters:
             # Q: Is it better to build a large batch and take one grad step, or
@@ -479,8 +487,9 @@ class SAC(RLAlgorithm):
         if iteration is not None:
             feed_dict[self._placeholders['iteration']] = iteration
 
+        feed_dict[self._placeholders['reward']['running_ext_rew_std']] = self._running_ext_rew_std
         if self._rnd_int_rew_coeff:
-            feed_dict[self._placeholders['rnd']['running_int_rew_std']] = self._running_int_rew_std
+            feed_dict[self._placeholders['reward']['running_int_rew_std']] = self._running_int_rew_std
 
         return feed_dict
 

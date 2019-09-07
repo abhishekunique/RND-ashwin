@@ -949,7 +949,7 @@ def evaluation_environment_params(spec):
     return eval_environment_params
 
 
-def get_variant_spec_base(universe, domain, task, policy, algorithm):
+def get_variant_spec_base(universe, domain, task, task_eval, policy, algorithm):
     algorithm_params = deep_update(
         ALGORITHM_PARAMS_BASE,
         get_algorithm_params(universe, domain, task),
@@ -965,11 +965,12 @@ def get_variant_spec_base(universe, domain, task, policy, algorithm):
                 'universe': universe,
                 'kwargs': get_environment_params(universe, domain, task),
             },
-            'evaluation': tune.sample_from(lambda spec: evaluation_environment_params(spec)),
-            #     spec.get('config', spec)
-            #     ['environment_params']
-            #     ['training']
-            # )),
+            'evaluation': {
+                'domain': domain,
+                'task': task_eval,
+                'universe': universe,
+                'kwargs': get_environment_params(universe, domain, task_eval),
+            },
         },
         'policy_params': get_policy_params(universe, domain, task),
         'exploration_policy_params': {
@@ -1151,21 +1152,22 @@ def is_image_env(universe, domain, task, variant_spec):
 def get_variant_spec_image(universe,
                            domain,
                            task,
+                           task_eval,
                            policy,
                            algorithm,
                            *args,
                            **kwargs):
     variant_spec = get_variant_spec_base(
-        universe, domain, task, policy, algorithm, *args, **kwargs)
+        universe, domain, task, task_eval, policy, algorithm, *args, **kwargs)
 
     if is_image_env(universe, domain, task, variant_spec):
         preprocessor_params = {
             'type': 'ConvnetPreprocessor',
             'kwargs': {
-                'conv_filters': (64, ) * 3,
+                'conv_filters': (8, 16, 32) * 3,
                 'conv_kernel_sizes': (3, ) * 3,
                 'conv_strides': (2, ) * 3,
-                'normalization_type': 'layer',
+                'normalization_type': tune.sample_from([None]),
                 'downsampling_type': 'conv',
             },
         }
@@ -1198,10 +1200,10 @@ def get_variant_spec_image(universe,
 
 
 def get_variant_spec(args):
-    universe, domain, task = args.universe, args.domain, args.task
+    universe, domain, task, task_eval = args.universe, args.domain, args.task, args.task_evaluation
 
     variant_spec = get_variant_spec_image(
-        universe, domain, task, args.policy, args.algorithm)
+        universe, domain, task, task_eval, args.policy, args.algorithm)
 
     if args.checkpoint_replay_pool is not None:
         variant_spec['run_params']['checkpoint_replay_pool'] = (

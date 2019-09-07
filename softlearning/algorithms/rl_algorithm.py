@@ -169,6 +169,10 @@ class RLAlgorithm(Checkpointable):
             'iteration': tf.compat.v1.placeholder(
                 tf.int64, shape=(), name='iteration',
             ),
+            'reward': {
+                'running_ext_rew_std': tf.compat.v1.placeholder(
+                    tf.float32, shape=(), name='running_ext_rew_std')
+            }
         }
 
     def _initial_exploration_hook(self, env, initial_exploration_policy, pool):
