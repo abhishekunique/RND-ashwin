@@ -424,7 +424,7 @@ class SAC(RLAlgorithm):
             self._session.run(self._training_ops, feed_dict)
 
         if self._normalize_ext_reward_gamma != 1:
-            ext_rew_std = np.maximum(np.std(self._session.run(self._ext_reward, feed_dict)), 1e-3)
+            ext_rew_std = np.maximum(np.std(self._session.run(self._normalized_ext_reward, feed_dict)), 1e-3)
             self._running_ext_rew_std = self._running_ext_rew_std * self._normalize_ext_reward_gamma + \
                 ext_rew_std * (1-self._normalize_ext_reward_gamma)
 
