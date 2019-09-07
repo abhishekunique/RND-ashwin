@@ -209,7 +209,8 @@ class SAC(RLAlgorithm):
             self._int_reward = self._rnd_int_rew_coeff * self._unscaled_int_reward
         else:
             self._int_reward = 0
-        self._total_reward = self._ext_reward / self._placeholders['reward']['running_ext_rew_std'] + self._int_reward
+        self._normalized_ext_reward = self._ext_reward / self._placeholders['reward']['running_ext_rew_std']
+        self._total_reward = self._normalized_ext_reward + self._int_reward
 
         Q_target = td_target(
             reward=self._total_reward,
@@ -380,6 +381,7 @@ class SAC(RLAlgorithm):
             diagnosables['rnd_error'] = self._rnd_errors
             diagnosables['running_rnd_reward_std'] = self._placeholders['reward']['running_int_rew_std']
         diagnosables['ext_reward'] = self._ext_reward
+        diagnosables['normalized_ext_reward'] = self._normalized_ext_reward
 
         diagnosables['running_ext_reward_std'] = self._placeholders['reward']['running_ext_rew_std']
         diagnosables['total_reward'] = self._total_reward
