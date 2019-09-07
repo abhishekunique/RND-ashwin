@@ -209,7 +209,7 @@ class SAC(RLAlgorithm):
             self._int_reward = self._rnd_int_rew_coeff * self._unscaled_int_reward
         else:
             self._int_reward = 0
-        self._total_reward = self._ext_reward + self._int_reward
+        self._total_reward = self._ext_reward / self._placeholders['reward']['running_ext_rew_std'] + self._int_reward
 
         Q_target = td_target(
             reward=self._total_reward,
@@ -342,11 +342,9 @@ class SAC(RLAlgorithm):
         self._training_ops.update({'policy_train_op': policy_train_op})
 
     def _init_rnd_update(self):
-        self._placeholders.update({
-            'reward': {
-                'running_int_rew_std': tf.compat.v1.placeholder(
-                    tf.float32, shape=(), name='running_int_rew_std')
-            }
+        self._placeholders['reward'].update({
+            'running_int_rew_std': tf.compat.v1.placeholder(
+                tf.float32, shape=(), name='running_int_rew_std')
         })
         policy_inputs = flatten_input_structure({
             name: self._placeholders['observations'][name]
@@ -382,6 +380,7 @@ class SAC(RLAlgorithm):
             diagnosables['rnd_error'] = self._rnd_errors
             diagnosables['running_rnd_reward_std'] = self._placeholders['reward']['running_int_rew_std']
         diagnosables['ext_reward'] = self._ext_reward
+
         diagnosables['running_ext_reward_std'] = self._placeholders['reward']['running_ext_rew_std']
         diagnosables['total_reward'] = self._total_reward
 
@@ -424,7 +423,8 @@ class SAC(RLAlgorithm):
 
         if self._normalize_ext_reward_gamma != 1:
             ext_rew_std = np.maximum(np.std(self._session.run(self._ext_reward, feed_dict)), 1e-3)
-            self._running_ext_rew_std = self._running_ext_rew_std * self._ext_rew_gamma + ext_rew_std * (1-self._ext_rew_gamma)
+            self._running_ext_rew_std = self._running_ext_rew_std * self._normalize_ext_reward_gamma + \
+                ext_rew_std * (1-self._normalize_ext_reward_gamma)
 
         if self._her_iters:
             # Q: Is it better to build a large batch and take one grad step, or
