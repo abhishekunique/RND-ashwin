@@ -49,7 +49,6 @@ class VICE(SACClassifier):
             for name in self._classifier.observation_keys
         })
         observation_log_p = self._classifier(classifier_inputs)
-        
         curr_policy_inputs = flatten_input_structure({
             name: self._placeholders['observations'][name]
             for name in self._policy.observation_keys
@@ -58,10 +57,9 @@ class VICE(SACClassifier):
         # Calculate log probability of the actions taken
         # curr_actions = self._placeholders['actions']
         # curr_log_pis = self._policy.log_pis(curr_policy_inputs, curr_actions)
- 
         # self._classifier_log_p_t = observation_log_p
         # self._log_pi_t = curr_log_pis
-        self._reward_t = observation_log_p 
+        self._reward_t = observation_log_p
         # self._reward_t = observation_log_p - curr_log_pis
 
         # log_pi_log_p_concat = tf.concat([curr_log_pis, observation_log_p], axis=1)
@@ -332,7 +330,6 @@ class VICE(SACClassifier):
             #     discriminator_output_goal_training),
             # 'reward_learning/discriminator_output_goal_obs_validation_mean': np.mean(
             #     discriminator_output_goal_validation),
-   
 
             # TODO: Figure out why converting to probabilities isn't working
             # 'reward_learning/classifier_negative_obs_prob_mean': np.mean(

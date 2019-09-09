@@ -90,7 +90,7 @@ def convnet_model(
         return x
 
     output_kwargs = output_kwargs or DEFAULT_OUTPUT_KWARGS
-    output_type = output_kwargs.pop('type')
+    output_type = output_kwargs.get('type', DEFAULT_OUTPUT_KWARGS['type'])
     if output_type == 'spatial_softmax':
         def spatial_softmax(x):
             # Create learnable temperature parameter `alpha`

@@ -2,6 +2,7 @@ import os
 from collections import OrderedDict
 from numbers import Number
 
+import skimage
 import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
@@ -364,6 +365,21 @@ class SAC(RLAlgorithm):
     def _do_training(self, iteration, batch):
         """Runs the operations for updating training and target ops."""
         feed_dict = self._get_feed_dict(iteration, batch)
+        # intermediate = self._Qs[0].preprocessed_inputs_fn
+        # inputs = (
+        #     feed_dict[self._placeholders['actions']],
+        #     feed_dict[self._placeholders['observations']['claw_qpos']],
+        #     feed_dict[self._placeholders['observations']['last_action']],
+        #     feed_dict[self._placeholders['observations']['pixels']],
+        #     feed_dict[self._placeholders['observations']['target_xy_position']],
+        #     feed_dict[self._placeholders['observations']['target_z_orientation_cos']],
+        #     feed_dict[self._placeholders['observations']['target_z_orientation_sin']],
+        # )
+        # feed_dict_interm = {
+        #     input_ph: input_np
+        #     for input_ph, input_np in zip(intermediate.inputs, inputs)
+        # }
+
         self._session.run(self._training_ops, feed_dict)
 
         if self._her_iters:
@@ -519,27 +535,43 @@ class SAC(RLAlgorithm):
             preprocessed_inputs = self._session.run(self._preprocessed_Q_inputs.output, feed_dict=test_feed_dict)
             encoded_pixels = preprocessed_inputs[3]
 
-            n_images_to_save = 10
+            n_images_to_save = 0
             decoded = self._session.run(
                 self._vae.decode(encoded_pixels, apply_sigmoid=True))
-            sample_idx = np.random.choice(decoded.shape[0], size=n_images_to_save)
-            concat = np.concatenate([
-                eval_pixels[sample_idx].astype(np.float32) / 255.,
-                decoded[sample_idx]], axis=2)
-            import os
-            import imageio
+
             image_save_dir = os.path.join(os.getcwd(), 'vae_reconstructions')
             if not os.path.exists(image_save_dir):
-                    os.makedirs(image_save_dir)
+                os.makedirs(image_save_dir)
 
-            for i in range(n_images_to_save):
-                image_save_path = os.path.join(
-                    image_save_dir, f'vae_reconstruction_{iteration}_{i}.png')
-                imageio.imwrite(image_save_path, concat[i])
+
+            if n_images_to_save > 0:
+                import imageio
+                sample_idx = np.random.choice(decoded.shape[0], size=n_images_to_save)
+                concat = np.concatenate([
+                    eval_pixels[sample_idx].astype(np.float32) / 255.,
+                    decoded[sample_idx]], axis=2)
+
+                for i in range(n_images_to_save):
+                    image_save_path = os.path.join(
+                        image_save_dir, f'vae_reconstruction_{iteration}_{i}.png')
+                    imageio.imwrite(image_save_path, concat[i])
 
             from softlearning.models.vae import compute_elbo_loss
+            # TODO: Make have this compute the elbo loss, on individual images
             loss = self._session.run(compute_elbo_loss(self._vae, eval_pixels))
-            diagnostics.update({'vae/elbo_loss_mean': np.mean(loss)})
+            diagnostics.update({
+                'vae/elbo_loss_mean': np.mean(loss),
+                'vae/elbo_loss_max': np.max(loss),
+                'vae/elbo_loss_min': np.min(loss)
+            })
+            worst_idx = np.argmax(loss)
+            reconstruction_cmp = np.concatenate([
+                eval_pixels[worst_idx],
+                skimage.util.img_as_ubyte(decoded[worst_idx])
+            ], axis=1)
+            skimage.io.imsave(
+                os.path.join(image_save_dir, f'worst_reconstruction_{iteration}.png'),
+                reconstruction_cmp)
 
         if 'pixels' in self._policy.preprocessors and \
                 self._state_estimator is not None and \

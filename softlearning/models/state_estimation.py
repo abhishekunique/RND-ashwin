@@ -2,8 +2,7 @@
 from collections import OrderedDict
 from softlearning.models.convnet import convnet_model
 import tensorflow as tf
-from tensorflow.keras.layers import Input, Dense
-from tensorflow.keras.models import Model
+
 from softlearning.models.feedforward import feedforward_model
 from softlearning.utils.keras import PicklableModel, PicklableSequential
 from softlearning.preprocessors.utils import get_preprocessor_from_params
@@ -15,12 +14,13 @@ import glob
 import os
 import matplotlib.pyplot as plt
 
-def state_estimator_model(domain,
-                          task,
-                          obs_keys_to_estimate,
-                          input_shape,
+tfk = tf.keras
+tfkl = tf.keras.layers
+
+def state_estimator_model(input_shape,
                           num_hidden_units=256,
-                          num_hidden_layers=2):
+                          num_hidden_layers=2,
+                          name='state_estimator_preprocessor'):
     """
     Need to pass in the obs_keys that the model will estimate
     """
@@ -40,20 +40,24 @@ def state_estimator_model(domain,
         'conv_strides': (2, ) * num_layers,
         'normalization_type': normalization_type,
     }
-    preprocessor = convnet_model(name='convnet_preprocessor_state_est', **convnet_kwargs)
-    inputs = Input(
-        shape=input_shape,
-        name='pixels',
-        dtype=tf.uint8)
-    preprocessed = preprocessor(inputs)
-    estimator_outputs = feedforward_model(
+    preprocessor = convnet_model(
+        name='convnet_preprocessor_state_est',
+        **convnet_kwargs)
+    state_estimator = feedforward_model(
         hidden_layer_sizes=(num_hidden_units, ) * num_hidden_layers,
         output_size=output_size,
         output_activation=tf.keras.activations.tanh,
         kernel_regularizer=tf.keras.regularizers.l2(0.001),
         name='feedforward_state_est'
-    )(preprocessed)
-    return PicklableModel(inputs, estimator_outputs, name='state_estimator_preprocessor')
+    )
+    model = tfk.Sequential([
+        tfk.Input(shape=input_shape,
+                  name='pixels',
+                  dtype=tf.uint8),
+        preprocessor,
+        state_estimator,
+    ], name=name)
+    return model
 
 
 def get_dumped_pkl_data(pkl_path):

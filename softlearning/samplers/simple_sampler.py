@@ -89,28 +89,30 @@ class SimpleSampler(BaseSampler):
                 pred_state = self._get_estimated_state(self._current_observation)
                 self._current_observation.update(pred_state)
 
-        if self._state_estimator is not None:
-            # Save high error images (if there is a label to compare to)
-            # TODO: Do this for replacing state too
-            if not self._replace_state:
-                pred_state = self._get_estimated_state(self._current_observation)
-                estimated_object_state = np.concatenate(list(pred_state.values()))
-                self._current_observation.update({
-                    # 'object_xy_position_pred': xy_pos,
-                    # 'object_z_orientation_cos_pred': z_cos,
-                    # 'object_z_orientation_sin_pred': z_sin,
-                    'object_state_prediction': estimated_object_state
-                })
-                label = np.concatenate([
-                    # normalize(self._current_observation['object_xy_position'], -0.1, 0.1, -1, 1),
-                    self._current_observation['object_xy_position'],
-                    self._current_observation['object_z_orientation_cos'],
-                    self._current_observation['object_z_orientation_sin'],
-                ])
-                if np.linalg.norm(label - estimated_object_state) > 0.1:
-                    self._num_high_errors += 1
-                    imageio.imwrite(f'/tmp/test_obs/{self._prefix}_high_error_{self._num_high_errors}.png',
-                            self._current_observation['pixels'])
+        # if self._state_estimator is not None:
+        #     # Save high error images (if there is a label to compare to)
+        #     # TODO: Do this for replacing state too
+        #     if not self._replace_state:
+        #         pred_state = self._get_estimated_state(self._current_observation)
+        #         estimated_object_state = np.concatenate(list(pred_state.values()))
+        #         self._current_observation.update({
+        #             # 'object_xy_position_pred': xy_pos,
+        #             # 'object_z_orientation_cos_pred': z_cos,
+        #             # 'object_z_orientation_sin_pred': z_sin,
+        #             'object_state_prediction': estimated_object_state
+        #         })
+        #         label = np.concatenate([
+        #             # normalize(self._current_observation['object_xy_position'], -0.1, 0.1, -1, 1),
+        #             self._current_observation['object_xy_position'],
+        #             self._current_observation['object_z_orientation_cos'],
+        #             self._current_observation['object_z_orientation_sin'],
+        #         ])
+        #         if np.linalg.norm(label - estimated_object_state) > 0.1:
+        #             self._num_high_errors += 1
+
+        #             imageio.imwrite(
+        #                 f'/tmp/test_obs/{self._prefix}_high_error_{self._num_high_errors}.png',
+        #                 self._current_observation['pixels'])
 
         if self._save_training_video_frequency:
             self._images.append(
@@ -119,9 +121,9 @@ class SimpleSampler(BaseSampler):
         action = self.policy.actions_np(self._policy_input)[0]
         next_observation, reward, terminal, info = self.env.step(action)
 
-        if self._state_estimator is not None and self._replace_state:
-            pred_next_state = self._get_estimated_state(next_observation)
-            next_observation.update(pred_next_state)
+        # if self._state_estimator is not None and self._replace_state:
+        #     pred_next_state = self._get_estimated_state(next_observation)
+        #     next_observation.update(pred_next_state)
 
         self._path_length += 1
         self._path_return += reward

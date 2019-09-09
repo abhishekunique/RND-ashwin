@@ -1085,7 +1085,7 @@ def get_variant_spec_base(universe, domain, task, policy, algorithm, from_vision
        "device_path" not in env_kwargs.keys():
         env_obs_keys = env_kwargs['observation_keys']
         non_image_obs_keys = tuple(key for key in env_obs_keys if key != 'pixels')
-        # variant_spec['replay_pool_params']['kwargs']['obs_save_keys'] = non_image_obs_keys
+        variant_spec['replay_pool_params']['kwargs']['obs_save_keys'] = non_image_obs_keys
 
         non_object_obs_keys = tuple(key for key in env_obs_keys if 'object' not in key)
         variant_spec['policy_params']['kwargs']['observation_keys'] = variant_spec[
@@ -1151,18 +1151,20 @@ PIXELS_PREPROCESSOR_PARAMS = {
             #     'object_orientation_sin',
             # ),
             'input_shape': (32, 32, 3),
-            'num_hidden_units': 256,
-            'num_hidden_layers': 2,
-            'state_estimator_path': '/home/justinvyu/dev/softlearning-vice/softlearning/models/state_estimators/state_estimator_fixed_antialias.h5'
+            # 'num_hidden_units': 256,
+            # 'num_hidden_layers': 2,
+            'num_hidden_units': 512,
+            'num_hidden_layers': 4,
+            'state_estimator_path': '/home/justinvyu/dev/softlearning-vice/softlearning/models/state_estimators/state_estimator_antialias_larger_network.h5'
         }
     },
     'VAEPreprocessor': {
         'type': 'VAEPreprocessor',
         'kwargs': {
             'image_shape': (32, 32, 3),
-            'latent_dim': 16,
-            'encoder_path': '/root/softlearning/softlearning/models/vae_weights/invisible_claw_encoder_weights.h5',
-            'decoder_path': '/root/softlearning/softlearning/models/vae_weights/invisible_claw_decoder_weights.h5',
+            'latent_dim': 4,
+            'encoder_path': '/home/justinvyu/dev/softlearning-vice/softlearning/models/vae_weights/invisible_claw_encoder_weights_4_final.h5',
+            'decoder_path': '/home/justinvyu/dev/softlearning-vice/softlearning/models/vae_weights/invisible_claw_decoder_weights_4_final.h5',
         },
     },
     'ConvnetPreprocessor': tune.grid_search([
