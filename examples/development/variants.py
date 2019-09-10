@@ -28,8 +28,6 @@ GAUSSIAN_POLICY_PARAMS_BASE = {
 
 
 ALGORITHM_PARAMS_BASE = {
-    'type': 'SAC',
-
     'kwargs': {
         'epoch_length': 1000, #50,
         'train_every_n_steps': 1,
@@ -45,6 +43,19 @@ ALGORITHM_PARAMS_BASE = {
             'height': 480,
             'mode': 'rgb_array',
         },
+        'rnd_int_rew_coeff': tune.sample_from([1]),
+    },
+    'rnd_params': {
+        'convnet_params': {
+            'conv_filters': (16, 32, 64),
+            'conv_kernel_sizes': (3, 3, 3),
+            'conv_strides': (2, 2, 2),
+            'normalization_type': None,
+        },
+        'fc_params': {
+            'hidden_layer_sizes': (256, 256),
+            'output_size': 512,
+        },
     }
 }
 
@@ -59,7 +70,18 @@ ALGORITHM_PARAMS_ADDITIONAL = {
             'tau': 5e-3,
             'target_entropy': 'auto', #tune.sample_from([-3, -5, -7]),#'auto',
             'action_prior': 'uniform',
-            'n_initial_exploration_steps': int(1e3),
+            'her_iters': tune.grid_search([0]),
+        }
+    },
+    'MultiSAC': {
+        'type': 'MultiSAC',
+        'kwargs': {
+            'reparameterize': REPARAMETERIZE,
+            'lr': 3e-4,
+            'target_update_interval': 1,
+            'tau': 5e-3,
+            'target_entropy': 'auto', #tune.sample_from([-3, -5, -7]),#'auto',
+            'action_prior': 'uniform',
             'her_iters': tune.grid_search([0]),
             # 'train_state_estimator_online': True,
             'train_state_estimator_online': False,
@@ -70,7 +92,6 @@ ALGORITHM_PARAMS_ADDITIONAL = {
         'kwargs': {
             'policy_lr': 3e-4,
             'target_update_interval': 1,
-            'n_initial_exploration_steps': int(1e3),
             'reward_scale': tune.sample_from(lambda spec: (
                 {
                     'Swimmer': 30,
@@ -115,8 +136,11 @@ MAX_PATH_LENGTH_PER_UNIVERSE_DOMAIN_TASK = {
         'HardwareDClaw3': {
             DEFAULT_KEY: 250,
         },
+        'MiniGrid': {
+            DEFAULT_KEY: 50,
+        },
         'DClaw': {
-            DEFAULT_KEY: 250,
+            DEFAULT_KEY: 50,
             'TurnFixed-v0': 50,
             'TurnResetFree-v0': 100,
             'TurnResetFreeSwapGoal-v0': tune.grid_search([100]),
@@ -126,6 +150,7 @@ MAX_PATH_LENGTH_PER_UNIVERSE_DOMAIN_TASK = {
             'TurnFreeValve3ResetFree-v0': tune.grid_search([50]),
             'TurnFreeValve3ResetFreeSwapGoal-v0': tune.grid_search([50]),
             'TurnFreeValve3ResetFreeSwapGoalEval-v0': tune.grid_search([50]),
+            'TurnFreeValve3ResetFreeComposedGoals-v0': tune.grid_search([150]),
             'TurnFreeValve3ResetFreeRandomGoal-v0': tune.grid_search([100]),
             'TurnFreeValve3FixedResetSwapGoal-v0': 50,
             'TurnRandomResetSingleGoal-v0': 100,
@@ -141,6 +166,7 @@ MAX_PATH_LENGTH_PER_UNIVERSE_DOMAIN_TASK = {
             # Flipping Tasks
             'FlipEraserFixed-v0': tune.grid_search([50]),
             'FlipEraserResetFree-v0': tune.grid_search([50]),
+            'FlipEraserResetFreeSwapGoal-v0': tune.grid_search([50]),
         },
     },
 }
@@ -196,6 +222,9 @@ NUM_EPOCHS_PER_UNIVERSE_DOMAIN_TASK = {
             DEFAULT_KEY: 200,
         },
         'HardwareDClaw3': {
+            DEFAULT_KEY: 100,
+        },
+        'MiniGrid': {
             DEFAULT_KEY: 100,
         },
         'DClaw': {
@@ -591,19 +620,9 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_VISION = {
                 },
             },
             'TurnFreeValve3ResetFree-v0': {
-                'reward_keys': (
-                    'object_to_target_position_distance_cost',
-                    'object_to_target_orientation_distance_cost',
-                ),
-                'reset_fingers': True,
-                'position_reward_weight': tune.sample_from([1]),
-                'pixel_wrapper_kwargs': {
-                    'observation_key': 'pixels',
-                    'pixels_only': False,
-                    'render_kwargs': {
-                        'width': 32,
-                        'height': 32,
-                    },
+                'reward_keys_and_weights': {
+                    'object_to_target_position_distance_reward': 1,
+                    'object_to_target_orientation_distance_reward': 0,
                 },
                 'observation_keys': (
                     'claw_qpos',
@@ -618,7 +637,6 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_VISION = {
                     #    'in_corner',
                     'pixels',
                 ),
-
             },
             'TurnFreeValve3ResetFreeRandomGoal-v0': {
             },
@@ -897,53 +915,7 @@ SAMPLER_PARAMS_PER_DOMAIN = {
 }
 
 
-def evaluation_environment_params(spec):
-    training_environment_params = (spec.get('config', spec)
-                                   ['environment_params']
-                                   ['training'])
-    eval_environment_params = training_environment_params.copy()
-    if training_environment_params['task'] == 'TurnFreeValve3ResetFree-v0':
-        eval_environment_params['task'] = 'TurnFreeValve3Fixed-v0'
-        eval_environment_params['kwargs'] = {
-            'reward_keys': (
-                'object_to_target_position_distance_cost',
-                'object_to_target_orientation_distance_cost',
-            ),
-            # 'initial_distribution_path': '/mnt/sda/ray_results/gym/DClaw/TurnFreeValve3ResetFree-v0/2019-06-30T18-53-06-baseline_both_push_and_turn_log_rew/id=38872574-seed=6880_2019-06-30_18-53-07whkq1aax/',
-            # 'reset_from_corners': False,
-        }
-        pass
-    elif training_environment_params['task'] == 'TurnFreeValve3ResetFreeSwapGoal-v0':
-        eval_environment_params['task'] = 'TurnFreeValve3ResetFreeSwapGoalEval-v0' #'TurnFreeValve3RandomReset-v0'
-        eval_environment_params['kwargs'].update({
-            # 'initial_distribution_path': '/mnt/sda/ray_results/gym/DClaw/TurnFreeValve3ResetFree-v0/2019-06-30T18-53-06-baseline_both_push_and_turn_log_rew/id=38872574-seed=6880_2019-06-30_18-53-07whkq1aax/',
-            # 'reset_from_corners': False,
-        })
-        eval_environment_params['kwargs'].pop('reset_fingers')
-
-    elif training_environment_params['task'] == 'TurnFreeValve3ResetFreeCurriculum-v0':
-        eval_environment_params['task'] = 'TurnFreeValve3ResetFreeCurriculumEval-v0' #'TurnFreeValve3RandomReset-v0'
-        eval_environment_params['kwargs'] = {
-            'reward_keys': (
-                'object_to_target_position_distance_cost',
-                'object_to_target_orientation_distance_cost',
-            ),
-            # 'initial_distribution_path': '/mnt/sda/ray_results/gym/DClaw/TurnFreeValve3ResetFree-v0/2019-06-30T18-53-06-baseline_both_push_and_turn_log_rew/id=38872574-seed=6880_2019-06-30_18-53-07whkq1aax/',
-            # 'reset_from_corners': False,
-        }
-    elif training_environment_params['task'] == 'FlipEraserResetFreeSwapGoal-v0':
-        eval_environment_params['task'] = 'FlipEraserResetFreeSwapGoalEval-v0' #'TurnFreeValve3RandomReset-v0'
-        eval_environment_params['kwargs'] = {
-            'reward_keys_and_weights': {
-                'object_to_target_position_distance_reward': 1,
-                'object_to_target_orientation_distance_reward': 20,
-            },
-        }
-
-    return eval_environment_params
-
-
-def get_variant_spec_base(universe, domain, task, policy, algorithm, from_vision):
+def get_variant_spec_base(universe, domain, task, task_eval, policy, algorithm, from_vision):
     algorithm_params = deep_update(
         ALGORITHM_PARAMS_BASE,
         get_algorithm_params(universe, domain, task),
@@ -959,11 +931,12 @@ def get_variant_spec_base(universe, domain, task, policy, algorithm, from_vision
                 'universe': universe,
                 'kwargs': get_environment_params(universe, domain, task, from_vision),
             },
-            'evaluation': tune.sample_from(lambda spec: evaluation_environment_params(spec)),
-            #     spec.get('config', spec)
-            #     ['environment_params']
-            #     ['training']
-            # )),
+            'evaluation': {
+                'domain': domain,
+                'task': task_eval,
+                'universe': universe,
+                'kwargs': get_environment_params(universe, domain, task_eval, from_vision),
+            },
         },
         'policy_params': get_policy_params(universe, domain, task),
         'exploration_policy_params': {
@@ -988,7 +961,8 @@ def get_variant_spec_base(universe, domain, task, policy, algorithm, from_vision
                     .get('observation_keys')
                 )),
                 'observation_preprocessors_params': {}
-            }
+            },
+            # 'discrete_actions': False,
         },
         'algorithm_params': algorithm_params,
         'replay_pool_params': {
@@ -997,7 +971,6 @@ def get_variant_spec_base(universe, domain, task, policy, algorithm, from_vision
                 'max_size': int(1.5e6),
             },
             'last_checkpoint_dir': '',
-            # 'last_checkpoint_dir': '/home/justinvyu/ray_results/gym/DClaw/TurnFreeValve3ResetFreeSwapGoal-v0/2019-08-07T14-57-41-state_gtr_2_goals_with_resets_regular_box_saving_pixels_fixed_env/id=612875d0-seed=9463_2019-08-07_14-57-42op75_8n7',
         },
         'sampler_params': deep_update({
             'type': 'SimpleSampler',
@@ -1020,64 +993,7 @@ def get_variant_spec_base(universe, domain, task, policy, algorithm, from_vision
         },
     }
 
-    if task == 'InfoScrewV2-v0':
-        variant_spec['replay_pool_params']['kwargs']['include_images'] = True
-    if task == 'ImageScrewV2-v0' and ENVIRONMENT_PARAMS['DClaw3']['ImageScrewV2-v0']['state_reward']:
-        variant_spec['replay_pool_params']['kwargs']['super_observation_space_shape'] = (9+9+2+1+2,)
-    if domain == 'HardwareDClaw3':
-        variant_spec['sampler_params']['type'] == 'RemoteSampler'
-        variant_spec['algorithm_params']['kwargs']['max_train_repeat_per_timestep'] = 1
-    if task == 'TurnFreeValve3ResetFree-v0':
-        pass
-        # variant_spec['replay_pool_params']['type'] = 'PartialSaveReplayPool'
-        # variant_spec['replay_pool_params']['kwargs']['mode'] = 'Bellman_Error'
-        # variant_spec['replay_pool_params']['kwargs']['per_alpha'] = tune.grid_search([1, 0.1, 0.5, 1])
-        # DEFAULT_OBSERVATION_KEYS = (
-        #     'claw_qpos',
-        #     'object_position',
-        #     'object_orientation_cos',
-        #     'object_orientation_sin',
-        #     'last_action',
-        #     'target_orientation_cos',
-        #     'target_orientation_sin',
-        #     'object_to_target_relative_position',
-        # )
-    if task == 'TurnFreeValve3ResetFreeSwapGoal-v0':
-        pass
-        # variant_spec['replay_pool_params']['type'] = 'PrioritizedExperienceReplayPool'
-        # variant_spec['replay_pool_params']['kwargs']['mode'] = 'Bellman_Error'
-        # variant_spec['replay_pool_params']['kwargs']['per_alpha'] = tune.grid_search([0.25, 0.5, 0.75])
-        # DEFAULT_OBSERVATION_KEYS = (
-        #     'claw_qpos',
-        #     'object_position',
-        #     'object_orientation_cos',
-        #     'object_orientation_sin',
-        #     'last_action',
-        #     'target_orientation_cos',
-        #     'target_orientation_sin',
-        #     'object_to_target_relative_position',
-        # )
-        # variant_spec['environment_params']['training']['kwargs'][
-        #     'observation_keys'] = DEFAULT_OBSERVATION_KEYS + ('in_corner', 'other_reward')
-        # variant_spec['policy_params']['kwargs']['observation_keys'] = variant_spec[
-        #     'exploration_policy_params']['kwargs']['observation_keys'] = variant_spec[
-        #         'Q_params']['kwargs']['observation_keys'] = DEFAULT_OBSERVATION_KEYS
-
-    # variant_spec['replay_pool_params']['type'] = 'UniformlyReweightedReplayPool'
-    # variant_spec['replay_pool_params']['kwargs'].update({
-    #     'bin_boundaries': (
-    #         np.arange(-0.1, 0.1, 0.01),
-    #         np.arange(-0.1, 0.1, 0.01),
-    #         np.arange(-np.pi, np.pi, 0.2),
-    #     ),
-    #     'bin_keys': (
-    #         ('infos', 'obs/object_xy_position'),
-    #         ('infos', 'obs/object_angle'),
-    #     ),
-    #     'bin_weight_bonus_scaling': 1000,
-    # })
-
-    # TODO: Add this as a command line arg
+    # Set this flag if you don't want to save the pixels in the replay pool 
     no_pixel_information = False
 
     env_kwargs = variant_spec['environment_params']['training']['kwargs']
@@ -1099,6 +1015,13 @@ def get_variant_spec_base(universe, domain, task, policy, algorithm, from_vision
 
     if 'ResetFree' not in task:
         variant_spec['algorithm_params']['kwargs']['save_training_video_frequency'] = 0
+
+    if domain == 'MiniGrid':
+        variant_spec['algorithm_params']['kwargs']['reparameterize'] = False
+        variant_spec['policy_params']['type'] = 'DiscretePolicy'
+        variant_spec['policy_params']['kwargs']['hidden_layer_sizes'] = (32, 32)
+        variant_spec['exploration_policy_params']['type'] = 'UniformDiscretePolicy'
+        variant_spec['environment_params']['training']['kwargs']['normalize'] = False
 
     return variant_spec
 
@@ -1188,6 +1111,7 @@ PIXELS_PREPROCESSOR_PARAMS = {
 def get_variant_spec_image(universe,
                            domain,
                            task,
+                           task_eval,
                            policy,
                            algorithm,
                            from_vision,
@@ -1198,6 +1122,7 @@ def get_variant_spec_image(universe,
         universe,
         domain,
         task,
+        task_eval,
         policy,
         algorithm,
         from_vision,
@@ -1265,7 +1190,11 @@ def get_variant_spec_image(universe,
 
 
 def get_variant_spec(args):
-    universe, domain, task = args.universe, args.domain, args.task
+    universe, domain, task, task_eval = (
+        args.universe,
+        args.domain,
+        args.task,
+        args.task_evaluation)
 
     from_vision = args.vision
     preprocessor_type = args.preprocessor_type
@@ -1274,6 +1203,7 @@ def get_variant_spec(args):
         universe,
         domain,
         task,
+        task_eval,
         args.policy,
         args.algorithm,
         from_vision,

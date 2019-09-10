@@ -72,6 +72,20 @@ ALGORITHM_PARAMS_BASE = {
         'discount': 0.99,
         'tau': 5e-3,
         'reward_scale': 1.0,
+        'normalize_ext_reward_gamma': 0.99,
+        'rnd_int_rew_coeff': tune.sample_from([1]),
+    },
+    'rnd_params': {
+        'convnet_params': {
+            'conv_filters': (16, 32, 64),
+            'conv_kernel_sizes': (3, 3, 3),
+            'conv_strides': (2, 2, 2),
+            'normalization_type': None,
+        },
+        'fc_params': {
+            'hidden_layer_sizes': (256, 256),
+            'output_size': 512,
+        },
     }
 }
 

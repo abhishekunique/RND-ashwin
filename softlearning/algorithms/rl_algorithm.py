@@ -30,7 +30,7 @@ class RLAlgorithm(Checkpointable):
 
     def __init__(
             self,
-            sampler,
+            sampler=None,
             n_epochs=1000,
             train_every_n_steps=1,
             n_train_repeat=1,
@@ -46,6 +46,7 @@ class RLAlgorithm(Checkpointable):
             session=None,
             training_video_save_frequency=0,
             n_training_videos_to_save=None,
+            random_epoch_freq=0,
     ):
         """
         Args:
@@ -63,7 +64,8 @@ class RLAlgorithm(Checkpointable):
         """
         self._save_training_video_frequency = save_training_video_frequency
         self.sampler = sampler
-        self.sampler.set_save_training_video_frequency(save_training_video_frequency)
+        if sampler:
+            self.sampler.set_save_training_video_frequency(save_training_video_frequency)
 
         self._n_epochs = n_epochs
         self._n_train_repeat = n_train_repeat
@@ -100,6 +102,7 @@ class RLAlgorithm(Checkpointable):
         self._epoch = 0
         self._timestep = 0
         self._num_train_steps = 0
+        self._random_epoch_freq = random_epoch_freq
 
     def _build(self):
         self._training_ops = {}
@@ -166,6 +169,10 @@ class RLAlgorithm(Checkpointable):
             'iteration': tf.compat.v1.placeholder(
                 tf.int64, shape=(), name='iteration',
             ),
+            'reward': {
+                'running_ext_rew_std': tf.compat.v1.placeholder(
+                    tf.float32, shape=(), name='running_ext_rew_std')
+            }
         }
 
     def _initial_exploration_hook(self, env, initial_exploration_policy, pool):
@@ -199,10 +206,21 @@ class RLAlgorithm(Checkpointable):
     def _epoch_before_hook(self):
         """Hook called at the beginning of each epoch."""
         self._train_steps_this_epoch = 0
+        if self._random_epoch_freq and self._epoch % self._random_epoch_freq == 0:
+            self.sampler.initialize(
+                self._training_environment,
+                self._initial_exploration_policy,
+                self._pool
+            )
 
     def _epoch_after_hook(self, *args, **kwargs):
         """Hook called at the end of each epoch."""
-        pass
+        if self._random_epoch_freq and self._epoch % self._random_epoch_freq == 0:
+            self.sampler.initialize(
+                self._training_environment,
+                self._policy,
+                self._pool
+            )
 
     def _training_batch(self, batch_size=None):
         return self.sampler.random_batch(batch_size)
@@ -252,10 +270,13 @@ class RLAlgorithm(Checkpointable):
 
         self._training_before_hook()
 
+        import time
         for self._epoch in gt.timed_for(range(self._epoch, self._n_epochs)):
             self._epoch_before_hook()
             gt.stamp('epoch_before_hook')
             start_samples = self.sampler._total_samples
+
+            sample_times = []
             for i in count():
                 samples_now = self.sampler._total_samples
                 self._timestep = samples_now - start_samples
@@ -266,15 +287,18 @@ class RLAlgorithm(Checkpointable):
 
                 self._timestep_before_hook()
                 gt.stamp('timestep_before_hook')
-
+                t0 = time.time()
                 self._do_sampling(timestep=self._total_timestep)
                 gt.stamp('sample')
+                sample_times.append(time.time() - t0)
                 if self.ready_to_train:
                     self._do_training_repeats(timestep=self._total_timestep)
                 gt.stamp('train')
 
                 self._timestep_after_hook()
                 gt.stamp('timestep_after_hook')
+
+            print("Average Sample Time: ", np.mean(np.array(sample_times)))
 
             training_paths = self._training_paths()
             # self.sampler.get_last_n_paths(

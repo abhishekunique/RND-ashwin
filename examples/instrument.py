@@ -66,6 +66,7 @@ def add_command_line_args_to_variant_spec(variant_spec, command_line_args):
     })
 
     variant_spec['restore'] = command_line_args.restore
+    variant_spec['algorithm_params']['type'] = command_line_args.algorithm
 
     return variant_spec
 

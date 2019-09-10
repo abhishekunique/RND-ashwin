@@ -82,7 +82,7 @@ class SACClassifierMultiGoal(SAC):
                 in zip(self._classifier_losses_t,
                        self._classifier_optimizers,
                        self._classifiers)
-       ]
+        ]
 
         return classifier_training_ops
 
@@ -93,7 +93,7 @@ class SACClassifierMultiGoal(SAC):
         })
 
         goal_logits = [classifier(classifier_inputs)
-            for classifier in self._classifiers]
+                       for classifier in self._classifiers]
 
         self._classifier_losses_t = [
             tf.reduce_mean(
@@ -103,6 +103,37 @@ class SACClassifierMultiGoal(SAC):
         ]
 
         self._classifier_training_ops = self._get_classifier_training_ops()
+
+    def _init_external_reward(self):
+        classifier_inputs = flatten_input_structure({
+            name: self._placeholders['observations'][name]
+            for name in self._classifiers[0].observation_keys
+        })
+
+        observation_logits_per_classifier = [
+            classifier(classifier_inputs) for classifier in self._classifiers]
+
+        # DEBUG
+        # self._observation_logits_per_classifier = observation_logits_per_classifier
+        goal_indices = self._placeholders['observations']['goal_index']
+        goal_index_masks = [
+            tf.equal(goal_indices, goal)
+            for goal in range(self._num_goals)
+        ]
+
+        # DEBUG
+        # self._goal_index_masks = goal_index_masks
+
+        # Replace the correct classification logits for the repsective goals
+        observation_logits = observation_logits_per_classifier[0]
+        for goal in range(1, self._num_goals):
+            observation_logits = tf.where(
+               goal_index_masks[goal],
+               x=observation_logits_per_classifier[goal],
+               y=observation_logits
+            )
+
+        self._ext_reward = self._reward_t = observation_logits
 
     def _get_classifier_feed_dicts(self):
         # Sample N x the normal amount of observations, where N is
@@ -180,65 +211,6 @@ class SACClassifierMultiGoal(SAC):
         ]
 
         return feed_dicts
-
-
-    def _get_Q_target(self):
-        policy_inputs = flatten_input_structure({
-            name: self._placeholders['next_observations'][name]
-            for name in self._policy.observation_keys
-        })
-        next_actions = self._policy.actions(policy_inputs)
-        next_log_pis = self._policy.log_pis(policy_inputs, next_actions)
-
-        next_Q_observations = {
-            name: self._placeholders['next_observations'][name]
-            for name in self._Qs[0].observation_keys
-        }
-        next_Q_inputs = flatten_input_structure(
-            {**next_Q_observations, 'actions': next_actions})
-        next_Qs_values = tuple(Q(next_Q_inputs) for Q in self._Q_targets)
-
-        min_next_Q = tf.reduce_min(next_Qs_values, axis=0)
-        next_values = min_next_Q - self._alpha * next_log_pis
-
-        classifier_inputs = flatten_input_structure({
-            name: self._placeholders['observations'][name]
-            for name in self._classifiers[0].observation_keys
-        })
-
-        observation_logits_per_classifier = [classifier(classifier_inputs)
-            for classifier in self._classifiers]
-
-        # DEBUG
-        # self._observation_logits_per_classifier = observation_logits_per_classifier
-        goal_indices = self._placeholders['observations']['goal_index']
-        goal_index_masks = [
-            tf.equal(goal_indices, goal)
-            for goal in range(self._num_goals)
-        ]
-
-        # DEBUG
-        # self._goal_index_masks = goal_index_masks
-
-        # Replace the correct classification logits for the repsective goals
-        observation_logits = observation_logits_per_classifier[0]
-        for goal in range(1, self._num_goals):
-            observation_logits = tf.where(
-               goal_index_masks[goal],
-               x=observation_logits_per_classifier[goal],
-               y=observation_logits
-            )
-
-        self._reward_t = observation_logits
-
-        terminals = tf.cast(self._placeholders['terminals'], next_values.dtype)
-
-        Q_target = td_target(
-            reward=self._reward_scale * self._reward_t,
-            discount=self._discount,
-            next_value=(1 - terminals) * next_values)
-
-        return Q_target
 
     def _epoch_after_hook(self, *args, **kwargs):
         if self._epoch == 0:

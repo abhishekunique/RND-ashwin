@@ -57,6 +57,7 @@ class SAC(RLAlgorithm):
             goal_classifier_params_directory=None,
             save_full_state=False,
             save_eval_paths=False,
+            normalize_ext_reward_gamma=1,
             per_alpha=1,
 
             state_estimator=None,
@@ -65,6 +66,10 @@ class SAC(RLAlgorithm):
 
             vae=None,
 
+            rnd_networks=(),
+            rnd_lr=1e-4,
+            rnd_int_rew_coeff=0,
+            rnd_gamma=0.99,
             **kwargs,
     ):
         """
@@ -82,8 +87,8 @@ class SAC(RLAlgorithm):
             lr (`float`): Learning rate used for the function approximators.
             discount (`float`): Discount factor for Q-function updates.
             tau (`float`): Soft value function target update weight.
-            target_update_interval ('int'): Frequency at which target network
-                updates occur in iterations.
+            target_update_interval ('int', [grad_steps]): Frequency at which target network
+                updates occur.
             reparameterize ('bool'): If True, we use a gradient estimator for
                 the policy derived using the reparameterization trick. We use
                 a likelihood ratio based estimator otherwise.
@@ -143,6 +148,19 @@ class SAC(RLAlgorithm):
         self._vae = vae
         self._preprocessed_Q_inputs = self._Qs[0].preprocessed_inputs_fn
 
+        self._normalize_ext_reward_gamma = normalize_ext_reward_gamma
+        self._running_ext_rew_std = 1
+        self._rnd_int_rew_coeff = 0
+
+        if rnd_networks:
+            self._rnd_target = rnd_networks[0]
+            self._rnd_predictor = rnd_networks[1]
+            self._rnd_lr = rnd_lr
+            self._rnd_int_rew_coeff = rnd_int_rew_coeff
+            self._rnd_gamma = rnd_gamma
+            self._running_int_rew_std = 0
+            # self._rnd_gamma = 1
+            # self._running_int_rew_std = 1
         self._build()
 
     def _build(self):
@@ -152,6 +170,9 @@ class SAC(RLAlgorithm):
         else:
             self._goal_classifier = None
 
+        self._init_external_reward()
+        if self._rnd_int_rew_coeff:
+            self._init_rnd_update()
         self._init_actor_update()
         self._init_critic_update()
         self._init_diagnostics_ops()
@@ -171,11 +192,16 @@ class SAC(RLAlgorithm):
         # Things to try:
         # - random goal
         # - single goal
-        feed_dict = {self._goal_classifier.images: images,
-            self._goal_classifier.goals: goals}
+        feed_dict = {
+            self._goal_classifier.images: images,
+            self._goal_classifier.goals: goals
+        }
         # lid_pos = observations[:, -2]
         goal_probs = self._session.run(self._goal_classifier.pred_probs, feed_dict=feed_dict)[:, 1].reshape((-1, 1))
         return goal_probs
+
+    def _init_external_reward(self):
+        self._ext_reward = self._reward_scale * self._placeholders['rewards']
 
     def _get_Q_target(self):
         policy_inputs = flatten_input_structure({
@@ -198,11 +224,21 @@ class SAC(RLAlgorithm):
 
         terminals = tf.cast(self._placeholders['terminals'], next_values.dtype)
 
+        if self._rnd_int_rew_coeff:
+            self._unscaled_int_reward = tf.clip_by_value(
+                self._rnd_errors / self._placeholders['reward']['running_int_rew_std'],
+                0, 1000
+            )
+            self._int_reward = self._rnd_int_rew_coeff * self._unscaled_int_reward
+        else:
+            self._int_reward = 0
+        self._normalized_ext_reward = self._ext_reward / self._placeholders['reward']['running_ext_rew_std']
+        self._total_reward = self._normalized_ext_reward + self._int_reward
+
         Q_target = td_target(
-            reward=self._reward_scale * self._placeholders['rewards'],
+            reward=self._total_reward,
             discount=self._discount,
             next_value=(1 - terminals) * next_values)
-
         return tf.stop_gradient(Q_target)
 
     def _init_critic_update(self):
@@ -329,24 +365,62 @@ class SAC(RLAlgorithm):
 
         self._training_ops.update({'policy_train_op': policy_train_op})
 
-    # def _init_diagnostics_ops(self):
-    #     diagnosables = OrderedDict((
-    #         ('Q_value', self._Q_values),
-    #         ('Q_loss', self._Q_losses),
-    #         ('policy_loss', self._policy_losses),
-    #         ('alpha', self._alpha)
-    #     ))
+    def _init_rnd_update(self):
+        self._placeholders['reward'].update({
+            'running_int_rew_std': tf.compat.v1.placeholder(
+                tf.float32, shape=(), name='running_int_rew_std')
+        })
+        policy_inputs = flatten_input_structure({
+            name: self._placeholders['observations'][name]
+            for name in self._policy.observation_keys
+        })
 
-    #     diagnostic_metrics = OrderedDict((
-    #         ('mean', tf.reduce_mean),
-    #         ('std', lambda x: tfp.stats.stddev(x, sample_axis=None)),
-    #     ))
+        targets = tf.stop_gradient(self._rnd_target(policy_inputs))
+        predictions = self._rnd_predictor(policy_inputs)
 
-    #     self._diagnostics_ops = OrderedDict([
-    #         (f'{key}-{metric_name}', metric_fn(values))
-    #         for key, values in diagnosables.items()
-    #         for metric_name, metric_fn in diagnostic_metrics.items()
-    #     ])
+        self._rnd_errors = tf.expand_dims(tf.reduce_mean(
+            tf.math.squared_difference(targets, predictions), axis=-1), 1)
+        self._rnd_loss = tf.reduce_mean(self._rnd_errors)
+        self._rnd_error_std = tf.math.reduce_std(self._rnd_errors)
+        self._rnd_optimizer = tf.compat.v1.train.AdamOptimizer(
+            learning_rate=self._rnd_lr,
+            name="policy_optimizer")
+        rnd_train_op = self._rnd_optimizer.minimize(
+            loss=self._rnd_loss)
+        self._training_ops.update(
+            {'rnd_train_op': rnd_train_op}
+        )
+
+    def _init_diagnostics_ops(self):
+        diagnosables = OrderedDict((
+            ('Q_value', self._Q_values),
+            ('Q_loss', self._Q_losses),
+            ('policy_loss', self._policy_losses),
+            ('alpha', self._alpha)
+        ))
+
+        if self._rnd_int_rew_coeff:
+            diagnosables['rnd_reward'] = self._int_reward
+            diagnosables['rnd_error'] = self._rnd_errors
+            diagnosables['running_rnd_reward_std'] = self._placeholders['reward']['running_int_rew_std']
+        diagnosables['ext_reward'] = self._ext_reward
+        diagnosables['normalized_ext_reward'] = self._normalized_ext_reward
+
+        diagnosables['running_ext_reward_std'] = self._placeholders['reward']['running_ext_rew_std']
+        diagnosables['total_reward'] = self._total_reward
+
+        diagnostic_metrics = OrderedDict((
+            ('mean', tf.reduce_mean),
+            ('std', lambda x: tfp.stats.stddev(x, sample_axis=None)),
+            ('max', tf.math.reduce_max),
+            ('min', tf.math.reduce_min),
+        ))
+
+        self._diagnostics_ops = OrderedDict([
+            (f'{key}-{metric_name}', metric_fn(values))
+            for key, values in diagnosables.items()
+            for metric_name, metric_fn in diagnostic_metrics.items()
+        ])
 
     def _init_training(self):
         self._update_target(tau=1.0)
@@ -381,6 +455,16 @@ class SAC(RLAlgorithm):
         # }
 
         self._session.run(self._training_ops, feed_dict)
+        if self._rnd_int_rew_coeff:
+            int_rew_std = np.maximum(np.std(self._session.run(self._unscaled_int_reward, feed_dict)), 1e-3)
+            self._running_int_rew_std = self._running_int_rew_std * self._rnd_gamma + int_rew_std * (1-self._rnd_gamma)
+        else:
+            self._session.run(self._training_ops, feed_dict)
+
+        if self._normalize_ext_reward_gamma != 1:
+            ext_rew_std = np.maximum(np.std(self._session.run(self._normalized_ext_reward, feed_dict)), 1e-3)
+            self._running_ext_rew_std = self._running_ext_rew_std * self._normalize_ext_reward_gamma + \
+                ext_rew_std * (1-self._normalize_ext_reward_gamma)
 
         if self._her_iters:
             # Q: Is it better to build a large batch and take one grad step, or
@@ -447,53 +531,38 @@ class SAC(RLAlgorithm):
         if iteration is not None:
             feed_dict[self._placeholders['iteration']] = iteration
 
+        feed_dict[self._placeholders['reward']['running_ext_rew_std']] = self._running_ext_rew_std
+        if self._rnd_int_rew_coeff:
+            feed_dict[self._placeholders['reward']['running_int_rew_std']] = self._running_int_rew_std
+
         return feed_dict
 
-    def _get_goal_resamp_batch(self, batch):
-        new_goal = self._base_env.sample_goal()
-        old_goal = self._base_env.get_goal()
-        batch_obs = batch['observations']
-        batch_act = batch['actions']
-        batch_next_obs = batch['next_observations']
+    # def _get_goal_resamp_batch(self, batch):
+    #     new_goal = self._base_env.sample_goal()
+    #     old_goal = self._base_env.get_goal()
+    #     batch_obs = batch['observations']
+    #     batch_act = batch['actions']
+    #     batch_next_obs = batch['next_observations']
 
-        new_batch_obs = self._base_env.relabel_obs_w_goal(batch_obs, new_goal)
-        new_batch_next_obs = self._base_env.relabel_obs_w_goal(batch_next_obs, new_goal)
+    #     new_batch_obs = self._base_env.relabel_obs_w_goal(batch_obs, new_goal)
+    #     new_batch_next_obs = self._base_env.relabel_obs_w_goal(batch_next_obs, new_goal)
 
-        if self._base_env.use_super_state_reward():
-            batch_super_obs = batch['super_observations']
-            new_batch_super_obs = super(self._base_env).relabel_obs_w_goal(batch_super_obs, new_goal)
-            new_batch_rew = np.expand_dims(self._base_env.compute_rewards(new_batch_super_obs, batch_act)[0], 1)
-        else:
-            new_batch_rew = np.expand_dims(self._base_env.compute_rewards(new_batch_obs, batch_act)[0], 1)
+    #     if self._base_env.use_super_state_reward():
+    #         batch_super_obs = batch['super_observations']
+    #         new_batch_super_obs = super(self._base_env).relabel_obs_w_goal(batch_super_obs, new_goal)
+    #         new_batch_rew = np.expand_dims(self._base_env.compute_rewards(new_batch_super_obs, batch_act)[0], 1)
+    #     else:
+    #         new_batch_rew = np.expand_dims(self._base_env.compute_rewards(new_batch_obs, batch_act)[0], 1)
 
-        new_batch = {
-            'rewards': new_batch_rew,
-            'observations': new_batch_obs,
-            'actions': batch['actions'],
-            'next_observations': new_batch_next_obs,
-            'terminals': batch['terminals'],
-        }
-        # (TODO) Implement relabeling of terminal flags
-        return new_batch
-
-    def _init_diagnostics_ops(self):
-        self._diagnostics_ops = {
-            **{
-                f'{key}-{metric_name}': metric_fn(values)
-                for key, values in (
-                        ('Q_values', self._Q_values),
-                        ('Q_losses', self._Q_losses),
-                        ('policy_losses', self._policy_losses))
-                for metric_name, metric_fn in (
-                        ('mean', tf.reduce_mean),
-                        ('std', lambda x: tfp.stats.stddev(
-                            x, sample_axis=None)))
-            },
-            'alpha': self._alpha,
-            'global_step': self.global_step,
-        }
-
-        return self._diagnostics_ops
+    #     new_batch = {
+    #         'rewards': new_batch_rew,
+    #         'observations': new_batch_obs,
+    #         'actions': batch['actions'],
+    #         'next_observations': new_batch_next_obs,
+    #         'terminals': batch['terminals'],
+    #     }
+    #     # (TODO) Implement relabeling of terminal flags
+    #     return new_batch
 
     def get_diagnostics(self,
                         iteration,

@@ -118,6 +118,12 @@ class ExperimentRunner(tune.Trainable):
         else:
             vae = None
 
+        if variant['algorithm_params']['rnd_params']:
+            from softlearning.rnd.utils import get_rnd_networks_from_variant
+            rnd_networks = get_rnd_networks_from_variant(variant, training_environment)
+        else:
+            rnd_networks = ()
+
         self.algorithm = get_algorithm_from_variant(
             variant=self._variant,
             training_environment=training_environment,
@@ -130,7 +136,8 @@ class ExperimentRunner(tune.Trainable):
             sampler=sampler,
             session=self._session,
             state_estimator=state_estimator,
-            vae=vae)
+            vae=vae,
+            rnd_networks=rnd_networks)
 
         if isinstance(replay_pool, PrioritizedExperienceReplayPool) and \
            replay_pool._mode == 'Bellman_Error':

@@ -97,6 +97,14 @@ class ExperimentRunnerClassifierRL(ExperimentRunner):
             algorithm_kwargs['goal_examples'] = np.empty((1, 1))
             algorithm_kwargs['goal_examples_validation'] = np.empty((1, 1))
 
+        # RND
+        if variant['algorithm_params']['rnd_params']:
+            from softlearning.rnd.utils import get_rnd_networks_from_variant
+            rnd_networks = get_rnd_networks_from_variant(variant, training_environment)
+        else:
+            rnd_networks = ()
+        algorithm_kwargs['rnd_networks'] = rnd_networks
+
         self.algorithm = get_algorithm_from_variant(**algorithm_kwargs)
 
         initialize_tf_variables(self._session, only_uninitialized=True)

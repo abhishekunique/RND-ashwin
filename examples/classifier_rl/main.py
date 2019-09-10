@@ -108,6 +108,14 @@ class ExperimentRunnerClassifierRL(ExperimentRunner):
             algorithm_kwargs['goal_example_pools'] = goal_pools_train
             algorithm_kwargs['goal_example_validation_pools'] = goal_pools_validation
 
+        # RND
+        if variant['algorithm_params']['rnd_params']:
+            from softlearning.rnd.utils import get_rnd_networks_from_variant
+            rnd_networks = get_rnd_networks_from_variant(variant, training_environment)
+        else:
+            rnd_networks = ()
+        algorithm_kwargs['rnd_networks'] = rnd_networks
+
         self.algorithm = get_algorithm_from_variant(**algorithm_kwargs)
 
         # Give the algorithm to the sampler to calculate reward
