@@ -50,15 +50,15 @@ def convnet_model(
         None: None,
     }[normalization_type]
 
-    def conv_block(conv_filter, conv_kernel_size, conv_stride):
+    def conv_block(conv_filter, conv_kernel_size, conv_stride, name='conv_block'):
         block_parts = [
             layers.Conv2D(
+                *args,
                 filters=conv_filter,
                 kernel_size=conv_kernel_size,
                 strides=(conv_stride if downsampling_type == 'conv' else 1),
                 padding=padding,
                 activation='linear',
-                *args,
                 **kwargs),
         ]
 
@@ -69,7 +69,6 @@ def convnet_model(
                          if isinstance(activation, str)
                          else activation())]
 
-        # if downsampling_type == 'pool' and conv_stride > 1:
         if downsampling_type in POOLING_TYPES:
             block_parts += [
                 POOLING_TYPES[downsampling_type](
@@ -77,11 +76,12 @@ def convnet_model(
                 )
             ]
 
-        block = tfk.Sequential(block_parts, name='conv_block')
+        block = tfk.Sequential(block_parts, name=name)
         return block
 
     def preprocess(x):
         """Cast to float, normalize, and concatenate images along last axis."""
+        import tensorflow as tf
         x = nest.map_structure(
             lambda image: tf.image.convert_image_dtype(image, tf.float32), x)
         x = nest.flatten(x)
@@ -132,42 +132,6 @@ def convnet_model(
             feature_keypoints = tf.reshape(expected_xy, [-1, 2 * channels])
             return feature_keypoints
 
-        # def spatial_softmax(x):
-        #     # Create learnable temperature parameter `alpha`
-        #     alpha = tf.Variable(1., dtype=tf.float32, name='softmax_alpha')
-        #     width, height, channels = x.shape[1:]
-        #     # softmax_attention = tf.math.softmax(x / alpha)
-        #     # Create matrices where all xs/ys are the same value acros
-        #     # the row/col. These will be multiplied by the softmax distr
-        #     # to get the 2D expectation.
-        #     pos_x, pos_y = tf.meshgrid(
-        #         tf.linspace(-1., 1., num=width),
-        #         tf.linspace(-1., 1., num=height),
-        #         indexing='ij'
-        #     )
-        #     # Reshape to a column vector to satisfy multiply broadcast.
-        #     pos_x, pos_y = (
-        #         tf.reshape(pos_x, [-1, 1]),
-        #         tf.reshape(pos_y, [-1, 1])
-        #     )
-        #     # Vectorize the feature maps, split by channels still
-        #     # softmax_attention = tf.reshape(
-        #     #     softmax_attention, [-1, width * height, channels])
-        #     x_flattened = tf.reshape(
-        #         x, [-1, width * height, channels])
-        #     softmax_attention = tf.math.softmax(x_flattened / alpha, axis=1)
-
-        #     expected_x = tf.math.reduce_sum(
-        #         pos_x * softmax_attention, axis=[1], keepdims=True)
-        #     expected_y = tf.math.reduce_sum(
-        #         pos_y * softmax_attention, axis=[1], keepdims=True)
-        #     expected_xy = tf.concat([expected_x, expected_y], axis=1)
-        #     feature_keypoints = tf.reshape(expected_xy, [-1, 2 * channels])
-
-        #     return feature_keypoints
-
-        # output_layer = tfkl.Lambda(spatial_softmax)
-
         output_layer = tfk.Sequential([
             tfkl.Lambda(spatial_softmax),
             tfkl.Lambda(calculate_expectation)
@@ -179,11 +143,15 @@ def convnet_model(
         output_layer = tfkl.Flatten()
 
     model = PicklableSequential((
-        tfkl.Lambda(preprocess),
+        tfkl.Lambda(preprocess, name='preprocess'),
         *[
-            conv_block(conv_filter, conv_kernel_size, conv_stride)
-            for (conv_filter, conv_kernel_size, conv_stride) in
-            zip(conv_filters, conv_kernel_sizes, conv_strides)
+            conv_block(
+                conv_filter,
+                conv_kernel_size,
+                conv_stride,
+                name=f'conv_block_{i}')
+            for i, (conv_filter, conv_kernel_size, conv_stride) in
+            enumerate(zip(conv_filters, conv_kernel_sizes, conv_strides))
         ],
         output_layer,
     ), name=name)

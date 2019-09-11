@@ -2,6 +2,10 @@ import tempfile
 
 import tensorflow as tf
 
+from softlearning.models.normalization import (
+    LayerNormalization,
+    GroupNormalization,
+    InstanceNormalization)
 
 class PicklableKerasModel(object):
     def __getstate__(self):
@@ -20,8 +24,13 @@ class PicklableKerasModel(object):
             loaded_model = tf.keras.models.load_model(
                 fd.name, custom_objects={
                     self.__class__.__name__: self.__class__,
+                    'tf': tf,
                     'PicklableSequential': PicklableSequential,
                     'PicklableModel': PicklableModel})
+                    'LayerNormalization': LayerNormalization,
+                    'GroupNormalization': GroupNormalization,
+                    'InstanceNormalization': InstanceNormalization,
+                })
 
         self.__dict__.update(loaded_model.__dict__.copy())
 
@@ -30,9 +39,12 @@ class PicklableKerasModel(object):
         custom_objects = custom_objects or {}
         custom_objects.update({
             cls.__name__: cls,
-            'PicklableSequential': PicklableSequential,
-            'PicklableModel': PicklableModel,
             'tf': tf,
+            'PicklableSequential': PicklableSequential,
+            'PicklableModel': PicklableModel})
+            'LayerNormalization': LayerNormalization,
+            'GroupNormalization': GroupNormalization,
+            'InstanceNormalization': InstanceNormalization,
         })
         return super(PicklableKerasModel, cls).from_config(
             *args, custom_objects=custom_objects, **kwargs)

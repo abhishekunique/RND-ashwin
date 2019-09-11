@@ -98,6 +98,7 @@ class RemoteSampler(BaseSampler):
 @ray.remote
 class _RemoteEnv(object):
     def __init__(self, env_pkl, policy_pkl):
+        import tensorflow as tf
         gpu_options = tf.GPUOptions(allow_growth=True)
         self._session = tf.Session(
             config=tf.ConfigProto(gpu_options=gpu_options))
@@ -116,7 +117,6 @@ class _RemoteEnv(object):
 
     def rollout(self, policy_weights, path_length):
         self._policy.set_weights(policy_weights)
-        del policy_weights
         path = rollout(self._env, self._policy, path_length)
 
         return path
