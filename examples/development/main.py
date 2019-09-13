@@ -94,6 +94,12 @@ class ExperimentRunner(tune.Trainable):
             get_policy_from_params(
                 variant['exploration_policy_params'], training_environment))
 
+        if variant['algorithm_params']['rnd_params']:
+            from softlearning.rnd.utils import get_rnd_networks_from_variant
+            rnd_networks = [get_rnd_networks_from_variant(variant, training_environment) for _ in range(num_goals)]
+        else:
+            rnd_networks = ()
+
         self.algorithm = get_algorithm_from_variant(
             variant=self._variant,
             training_environment=training_environment,
@@ -106,6 +112,7 @@ class ExperimentRunner(tune.Trainable):
             pools=replay_pools,
             samplers=samplers,
             num_goals=num_goals,
+            rnd_networks=rnd_networks,
             session=self._session)
 
         initialize_tf_variables(self._session, only_uninitialized=True)

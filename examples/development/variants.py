@@ -41,19 +41,6 @@ ALGORITHM_PARAMS_BASE = {
             'height': 480,
             'mode': 'rgb_array',
         },
-        'rnd_int_rew_coeff': tune.sample_from([1]),
-    },
-    'rnd_params': {
-        'convnet_params': {
-            'conv_filters': (16, 32, 64),
-            'conv_kernel_sizes': (3, 3, 3),
-            'conv_strides': (2, 2, 2),
-            'normalization_type': None,
-        },
-        'fc_params': {
-            'hidden_layer_sizes': (256, 256),
-            'output_size': 512,
-        },
     }
 }
 
@@ -69,6 +56,20 @@ ALGORITHM_PARAMS_ADDITIONAL = {
             'target_entropy': 'auto', #tune.sample_from([-3, -5, -7]),#'auto',
             'action_prior': 'uniform',
             'her_iters': tune.grid_search([0]),
+            'rnd_int_rew_coeff': tune.sample_from([1]),
+            'normalize_ext_reward_gamma': 0.99,
+        },
+        'rnd_params': {
+            'convnet_params': {
+                'conv_filters': (16, 32, 64),
+                'conv_kernel_sizes': (3, 3, 3),
+                'conv_strides': (2, 2, 2),
+                'normalization_type': None,
+            },
+            'fc_params': {
+                'hidden_layer_sizes': (256, 256),
+                'output_size': 512,
+            },
         }
     },
     'MultiSAC': {
@@ -81,7 +82,22 @@ ALGORITHM_PARAMS_ADDITIONAL = {
             'target_entropy': 'auto', #tune.sample_from([-3, -5, -7]),#'auto',
             'action_prior': 'uniform',
             'her_iters': tune.grid_search([0]),
-        }
+            'rnd_int_rew_coeffs': tune.sample_from([[1, 1]]),
+            'ext_reward_coeffs': [1, 0], # 0 corresponds to reset policy
+            'normalize_ext_reward_gamma': 0.99,
+        },
+        'rnd_params': {
+            'convnet_params': {
+                'conv_filters': (16, 32, 64),
+                'conv_kernel_sizes': (3, 3, 3),
+                'conv_strides': (2, 2, 2),
+                'normalization_type': None,
+            },
+            'fc_params': {
+                'hidden_layer_sizes': (256, 256),
+                'output_size': 512,
+            },
+        },
     },
     'SQL': {
         'type': 'SQL',

@@ -12,7 +12,7 @@ from softlearning.samplers import rollouts
 import math
 from softlearning.misc.utils import save_video
 tfd = tfp.distributions
-
+from flatten_dict import flatten
 
 def td_target(reward, discount, next_value):
     return reward + discount * next_value
@@ -55,6 +55,12 @@ class MultiSAC(SAC):
             save_full_state=False,
             save_eval_paths=False,
             per_alpha=1,
+            normalize_ext_reward_gamma=1,
+            ext_reward_coeffs=[],
+            rnd_networks=(),
+            rnd_lr=1e-4,
+            rnd_int_rew_coeffs=[],
+            rnd_gamma=0.99,
             **kwargs,
     ):
         """
@@ -133,6 +139,27 @@ class MultiSAC(SAC):
         self._n_episodes_elapsed = 0
         self._num_grad_steps_taken_per_policy = [0 for _ in range(self._num_goals)]
 
+        self._normalize_ext_reward_gamma = normalize_ext_reward_gamma
+        if ext_reward_coeffs:
+            self._ext_reward_coeffs = ext_reward_coeffs
+        else:
+            self._ext_reward_coeffs = [1 for _ in range(num_goals)]
+        self._running_ext_rew_stds = [1 for _ in range(num_goals)]
+        self._rnd_int_rew_coeffs = []
+
+        if rnd_networks:
+            assert len(rnd_networks) == num_goals
+            self._rnd_targets = [rnd_network_pair[0] for rnd_network_pair in rnd_networks]
+            self._rnd_predictors = [rnd_network_pair[1] for rnd_network_pair in rnd_networks]
+            self._rnd_lr = rnd_lr
+            self._rnd_int_rew_coeffs = rnd_int_rew_coeffs
+
+            assert len(self._rnd_int_rew_coeffs) == num_goals
+            self._rnd_gamma = rnd_gamma
+            self._running_int_rew_stds = [1 for _ in range(num_goals)]
+            # self._rnd_gamma = 1
+            # self._running_int_rew_std = 1
+
         self._build()
 
     def _build(self):
@@ -142,12 +169,25 @@ class MultiSAC(SAC):
         else:
             self._goal_classifier = None
 
+        self._init_external_rewards()
+        self._init_rnd_updates()
         self._init_actor_updates()
         self._init_critic_updates()
         self._init_diagnostics_ops()
 
+    def _init_external_rewards(self):
+        self._unscaled_ext_rewards = [self._placeholders['rewards'] for _ in range(self._num_goals)]
+        self._placeholders['reward'].update({
+            f'running_ext_rew_std_{i}': tf.compat.v1.placeholder(
+                tf.float32, shape=(), name=f'running_ext_rew_std_{i}')
+            for i in range(self._num_goals)
+        })
+
     def _get_Q_targets(self):
         Q_targets = []
+
+        self._unscaled_int_rewards, self._int_rewards, self._normalized_ext_rewards, self._ext_rewards, self._total_rewards = [], [], [], [], []
+
         for i, policy in enumerate(self._policies):
             policy_inputs = flatten_input_structure({
                 name: self._placeholders['next_observations'][name]
@@ -169,11 +209,25 @@ class MultiSAC(SAC):
 
             terminals = tf.cast(self._placeholders['terminals'], next_values.dtype)
 
+            if self._rnd_int_rew_coeffs[i]:
+                self._unscaled_int_rewards.append(tf.clip_by_value(
+                    self._rnd_errors[i] / self._placeholders['reward'][f'running_int_rew_std_{i}'],
+                    0, 1000
+                ))
+                self._int_rewards.append(self._rnd_int_rew_coeffs[i] * self._unscaled_int_rewards[i])
+            else:
+                self._int_rewards.append(0)
+            self._normalized_ext_rewards.append(
+                self._unscaled_ext_rewards[i] / self._placeholders['reward'][f'running_ext_rew_std_{i}'])
+            self._ext_rewards.append(self._ext_reward_coeffs[i] * self._normalized_ext_rewards[i])
+            self._total_rewards.append(self._ext_rewards[i] + self._int_rewards[i])
+
             Q_target = td_target(
-                reward=self._reward_scale * self._placeholders['rewards'],
+                reward=self._reward_scale * self._total_rewards[i],
                 discount=self._discount,
                 next_value=(1 - terminals) * next_values)
             Q_targets.append(tf.stop_gradient(Q_target))
+
         return Q_targets
 
     def _init_critic_updates(self):
@@ -208,7 +262,7 @@ class MultiSAC(SAC):
 
             Q_losses = tuple(
                 tf.compat.v1.losses.mean_squared_error(
-                    labels=Q_target, predictions=Q_value, weights=0.5)
+                    labels=Q_targets[i], predictions=Q_value, weights=0.5)
                 for Q_value in Q_values)
             self._Q_losses_per_policy.append(Q_losses)
 
@@ -219,7 +273,7 @@ class MultiSAC(SAC):
             Q_optimizers = tuple(
                 tf.compat.v1.train.AdamOptimizer(
                     learning_rate=self._Q_lr,
-                    name='{}_{}_{}_optimizer'.format(i, Q._name, j)
+                    name='{}_{}_optimizer_{}'.format(i, Q._name, j)
                 ) for j, Q in enumerate(Qs))
             self._Q_optimizers_per_policy.append(Q_optimizers)
 
@@ -228,7 +282,7 @@ class MultiSAC(SAC):
                 for i, (Q, Q_loss, Q_optimizer)
                 in enumerate(zip(Qs, Q_losses, Q_optimizers)))
 
-            self._training_ops_per_policy[i].update({'Q': tf.group(Q_training_ops)})
+            self._training_ops_per_policy[i].update({f'Q_{i}': tf.group(Q_training_ops)})
 
     def _init_actor_updates(self):
         """Create minimization operations for policies and entropies.
@@ -274,7 +328,7 @@ class MultiSAC(SAC):
                 self._alpha_optimizers.append(alpha_optimizer)
                 alpha_train_op = alpha_optimizer.minimize(loss=alpha_loss, var_list=[log_alpha])
                 self._training_ops_per_policy[i].update({
-                    'temperature_alpha': alpha_train_op
+                    f'temperature_alpha_{i}': alpha_train_op
                 })
 
             if self._action_prior == 'normal':
@@ -317,7 +371,35 @@ class MultiSAC(SAC):
                 loss=policy_loss,
                 var_list=policy.trainable_variables)
 
-            self._training_ops_per_policy[i].update({'policy_train_op': policy_train_op})
+            self._training_ops_per_policy[i].update({f'policy_train_op_{i}': policy_train_op})
+
+    def _init_rnd_updates(self):
+        self._rnd_errors, self._rnd_losses, self._rnd_error_stds, self._rnd_optimizers = [], [], [], []
+        for i in range(self._num_goals):
+            self._placeholders['reward'].update({
+                f'running_int_rew_std_{i}': tf.compat.v1.placeholder(
+                    tf.float32, shape=(), name=f'running_int_rew_std_{i}')
+            })
+            policy_inputs = flatten_input_structure({
+                name: self._placeholders['observations'][name]
+                for name in self._policies[i].observation_keys
+            })
+
+            targets = tf.stop_gradient(self._rnd_targets[i](policy_inputs))
+            predictions = self._rnd_predictors[i](policy_inputs)
+
+            self._rnd_errors.append(tf.expand_dims(tf.reduce_mean(
+                tf.math.squared_difference(targets, predictions), axis=-1), 1))
+            self._rnd_losses.append(tf.reduce_mean(self._rnd_errors[i]))
+            self._rnd_error_stds.append(tf.math.reduce_std(self._rnd_errors[i]))
+            self._rnd_optimizers.append(tf.compat.v1.train.AdamOptimizer(
+                learning_rate=self._rnd_lr,
+                name=f"rnd_optimizer_{i}"))
+            rnd_train_op = self._rnd_optimizers[i].minimize(
+                loss=self._rnd_losses[i])
+            self._training_ops_per_policy[i].update(
+                {f'rnd_train_op_{i}': rnd_train_op}
+            )
 
     def _init_diagnostics_ops(self):
         diagnosables_per_goal = [
@@ -330,9 +412,23 @@ class MultiSAC(SAC):
             for i in range(self._num_goals)
         ]
 
+        for i in range(self._num_goals):
+            if self._rnd_int_rew_coeffs[i]:
+                diagnosables_per_goal[i][f'rnd_reward_{i}'] = self._int_rewards[i]
+                diagnosables_per_goal[i][f'rnd_error_{i}'] = self._rnd_errors[i]
+                diagnosables_per_goal[i][f'running_rnd_reward_std_{i}'] = self._placeholders['reward'][f'running_int_rew_std_{i}']
+            diagnosables_per_goal[i][f'ext_reward_{i}'] = self._ext_rewards[i]
+            diagnosables_per_goal[i][f'normalized_ext_reward_{i}'] = self._normalized_ext_rewards[i]
+            diagnosables_per_goal[i][f'unnormalized_ext_reward_{i}'] = self._unscaled_ext_rewards[i]
+
+            diagnosables_per_goal[i][f'running_ext_reward_std_{i}'] = self._placeholders['reward'][f'running_ext_rew_std_{i}']
+            diagnosables_per_goal[i][f'total_reward_{i}'] = self._total_rewards[i]
+
         diagnostic_metrics = OrderedDict((
             ('mean', tf.reduce_mean),
             ('std', lambda x: tfp.stats.stddev(x, sample_axis=None)),
+            ('max', tf.math.reduce_max),
+            ('min', tf.math.reduce_min),
         ))
 
         self._diagnostics_ops_per_goal = [
@@ -362,13 +458,59 @@ class MultiSAC(SAC):
     def _do_training(self, iteration, batch):
         """Runs the operations for updating training and target ops."""
         feed_dict = self._get_feed_dict(iteration, batch)
+
         self._session.run(self._training_ops_per_policy[self._goal_index], feed_dict)
+
+        if self._rnd_int_rew_coeffs[self._goal_index]:
+            int_rew_std = np.maximum(np.std(self._session.run(
+                self._unscaled_int_rewards[self._goal_index], feed_dict)), 1e-3)
+            self._running_int_rew_stds[
+                self._goal_index] = self._running_int_rew_stds[self._goal_index] * self._rnd_gamma + int_rew_std * (1-self._rnd_gamma)
+
+        if self._normalize_ext_reward_gamma != 1:
+            ext_rew_std = np.maximum(np.std(self._session.run(
+                self._normalized_ext_rewards[self._goal_index], feed_dict)), 1e-3)
+            self._running_ext_rew_stds[
+                self._goal_index] = self._running_ext_rew_stds[self._goal_index] * self._normalize_ext_reward_gamma + \
+                ext_rew_std * (1-self._normalize_ext_reward_gamma)
 
         self._num_grad_steps_taken_per_policy[self._goal_index] += 1
 
         if self._num_grad_steps_taken_per_policy[self._goal_index] % self._target_update_interval == 0:
             # Run target ops here.
             self._update_target(self._goal_index)
+
+    def _get_feed_dict(self, iteration, batch):
+        batch_flat = flatten(batch)
+        placeholders_flat = flatten(self._placeholders)
+
+        if np.random.rand() < 1e-4 and 'pixels' in batch['observations']:
+            import os
+            from skimage import io
+            random_idx = np.random.randint(
+                batch['observations']['pixels'].shape[0])
+            image_save_dir = os.path.join(os.getcwd(), 'pixels')
+            image_save_path = os.path.join(
+                image_save_dir, f'observation_{iteration}_batch.png')
+            if not os.path.exists(image_save_dir):
+                os.makedirs(image_save_dir)
+            io.imsave(image_save_path,
+                      batch['observations']['pixels'][random_idx].copy())
+
+        feed_dict = {
+            placeholders_flat[key]: batch_flat[key]
+            for key in placeholders_flat.keys()
+            if key in batch_flat.keys()
+        }
+
+        if iteration is not None:
+            feed_dict[self._placeholders['iteration']] = iteration
+
+        feed_dict[self._placeholders['reward'][f'running_ext_rew_std_{self._goal_index}']] = self._running_ext_rew_stds[self._goal_index]
+        if self._rnd_int_rew_coeffs[self._goal_index]:
+            feed_dict[self._placeholders['reward'][f'running_int_rew_std_{self._goal_index}']] = self._running_int_rew_stds[self._goal_index]
+
+        return feed_dict
 
     def get_diagnostics(self,
                         iteration,
@@ -379,22 +521,23 @@ class MultiSAC(SAC):
 
         Also calls the `draw` method of the plotter, if plotter defined.
         """
-
-        feed_dict = self._get_feed_dict(iteration, batch)
-        # TODO(hartikainen): We need to unwrap self._diagnostics_ops from its
-        # tensorflow `_DictWrapper`.
-
+        goal_index = self._goal_index
         diagnostics = {}
 
         for i in range(self._num_goals):
-            diagnostics.update(self._session.run({**self._diagnostics_ops_per_goal[i]}, feed_dict))
+            self._goal_index = i
+            feed_dict = self._get_feed_dict(iteration, batch)
+            diagnostics.update(
+                self._session.run({**self._diagnostics_ops_per_goal[i]}, feed_dict))
             diagnostics.update(OrderedDict([
                 (f'policy_{i}/{key}', value)
                 for key, value in self._policies[i].get_diagnostics(
-                        flatten_input_structure({name: batch['observations'][name]
-                                                 for name in self._policies[i].observation_keys})
+                    flatten_input_structure({
+                        name: batch['observations'][name]
+                        for name in self._policies[i].observation_keys})
                 ).items()
             ]))
+        self._goal_index = goal_index
 
         if self._goal_classifier:
             diagnostics.update({'goal_classifier/avg_reward': np.mean(feed_dict[self._rewards_ph])})
@@ -475,7 +618,7 @@ class MultiSAC(SAC):
         self._goal_index = goal_index
         self._training_environment.set_goal(self._goal_index) # TODO: implement in env
 
-    def _timestep_after_hook(self, *args, **kwargs):
+    def _timestep_before_hook(self, *args, **kwargs):
         # Check if an entire trajectory has been completed
         n_episodes_sampled = sum([self._samplers[i]._n_episodes for i in range(self._num_goals)])
         if n_episodes_sampled > self._n_episodes_elapsed:
