@@ -968,7 +968,7 @@ def get_variant_spec_base(universe, domain, task, task_eval, policy, algorithm, 
         'replay_pool_params': {
             'type': 'SimpleReplayPool',
             'kwargs': {
-                'max_size': int(1.5e6),
+                'max_size': int(3e5),
             },
             'last_checkpoint_dir': '',
         },

@@ -27,8 +27,8 @@ class SimpleSampler(BaseSampler):
         self._save_training_video_frequency = 0
         self._images = []
 
-        self._state_estimator = state_estimator
-        self._replace_state = replace_state
+        # self._state_estimator = state_estimator
+        # self._replace_state = replace_state
 
         self._num_high_errors = 0
         self._prefix = np.random.randint(1000)
@@ -85,9 +85,9 @@ class SimpleSampler(BaseSampler):
         if self._current_observation is None:
             self._current_observation = self.env.reset()
             # Replace the first observation, do all the rest to `next_observation`
-            if self._replace_state:
-                pred_state = self._get_estimated_state(self._current_observation)
-                self._current_observation.update(pred_state)
+            # if self._replace_state:
+            #     pred_state = self._get_estimated_state(self._current_observation)
+            #     self._current_observation.update(pred_state)
 
         # if self._state_estimator is not None:
         #     # Save high error images (if there is a label to compare to)

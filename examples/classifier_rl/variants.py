@@ -308,7 +308,7 @@ CLASSIFIER_PARAMS_PER_UNIVERSE_DOMAIN_TASK = {
     'gym': {
         'DClaw': {
             **dict.fromkeys(['LiftDDFixed-v0', 'LiftDDResetFree-v0'], {
-                'observation_keys': ('pixels', 'claw_qpos')
+                'observation_keys': ('pixels', )
             })
         }
     }
@@ -792,7 +792,7 @@ def get_variant_spec_base(universe, domain, task, task_eval,
         'replay_pool_params': {
             'type': 'SimpleReplayPool',
             'kwargs': {
-                'max_size': int(1e6)
+                'max_size': int(3e5)
             }
         },
         'sampler_params': {

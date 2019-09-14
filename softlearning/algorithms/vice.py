@@ -133,7 +133,6 @@ class VICE(SACClassifier):
                         evaluation_paths):
         diagnostics = super(SACClassifier, self).get_diagnostics(
             iteration, batch, training_paths, evaluation_paths)
-
         sample_observations = batch['observations']
         sample_actions = batch['actions']
         num_sample_observations = sample_observations[
@@ -145,15 +144,14 @@ class VICE(SACClassifier):
             size=sample_observations[next(iter(sample_observations))].shape[0])
         goal_observations = {
             key: values[goal_index] for key, values in self._goal_examples.items()
+            if key in self._policy.observation_keys
         }
-        
         # Sample goal actions uniformly in action space
         # action_space_dim = sample_actions.shape[1]
         # goal_actions = np.random.uniform(
         #     low=-1, high=1, size=(num_sample_observations, action_space_dim)) 
         # goal_validation_actions = np.random.uniform(
         #     low=-1, high=1, size=(num_sample_observations, action_space_dim)) 
-      
         goal_index_validation = np.random.randint(
             self._goal_examples_validation[
                 next(iter(self._goal_examples_validation))].shape[0],
@@ -161,8 +159,9 @@ class VICE(SACClassifier):
         goal_observations_validation = {
             key: values[goal_index_validation]
             for key, values in self._goal_examples_validation.items()
+            if key in self._policy.observation_keys
         }
- 
+
         num_goal_observations = goal_observations[
             next(iter(goal_observations))].shape[0]
         goal_labels = np.repeat(((0, 1), ), num_goal_observations, axis=0)

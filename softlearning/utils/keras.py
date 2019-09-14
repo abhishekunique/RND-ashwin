@@ -1,11 +1,11 @@
 import tempfile
-
 import tensorflow as tf
 
 from softlearning.models.normalization import (
     LayerNormalization,
     GroupNormalization,
     InstanceNormalization)
+
 
 class PicklableKerasModel(object):
     def __getstate__(self):
@@ -26,7 +26,7 @@ class PicklableKerasModel(object):
                     self.__class__.__name__: self.__class__,
                     'tf': tf,
                     'PicklableSequential': PicklableSequential,
-                    'PicklableModel': PicklableModel})
+                    'PicklableModel': PicklableModel,
                     'LayerNormalization': LayerNormalization,
                     'GroupNormalization': GroupNormalization,
                     'InstanceNormalization': InstanceNormalization,
@@ -41,7 +41,7 @@ class PicklableKerasModel(object):
             cls.__name__: cls,
             'tf': tf,
             'PicklableSequential': PicklableSequential,
-            'PicklableModel': PicklableModel})
+            'PicklableModel': PicklableModel,
             'LayerNormalization': LayerNormalization,
             'GroupNormalization': GroupNormalization,
             'InstanceNormalization': InstanceNormalization,
