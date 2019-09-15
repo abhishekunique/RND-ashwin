@@ -214,9 +214,9 @@ class MultiSAC(SAC):
                     self._rnd_errors[i] / self._placeholders['reward'][f'running_int_rew_std_{i}'],
                     0, 1000
                 ))
-                self._int_rewards.append(self._rnd_int_rew_coeffs[i] * self._unscaled_int_rewards[i])
             else:
-                self._int_rewards.append(0)
+                self._unscaled_int_rewards.append(0)
+            self._int_rewards.append(self._rnd_int_rew_coeffs[i] * self._unscaled_int_rewards[i])
             self._normalized_ext_rewards.append(
                 self._unscaled_ext_rewards[i] / self._placeholders['reward'][f'running_ext_rew_std_{i}'])
             self._ext_rewards.append(self._ext_reward_coeffs[i] * self._normalized_ext_rewards[i])
@@ -443,6 +443,9 @@ class MultiSAC(SAC):
     def _training_batch(self, batch_size=None):
         return self._samplers[self._goal_index].random_batch(batch_size)
 
+    def _evaluation_batches(self, batch_size=None):
+        return [self._samplers[i].random_batch(batch_size) for i in range(self._num_goals)]
+
     def _update_target(self, i, tau=None):
         """ Update target networks for policy i. """
         tau = tau or self._tau
@@ -514,7 +517,7 @@ class MultiSAC(SAC):
 
     def get_diagnostics(self,
                         iteration,
-                        batch,
+                        batches,
                         training_paths_per_policy,
                         evaluation_paths_per_policy):
         """Return diagnostic information as ordered dictionary.
@@ -526,14 +529,14 @@ class MultiSAC(SAC):
 
         for i in range(self._num_goals):
             self._goal_index = i
-            feed_dict = self._get_feed_dict(iteration, batch)
+            feed_dict = self._get_feed_dict(iteration, batches[i])
             diagnostics.update(
                 self._session.run({**self._diagnostics_ops_per_goal[i]}, feed_dict))
             diagnostics.update(OrderedDict([
                 (f'policy_{i}/{key}', value)
                 for key, value in self._policies[i].get_diagnostics(
                     flatten_input_structure({
-                        name: batch['observations'][name]
+                        name: batches[i]['observations'][name]
                         for name in self._policies[i].observation_keys})
                 ).items()
             ]))
@@ -734,7 +737,7 @@ class MultiSAC(SAC):
 
             diagnostics = self.get_diagnostics(
                 iteration=self._total_timestep,
-                batch=self._evaluation_batch(),
+                batches=self._evaluation_batches(),
                 training_paths_per_policy=training_paths_per_policy,
                 evaluation_paths_per_policy=evaluation_paths_per_policy)
 

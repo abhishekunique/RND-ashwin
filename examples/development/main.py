@@ -46,6 +46,7 @@ class ExperimentRunner(tune.Trainable):
         tf.keras.backend.clear_session()
 
     def _multi_sac_build(self):
+        share_pool = self._variant['algorithm_params']['kwargs']['share_pool']
         variant = copy.deepcopy(self._variant)
         environment_params = variant['environment_params']
         training_environment = self.training_environment = (
@@ -61,10 +62,16 @@ class ExperimentRunner(tune.Trainable):
         #     for _ in range(num_goals)
         # ])
         # self.replay_pool = replay_pools[0]
-        replay_pools = self._replay_pools = tuple([
-            get_replay_pool_from_variant(variant, training_environment)
-            for _ in range(num_goals)
-        ])
+        if share_pool:
+            replay_pool = get_replay_pool_from_variant(variant, training_environment)
+            replay_pools = self._replay_pools = tuple([
+                replay_pool for _ in range(num_goals)
+            ])
+        else:
+            replay_pools = self._replay_pools = tuple([
+                get_replay_pool_from_variant(variant, training_environment)
+                for _ in range(num_goals)
+            ])
 
         samplers = self._samplers = tuple([
             get_sampler_from_variant(variant)
