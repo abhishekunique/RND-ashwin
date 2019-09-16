@@ -17,32 +17,30 @@ import matplotlib.pyplot as plt
 tfk = tf.keras
 tfkl = tf.keras.layers
 
+DEFAULT_STATE_ESTIMATOR_PREPROCESSOR_PARAMS = {
+    'type': 'ConvnetPreprocessor',
+    'kwargs': {
+        'conv_filters': (64, ) * 4,
+        'conv_kernel_sizes': (3, ) * 4,
+        'conv_strides': (2, ) * 4,
+        'normalization_type': None,
+    },
+}
+
 def state_estimator_model(input_shape,
                           num_hidden_units=256,
                           num_hidden_layers=2,
+                          preprocessor_params=None,
                           name='state_estimator_preprocessor'):
-    """
-    Need to pass in the obs_keys that the model will estimate
-    """
-    # env = GymAdapter(domain=domain, task=task)
-#    output_sizes = OrderedDict(
-#        (key, value)
-#        for key, value in env.observation_shape.items()
-#        if key in obs_keys_to_estimate
-#    )
-#    output_size = np.sum([size[0].value for size in output_sizes.values()])
+    # TODO: Make this take in observation keys instead of this hardcoded output size.
+    import ipdb; ipdb.set_trace()
     output_size = 4
-    num_layers = 4
-    normalization_type = None
-    convnet_kwargs = {
-        'conv_filters': (64, ) * num_layers,
-        'conv_kernel_sizes': (3, ) * num_layers,
-        'conv_strides': (2, ) * num_layers,
-        'normalization_type': normalization_type,
-    }
-    preprocessor = convnet_model(
-        name='convnet_preprocessor_state_est',
-        **convnet_kwargs)
+    obs_preprocessor_params = (
+        preprocessor_params or DEFAULT_STATE_ESTIMATOR_PREPROCESSOR_PARAMS)
+#     preprocessor = convnet_model(
+#         name='convnet_preprocessor_state_est',
+#         **convnet_kwargs)
+    preprocessor = get_preprocessor_from_params(None, obs_preprocessor_params)
     state_estimator = feedforward_model(
         hidden_layer_sizes=(num_hidden_units, ) * num_hidden_layers,
         output_size=output_size,

@@ -32,8 +32,11 @@ def create_feedforward_Q_function(input_shapes,
 
     Q_function = PicklableModel(inputs_flat, Q_function(preprocessed_inputs))
     preprocessed_inputs_fn = PicklableModel(inputs_flat, preprocessed_inputs)
-
+    
     Q_function.observation_keys = observation_keys
-    Q_function.preprocessed_inputs_fn = preprocessed_inputs_fn
 
+    Q_function.actions_preprocessors = preprocessors['actions']
+    Q_function.observations_preprocessors = preprocessors['observations']
+
+    Q_function.preprocessed_inputs_fn = preprocessed_inputs_fn
     return Q_function
