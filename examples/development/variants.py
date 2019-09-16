@@ -179,6 +179,11 @@ MAX_PATH_LENGTH_PER_UNIVERSE_DOMAIN_TASK = {
             'FlipEraserFixed-v0': tune.grid_search([50]),
             'FlipEraserResetFree-v0': tune.grid_search([50]),
             'FlipEraserResetFreeSwapGoal-v0': tune.grid_search([50]),
+
+            # Sliding Tasks
+            'SlideBeadsFixed-v0': tune.grid_search([25]),
+            'SlideBeadsResetFree-v0': tune.grid_search([25]),
+            'SlideBeadsResetFreeEval-v0': tune.grid_search([25]),
         },
     },
 }
@@ -737,7 +742,112 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK = {
                      (0, 0, 0, np.pi, 0, 0),
                      (0, 0, 0, 0, 0, 0),
                  ],
-
+            },
+            # Sliding Tasks
+            'SlideBeadsFixed-v0': {
+                'reward_keys_and_weights': {
+                    'objects_to_targets_mean_distance_reward': 1,
+                },
+                'init_qpos_range': [(0, 0)],
+                'target_qpos_range': [
+                    (-0.0825, 0.0825)],
+                'pixel_wrapper_kwargs': {
+                    'observation_key': 'pixels',
+                    'pixels_only': False,
+                    'render_kwargs': {
+                        'width': 32,
+                        'height': 32,
+                    },
+                },
+                'observation_keys': (
+                    'claw_qpos',
+                    'objects_positions',
+                    'last_action',
+                    'objects_target_positions',
+                    'pixels',
+                ),
+                'camera_settings': {
+                    'azimuth': 23.234042553191497,
+                    'distance': 0.2403358053524018,
+                    'elevation': -29.68085106382978,
+                    'lookat': (-0.00390331,  0.01236683,  0.01093447),
+                }
+            },
+            'SlideBeadsResetFree-v0': {
+                'reward_keys_and_weights': {
+                    'objects_to_targets_mean_distance_reward': 1,
+                },
+                'init_qpos_range': [(0, 0)],
+                'target_qpos_range': [
+                    (0, 0),
+                    (-0.0825, 0.0825),
+                    (0.0825, 0.0825),
+                    (-0.04, 0.04),
+                    (-0.0825, -0.0825),
+                ],
+                'cycle_goals': True,
+                'pixel_wrapper_kwargs': {
+                    'observation_key': 'pixels',
+                    'pixels_only': False,
+                    'render_kwargs': {
+                        'width': 32,
+                        'height': 32,
+                    },
+                },
+                'observation_keys': (
+                    'claw_qpos',
+                    'objects_positions',
+                    'last_action',
+                    'objects_target_positions',
+                    'pixels',
+                ),
+                # 'camera_settings': {
+                #     'azimuth': 90,
+                #     'distance': 0.46,
+                #     'elevation': 86.8,
+                #     'lookat': (0, 0.0412058 , 0.388),
+                # }
+                'camera_settings': {
+                    'azimuth': 23.234042553191497,
+                    'distance': 0.2403358053524018,
+                    'elevation': -29.68085106382978,
+                    'lookat': (-0.00390331,  0.01236683,  0.01093447),
+                }
+            },
+            'SlideBeadsResetFreeEval-v0': {
+                'reward_keys_and_weights': {
+                    'objects_to_targets_mean_distance_reward': 1,
+                },
+                'init_qpos_range': [(0, 0)],
+                'target_qpos_range': [
+                    (0, 0),
+                    (-0.0825, 0.0825),
+                    (0.0825, 0.0825),
+                    (-0.04, 0.04),
+                    (-0.0825, -0.0825),
+                ],
+                'cycle_goals': True,
+                'pixel_wrapper_kwargs': {
+                    'observation_key': 'pixels',
+                    'pixels_only': False,
+                    'render_kwargs': {
+                        'width': 32,
+                        'height': 32,
+                    },
+                },
+                'observation_keys': (
+                    'claw_qpos',
+                    'objects_positions',
+                    'last_action',
+                    'objects_target_positions',
+                    'pixels',
+                ),
+                'camera_settings': {
+                    'azimuth': 23.234042553191497,
+                    'distance': 0.2403358053524018,
+                    'elevation': -29.68085106382978,
+                    'lookat': (-0.00390331,  0.01236683,  0.01093447),
+                }
             },
 
         },

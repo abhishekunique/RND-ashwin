@@ -46,7 +46,8 @@ class ExperimentRunner(tune.Trainable):
         tf.keras.backend.clear_session()
 
     def _multi_sac_build(self):
-        share_pool = self._variant['algorithm_params']['kwargs']['share_pool']
+        share_pool = self._variant['algorithm_params']['kwargs'].pop('share_pool')
+
         variant = copy.deepcopy(self._variant)
         environment_params = variant['environment_params']
         training_environment = self.training_environment = (
