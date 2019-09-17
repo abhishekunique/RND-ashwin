@@ -158,18 +158,22 @@ MAX_PATH_LENGTH_PER_UNIVERSE_DOMAIN_TASK = {
             'TurnResetFreeSwapGoal-v0': tune.grid_search([100]),
             'TurnResetFreeRandomGoal-v0': 100,
             'TurnFreeValve3Fixed-v0': tune.grid_search([50]),
-            'TurnFreeValve3RandomReset-v0': 50,
+            # 'TurnFreeValve3RandomReset-v0': 50,
             'TurnFreeValve3ResetFree-v0': tune.grid_search([50]),
             'TurnFreeValve3ResetFreeSwapGoal-v0': tune.grid_search([50]),
             'TurnFreeValve3ResetFreeComposedGoals-v0': tune.grid_search([150]),
 
-            'TurnFreeValve3ResetFreeRandomGoal-v0': tune.grid_search([100]),
-            'TurnFreeValve3FixedResetSwapGoal-v0': 50,
-            'TurnRandomResetSingleGoal-v0': 100,
-            'XYTurnValve3Fixed-v0': 50,
-            'XYTurnValve3Random-v0': tune.grid_search([50, 100]),
-            'XYTurnValve3RandomReset-v0': 100,
-            'XYTurnValve3ResetFree-v0': 50,
+            # 'TurnFreeValve3ResetFreeRandomGoal-v0': tune.grid_search([100]),
+            # 'TurnFreeValve3FixedResetSwapGoal-v0': 50,
+            # 'TurnRandomResetSingleGoal-v0': 100,
+            # 'XYTurnValve3Fixed-v0': 50,
+            # 'XYTurnValve3Random-v0': tune.grid_search([50, 100]),
+            # 'XYTurnValve3RandomReset-v0': 100,
+            # 'XYTurnValve3ResetFree-v0': 50,
+
+            # Translating Tasks
+            'TranslatePuckFixed-v0': 50,
+            'TranslatePuckResetFree-v0': 50,
 
             # Lifting Tasks
             'LiftDDFixed-v0': tune.grid_search([50]),
@@ -654,6 +658,72 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK = {
             'ScrewFixed-v0': {},
             'ScrewRandom-v0': {},
             'ScrewRandomDynamics-v0': {},
+            # Translating Puck Tasks
+            'TranslatePuckFixed-v0': {
+                # 'pixel_wrapper_kwargs': {
+                #     'observation_key': 'pixels',
+                #     'pixels_only': False,
+                #     'render_kwargs': {
+                #         'width': 32,
+                #         'height': 32,
+                #     },
+                # },
+                # 'camera_settings': {
+                #     'distance': 0.5,
+                #     'elevation': -60
+                # },
+                # 'observation_keys': (
+                #     'claw_qpos',
+                #     'object_xy_position',
+                #     'last_action',
+                #     'target_xy_position',
+                #     'pixels',
+                # ),
+                'target_qpos_range': [
+                    (0, 0, 0, 0, 0, 0),
+                    (0, 0, 0, 0, 0, 0)
+                ],
+                'init_qpos_range': (
+                    (-0.08, -0.08, 0, 0, 0, 0),
+                    (0.08, 0.08, 0, 0, 0, 0)
+                ),
+                'reward_keys_and_weights': {
+                    'object_to_target_position_distance_reward': 1,
+                },
+            },
+            'TranslatePuckResetFree-v0': {
+                # 'pixel_wrapper_kwargs': {
+                #     'observation_key': 'pixels',
+                #     'pixels_only': False,
+                #     'render_kwargs': {
+                #         'width': 32,
+                #         'height': 32,
+                #     },
+                # },
+                # 'camera_settings': {
+                #     'distance': 0.5,
+                #     'elevation': -60
+                # },
+                # 'observation_keys': (
+                #     'claw_qpos',
+                #     'object_xy_position',
+                #     'last_action',
+                #     'target_xy_position',
+                #     'pixels',
+                # ),
+                'target_qpos_range': [
+                    (-0.08, -0.08, 0, 0, 0, 0),
+                    (0.08, 0.08, 0, 0, 0, 0)
+                ],
+                # 'init_qpos_range': (
+                #     (-0.08, -0.08, 0, 0, 0, 0),
+                #     (0.08, 0.08, 0, 0, 0, 0)
+                # ),
+                'reward_keys_and_weights': {
+                    'object_to_target_position_distance_reward': 1,
+                },
+            },
+
             # Lifting Tasks
             'LiftDDFixed-v0': {
                 'reward_keys_and_weights': {
