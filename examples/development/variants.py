@@ -85,6 +85,7 @@ ALGORITHM_PARAMS_ADDITIONAL = {
             'rnd_int_rew_coeffs': tune.sample_from([[1, 1]]),
             'ext_reward_coeffs': [1, 0], # 0 corresponds to reset policy
             'normalize_ext_reward_gamma': 0.99,
+            'share_pool': False,
         },
         'rnd_params': {
             'convnet_params': {
