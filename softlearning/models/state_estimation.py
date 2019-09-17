@@ -30,11 +30,10 @@ DEFAULT_STATE_ESTIMATOR_PREPROCESSOR_PARAMS = {
 def state_estimator_model(input_shape,
                           num_hidden_units=256,
                           num_hidden_layers=2,
+                          output_size=4, # (x, y, z_cos, z_sin)
                           preprocessor_params=None,
                           name='state_estimator_preprocessor'):
     # TODO: Make this take in observation keys instead of this hardcoded output size.
-    import ipdb; ipdb.set_trace()
-    output_size = 4
     obs_preprocessor_params = (
         preprocessor_params or DEFAULT_STATE_ESTIMATOR_PREPROCESSOR_PARAMS)
 #     preprocessor = convnet_model(

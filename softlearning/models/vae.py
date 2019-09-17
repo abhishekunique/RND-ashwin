@@ -247,7 +247,6 @@ class VAE(tfk.Model):
         return model
 
     def get_encoder(self, trainable=True, name='encoder'):
-        import ipdb; ipdb.set_trace()
         encoder = self.create_encoder_model(
             self.image_shape, trainable=trainable, name=name)
         # Copy weights over to this new model
@@ -370,6 +369,10 @@ if __name__ == '__main__':
     if not os.path.exists(reconstruct_save_path):
         os.makedirs(reconstruct_save_path)
 
+    # Set up tensorboard
+    logdir = os.path.join(save_path, 'logs')
+    file_writer = tf.contrib.summary.create_file_writer(logdir)
+
     from softlearning.models.state_estimation import get_dumped_pkl_data
     images, _ = get_dumped_pkl_data(args.data_directory)
 
@@ -415,6 +418,11 @@ if __name__ == '__main__':
         kl_loss = -(_kl_loss.result())
         print(f'Epoch: {epoch}, Test set ELBO: {elbo}, Reconstruction Loss: {recon_loss}, KL loss: {kl_loss}\nTime elapsed for current epoch {end_time-start_time}')
 
+        with file_writer.as_default(), tf.contrib.summary.always_record_summaries():
+            tf.contrib.summary.scalar('elbo', elbo, step=epoch)
+            tf.contrib.summary.scalar('reconstruction_loss', recon_loss, step=epoch)
+            tf.contrib.summary.scalar('kl_div', kl_loss, step=epoch)
+
         elbo_history.append(elbo)
         recon_history.append(recon_loss)
         kl_history.append(kl_loss)
@@ -423,8 +431,22 @@ if __name__ == '__main__':
         random_images = images[np.random.randint(images.shape[0],
                                                  size=n_examples_to_generate)]
         reconstructions = vae(random_images)
-        for i, (r, orig) in enumerate(zip(reconstructions, random_images)):
-            concat = np.concatenate([
-                skimage.util.img_as_ubyte(r), orig], axis=1)
-            img_path = os.path.join(reconstruct_save_path, f'epoch_{epoch}_{i}.png')
-            skimage.io.imsave(img_path, concat)
+        concat = np.concatenate([
+            skimage.util.img_as_ubyte(reconstructions),
+            random_images
+        ], axis=2)
+
+        # for i, (r, orig) in enumerate(zip(reconstructions, random_images)):
+        #     concat = np.concatenate([
+        #         skimage.util.img_as_ubyte(r), orig], axis=1)
+            # img_path = os.path.join(reconstruct_save_path, f'epoch_{epoch}_{i}.png')
+            # skimage.io.imsave(img_path, concat)
+
+        sampled_vectors = tf.random.normal(
+            shape=[n_examples_to_generate, latent_dim]) 
+        decoded_samples = vae.decode(sampled_vectors)
+        with file_writer.as_default(), tf.contrib.summary.always_record_summaries():
+            tf.contrib.summary.image('reconstruction', concat, step=epoch)
+            tf.contrib.summary.image('samples', decoded_samples, step=epoch)
+
+
