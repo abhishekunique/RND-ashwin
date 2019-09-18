@@ -625,22 +625,22 @@ class SAC(RLAlgorithm):
                         image_save_dir, f'vae_reconstruction_{iteration}_{i}.png')
                     imageio.imwrite(image_save_path, concat[i])
 
-            from softlearning.models.vae import compute_elbo_loss
-            # TODO: Make have this compute the elbo loss, on individual images
-            loss = self._session.run(compute_elbo_loss(self._vae, eval_pixels))
-            diagnostics.update({
-                'vae/elbo_loss_mean': np.mean(loss),
-                'vae/elbo_loss_max': np.max(loss),
-                'vae/elbo_loss_min': np.min(loss)
-            })
-            worst_idx = np.argmax(loss)
-            reconstruction_cmp = np.concatenate([
-                eval_pixels[worst_idx],
-                skimage.util.img_as_ubyte(decoded[worst_idx])
-            ], axis=1)
-            skimage.io.imsave(
-                os.path.join(image_save_dir, f'worst_reconstruction_{iteration}.png'),
-                reconstruction_cmp)
+            # from softlearning.models.vae import compute_elbo_loss
+            # # TODO: Make have this compute the elbo loss, on individual images
+            # loss = self._session.run(compute_elbo_loss(self._vae, eval_pixels))
+            # diagnostics.update({
+            #     'vae/elbo_loss_mean': np.mean(loss),
+            #     'vae/elbo_loss_max': np.max(loss),
+            #     'vae/elbo_loss_min': np.min(loss)
+            # })
+            # worst_idx = np.argmax(loss)
+            # reconstruction_cmp = np.concatenate([
+            #     eval_pixels[worst_idx],
+            #     skimage.util.img_as_ubyte(decoded[worst_idx])
+            # ], axis=1)
+            # skimage.io.imsave(
+            #     os.path.join(image_save_dir, f'worst_reconstruction_{iteration}.png'),
+            #     reconstruction_cmp)
 
         if 'pixels' in self._policy.preprocessors and \
                 self._state_estimator is not None and \

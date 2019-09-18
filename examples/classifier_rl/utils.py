@@ -180,7 +180,7 @@ def get_parser(allow_policy_list=False):
     parser.add_argument(
         '--active-query-frequency', type=int, default=1)
     parser.add_argument(
-        '--from-pixels',
+        '--vision',
         type=lambda x: bool(strtobool(x)),
         default=True)
 

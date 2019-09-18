@@ -231,7 +231,7 @@ def get_parser(allow_policy_list=False):
     parser.add_argument(
         '--preprocessor-type',
         type=str,
-        default='ConvnetPreprocessor',
+        default=None,
         help="Preprocessor type for observations.",
         choices=list(PREPROCESSOR_FUNCTIONS.keys()))
     parser.add_argument(

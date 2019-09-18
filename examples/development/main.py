@@ -108,7 +108,8 @@ class ExperimentRunner(tune.Trainable):
                 variant['exploration_policy_params'], training_environment))
 
         # VAE
-        if self.policy.preprocessors['pixels'].name == 'vae_preprocessor':
+        if ('pixels' in self.policy.preprocessors
+            and self.policy.preprocessors['pixels'].name == 'vae_preprocessor'):
             from softlearning.models.utils import get_vae
             vae = get_vae(**variant['policy_params']
                                    ['kwargs']

@@ -80,7 +80,7 @@ class VAE(tfk.Model):
             tfkl.Flatten(),
             tfkl.Dense(latent_dim + latent_dim, trainable=trainable)
         ], name=name)
-    
+
     def create_decoder_model(self, latent_dim=None):
         if latent_dim is None:
             latent_dim = self.latent_dim
@@ -113,7 +113,7 @@ class VAE(tfk.Model):
                 strides=(1, 1),
                 padding="SAME")
         ], name='decoder')
-        
+
     @tf.function
     def sample(self, eps=None):
         if eps is None:
@@ -141,7 +141,7 @@ class VAE(tfk.Model):
         z = self.reparameterize(mean, logvar)
         x_reconstruct = self.decode(z, apply_sigmoid=True)
         return x_reconstruct
-    
+
     def get_encoder(self, trainable=True, name='encoder'):
         encoder = self.create_encoder_model(
             self.image_shape, trainable=trainable, name=name)
@@ -155,5 +155,4 @@ class VAE(tfk.Model):
         encoder.add(tfkl.Lambda(get_encoded_mean, name='encoded_mean'))
         encoder.summary()
         return encoder
-        
-        
+
