@@ -10,7 +10,7 @@ goal_directory = os.path.abspath(
 GOAL_POOL_PATHS_PER_ENV_PER_NUM_GOALS = {
     # Needs to be 180, 0, since the first goal is 180
     'TurnMultiGoalResetFree-v0': {
-        '2': (f'fixed_screw_2_goals_{goal}/' for goal in [180, 0]), 
+        '2': (f'fixed_screw_2_goals_{goal}/' for goal in [180, 0]),
     },
     'TurnFreeValve3MultiGoalResetFree-v0': {
         '2': (f'free_screw_2_goals_less_tiny_box_{goal}/' for goal in (180, 0)),
@@ -24,13 +24,21 @@ GOAL_POOL_PATHS_PER_ENV_PER_NUM_GOALS = {
         # '2': (f'free_screw_2_goals_tiny_box_{goal}/' for goal in (180, 0)),
         '2': (f'free_screw_2_goals_regular_box_{goal}/' for goal in (180, 0)),
     },
-
+    'TurnFreeValve3ResetFreeSwapGoal-v0': {
+        '2': (f'free_screw_2_goals_bowl_{goal}/' for goal in (90, -90)),
+    },
+    'LiftDDResetFree-v0': {
+        '1': ('dodecahedron_lifting_bowl_arena/', ),
+    },
+    'TranslatePuckResetFree-v0': {
+        '1': ('2_beads_{goal}/' for goal in (np.array([0, 0]), np.array([-0.0875, 0.0875]))),
+        },
     # 'TurnMultiGoalResetFree-v0': (f'fixed_screw_multigoal_{goal}/' for goal in [180, 0]),
     # 'TurnMultiGoalResetFree-v0': (f'fixed_screw_multigoal_{goal}/' for goal in [120, 240, 0]),
     # 'TurnMultiGoalResetFree-v0': (f'fixed_screw_5_goals_{goal}/' for goal in [72, 144, 216, 288, 0]),
     # 'TurnMultiGoalResetFree-v0': (f'fixed_screw_4_goals_{goal}/' for goal in [0, 90, 180, 270]),
-
 }
+
 
 def get_example_pools_from_variant(variant):
     task = variant['environment_params']['training']['task']
@@ -38,6 +46,7 @@ def get_example_pools_from_variant(variant):
 
     goal_example_pools_train, goal_example_pools_validation = [], []
     n_goal_examples = variant['data_params']['n_goal_examples']
+
     if task in GOAL_POOL_PATHS_PER_ENV_PER_NUM_GOALS:
         directories = GOAL_POOL_PATHS_PER_ENV_PER_NUM_GOALS[task][f'{num_goals}']
         file_paths = [

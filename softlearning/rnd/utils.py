@@ -12,8 +12,9 @@ def get_rnd_networks_from_variant(variant, env):
     target_network = None
     predictor_network = None
 
-    observation_keys = variant['policy_params']['kwargs'].pop(
-        'observation_keys', None) or env.observation_keys
+    observation_keys = variant['policy_params']['kwargs']['observation_keys']
+    if observation_keys is None:
+        observation_keys = env.observation_keys
     observation_shapes = OrderedDict((
         (key, value) for key, value in env.observation_shape.items()
         if key in observation_keys

@@ -1,26 +1,24 @@
 import os
-import uuid
 from collections import OrderedDict
 from numbers import Number
 
-import skimage
 import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
-from flatten_dict import flatten
 
 from softlearning.models.utils import flatten_input_structure
-from .rl_algorithm import RLAlgorithm
-from softlearning.replay_pools.prioritized_experience_replay_pool import PrioritizedExperienceReplayPool
-
+from .sac import SAC
+from softlearning.samplers import rollouts
+import math
+from softlearning.misc.utils import save_video
 tfd = tfp.distributions
-
+from flatten_dict import flatten
 
 def td_target(reward, discount, next_value):
     return reward + discount * next_value
 
 
-class MultiSAC(RLAlgorithm):
+class MultiSAC(SAC):
     """Soft Actor-Critic (SAC)
 
     References
@@ -36,11 +34,14 @@ class MultiSAC(RLAlgorithm):
             training_environment,
             evaluation_environment,
             policies,
-            Qs,
+            Qs_per_policy,
             pools,
-            goals=(),
+            samplers,
+            # goals=(),
+            num_goals,
             plotter=None,
 
+            # hyperparams shared across policies
             lr=3e-4,
             reward_scale=1.0,
             target_entropy='auto',
@@ -54,6 +55,12 @@ class MultiSAC(RLAlgorithm):
             save_full_state=False,
             save_eval_paths=False,
             per_alpha=1,
+            normalize_ext_reward_gamma=1,
+            ext_reward_coeffs=[],
+            rnd_networks=(),
+            rnd_lr=1e-4,
+            rnd_int_rew_coeffs=[],
+            rnd_gamma=0.99,
             **kwargs,
     ):
         """
@@ -82,24 +89,28 @@ class MultiSAC(RLAlgorithm):
 
         self._training_environment = training_environment
         self._evaluation_environment = evaluation_environment
+
         self._policies = policies
+        self._Qs_per_policy = Qs_per_policy
+        self._samplers = samplers
+        self._pools = pools
 
-        self._Qs = Qs
-        self._Q_targets = tuple(tf.keras.models.clone_model(Q) for Q in Qs)
+        self._num_goals = num_goals
+        self._goal_index = 0
+        self._epoch_length *= num_goals
+        self._n_epochs *= num_goals
 
-        self._goals = goals
-        assert len(self._policies) == len(self._goals)
-        assert len(self._Qs) == len(self._goals)
+        error_msg = 'Mismatch between number of policies, Qs, and samplers'
+        assert len(self._policies) == num_goals, error_msg
+        assert len(self._Qs_per_policy) == num_goals, error_msg
+        assert len(self._samplers) == num_goals, error_msg
 
-        self._pool = pool
-        if isinstance(self._pool, PrioritizedExperienceReplayPool) and \
-           self._pool._mode == 'Bellman_Error':
-            self._per = True
-            self._per_alpha = per_alpha
-        else:
-            self._per = False
+        self._Q_targets_per_policy = [
+            tuple(tf.keras.models.clone_model(Q) for Q in Qs)
+            for Qs in Qs_per_policy
+        ]
 
-        self._plotter = plotter
+        self._training_ops_per_policy = [{} for _ in range(num_goals)]
 
         self._policy_lr = lr
         self._Q_lr = lr
@@ -116,6 +127,7 @@ class MultiSAC(RLAlgorithm):
         self._action_prior = action_prior
 
         self._reparameterize = reparameterize
+        self._plotter = plotter
 
         self._her_iters = her_iters
         self._base_env = training_environment.unwrapped
@@ -123,6 +135,31 @@ class MultiSAC(RLAlgorithm):
         self._save_full_state = save_full_state
         self._save_eval_paths = save_eval_paths
         self._goal_classifier_params_directory = goal_classifier_params_directory
+
+        self._n_episodes_elapsed = 0
+        self._num_grad_steps_taken_per_policy = [0 for _ in range(self._num_goals)]
+
+        self._normalize_ext_reward_gamma = normalize_ext_reward_gamma
+        if ext_reward_coeffs:
+            self._ext_reward_coeffs = ext_reward_coeffs
+        else:
+            self._ext_reward_coeffs = [1 for _ in range(num_goals)]
+        self._running_ext_rew_stds = [1 for _ in range(num_goals)]
+        self._rnd_int_rew_coeffs = []
+
+        if rnd_networks:
+            assert len(rnd_networks) == num_goals
+            self._rnd_targets = [rnd_network_pair[0] for rnd_network_pair in rnd_networks]
+            self._rnd_predictors = [rnd_network_pair[1] for rnd_network_pair in rnd_networks]
+            self._rnd_lr = rnd_lr
+            self._rnd_int_rew_coeffs = rnd_int_rew_coeffs
+
+            assert len(self._rnd_int_rew_coeffs) == num_goals
+            self._rnd_gamma = rnd_gamma
+            self._running_int_rew_stds = [1 for _ in range(num_goals)]
+            # self._rnd_gamma = 1
+            # self._running_int_rew_std = 1
+
         self._build()
 
     def _build(self):
@@ -132,65 +169,69 @@ class MultiSAC(RLAlgorithm):
         else:
             self._goal_classifier = None
 
-        self._init_actor_update()
-        self._init_critic_update()
+        self._init_external_rewards()
+        self._init_rnd_updates()
+        self._init_actor_updates()
+        self._init_critic_updates()
         self._init_diagnostics_ops()
 
-    def _load_goal_classifier(self, goal_classifier_params_directory):
-        import sys
-        from goal_classifier.conv import CNN
-        from tensorflow.python.tools.inspect_checkpoint import print_tensors_in_checkpoint_file
-
-        # print_tensors_in_checkpoint_file(goal_classifier_params_directory, all_tensors=False, tensor_name='')
-        self._goal_classifier = CNN(goal_cond=True)
-        variables = self._goal_classifier.get_variables()
-        cnn_vars = [v for v in tf.trainable_variables() if v.name.split('/')[0] == 'goal_classifier']
-        saver = tf.train.Saver(cnn_vars)
-        saver.restore(self._session, goal_classifier_params_directory)
-
-    def _classify_as_goals(self, images, goals):
-        # NOTE: we can choose any goals we want.
-        # Things to try:
-        # - random goal
-        # - single goal
-        feed_dict = {self._goal_classifier.images: images,
-            self._goal_classifier.goals: goals}
-        # lid_pos = observations[:, -2]
-        goal_probs = self._session.run(self._goal_classifier.pred_probs, feed_dict=feed_dict)[:, 1].reshape((-1, 1))
-        return goal_probs
+    def _init_external_rewards(self):
+        self._unscaled_ext_rewards = [self._placeholders['rewards'] for _ in range(self._num_goals)]
+        self._placeholders['reward'].update({
+            f'running_ext_rew_std_{i}': tf.compat.v1.placeholder(
+                tf.float32, shape=(), name=f'running_ext_rew_std_{i}')
+            for i in range(self._num_goals)
+        })
 
     def _get_Q_targets(self):
         Q_targets = []
+
+        self._unscaled_int_rewards, self._int_rewards, self._normalized_ext_rewards, self._ext_rewards, self._total_rewards = [], [], [], [], []
+
         for i, policy in enumerate(self._policies):
             policy_inputs = flatten_input_structure({
-                name: self._placeholders[i]['next_observations'][name]
-            for name in policy.observation_keys
+                name: self._placeholders['next_observations'][name]
+                for name in policy.observation_keys
             })
             next_actions = policy.actions(policy_inputs)
             next_log_pis = policy.log_pis(policy_inputs, next_actions)
 
             next_Q_observations = {
-                name: self._placeholders[i]['next_observations'][name]
-                for name in self._Qs[i][0].observation_keys
+                name: self._placeholders['next_observations'][name]
+                for name in self._Qs_per_policy[i][0].observation_keys
             }
             next_Q_inputs = flatten_input_structure(
                 {**next_Q_observations, 'actions': next_actions})
-            next_Qs_values = tuple(Q(next_Q_inputs) for Q in self._Q_targets[i])
+            next_Qs_values = tuple(Q(next_Q_inputs) for Q in self._Q_targets_per_policy[i])
 
             min_next_Q = tf.reduce_min(next_Qs_values, axis=0)
-            next_values = min_next_Q - self._alpha * next_log_pis
+            next_values = min_next_Q - self._alphas[i] * next_log_pis
 
-            terminals = tf.cast(self._placeholders[i]['terminals'], next_values.dtype)
+            terminals = tf.cast(self._placeholders['terminals'], next_values.dtype)
+
+            if self._rnd_int_rew_coeffs[i]:
+                self._unscaled_int_rewards.append(tf.clip_by_value(
+                    self._rnd_errors[i] / self._placeholders['reward'][f'running_int_rew_std_{i}'],
+                    0, 1000
+                ))
+            else:
+                self._unscaled_int_rewards.append(0)
+            self._int_rewards.append(self._rnd_int_rew_coeffs[i] * self._unscaled_int_rewards[i])
+            self._normalized_ext_rewards.append(
+                self._unscaled_ext_rewards[i] / self._placeholders['reward'][f'running_ext_rew_std_{i}'])
+            self._ext_rewards.append(self._ext_reward_coeffs[i] * self._normalized_ext_rewards[i])
+            self._total_rewards.append(self._ext_rewards[i] + self._int_rewards[i])
 
             Q_target = td_target(
-                reward=self._reward_scale * self._placeholders[i]['rewards'],
+                reward=self._reward_scale * self._total_rewards[i],
                 discount=self._discount,
                 next_value=(1 - terminals) * next_values)
             Q_targets.append(tf.stop_gradient(Q_target))
+
         return Q_targets
 
     def _init_critic_updates(self):
-        """Create minimization operation for critic Q-function.
+        """Create minimization operation for critics' Q-functions.
 
         Creates a `tf.optimizer.minimize` operation for updating
         critic Q-function with gradient descent, and appends it to
@@ -204,46 +245,47 @@ class MultiSAC(RLAlgorithm):
         for Q_target in Q_targets:
             assert Q_target.shape.as_list() == [None, 1]
 
-        self._Q_optimizers = []
-        self._Q_values = []
-        self._Q_losses = []
+        self._Q_optimizers_per_policy = []
+        self._Q_values_per_policy = []
+        self._Q_losses_per_policy = []
 
-        for i, Qs in enumerate(self._Qs):
+        for i, Qs in enumerate(self._Qs_per_policy):
             Q_observations = {
-                name: self._placeholders[i]['observations'][name]
+                name: self._placeholders['observations'][name]
                 for name in Qs[0].observation_keys
             }
             Q_inputs = flatten_input_structure({
-                **Q_observations, 'actions': self._placeholders[i]['actions']})
+                **Q_observations, 'actions': self._placeholders['actions']})
 
             Q_values = tuple(Q(Q_inputs) for Q in Qs)
-            self._Q_values.append(Q_values)
+            self._Q_values_per_policy.append(Q_values)
 
             Q_losses = tuple(
                 tf.compat.v1.losses.mean_squared_error(
-                    labels=Q_target, predictions=Q_value, weights=0.5)
+                    labels=Q_targets[i], predictions=Q_value, weights=0.5)
                 for Q_value in Q_values)
-            self._Q_losses.append(Q_losses)
+            self._Q_losses_per_policy.append(Q_losses)
 
-            self._bellman_errors.append(tf.reduce_min(tuple(
-                tf.math.squared_difference(Q_target, Q_value)
-                for Q_value in Q_values), axis=0))
+            # self._bellman_errors.append(tf.reduce_min(tuple(
+            #     tf.math.squared_difference(Q_target, Q_value)
+            #     for Q_value in Q_values), axis=0))
 
-            self._Q_optimizers.append(tuple(
+            Q_optimizers = tuple(
                 tf.compat.v1.train.AdamOptimizer(
                     learning_rate=self._Q_lr,
-                    name='{}_{}_{}_optimizer'.format(i, Q._name, j)
-                ) for j, Q in enumerate(Qs)))
+                    name='{}_{}_optimizer_{}'.format(i, Q._name, j)
+                ) for j, Q in enumerate(Qs))
+            self._Q_optimizers_per_policy.append(Q_optimizers)
 
             Q_training_ops = tuple(
                 Q_optimizer.minimize(loss=Q_loss, var_list=Q.trainable_variables)
                 for i, (Q, Q_loss, Q_optimizer)
-                in enumerate(zip(Qs, Q_losses, self._Q_optimizers[i])))
+                in enumerate(zip(Qs, Q_losses, Q_optimizers)))
 
-            self._training_ops.update({'Q_{}'.formate(i): tf.group(Q_training_ops)})
+            self._training_ops_per_policy[i].update({f'Q_{i}': tf.group(Q_training_ops)})
 
-    def _init_actor_update(self):
-        """Create minimization operations for policy and entropy.
+    def _init_actor_updates(self):
+        """Create minimization operations for policies and entropies.
 
         Creates a `tf.optimizer.minimize` operations for updating
         policy and entropy with gradient descent, and adds them to
@@ -255,12 +297,13 @@ class MultiSAC(RLAlgorithm):
 
         self._log_alphas = []
         self._alpha_optimizers = []
-        self._alpha_train_ops = []
         self._alphas = []
+        self._policy_optimizers = []
+        self._policy_losses = []
 
         for i, policy in enumerate(self._policies):
             policy_inputs = flatten_input_structure({
-                name: self._placeholders[i]['observations'][name]
+                name: self._placeholders['observations'][name]
                 for name in policy.observation_keys
             })
             actions = policy.actions(policy_inputs)
@@ -269,7 +312,7 @@ class MultiSAC(RLAlgorithm):
             assert log_pis.shape.as_list() == [None, 1]
 
             log_alpha = tf.compat.v1.get_variable(
-                'log_alpha',
+                f'log_alpha_{i}',
                 dtype=tf.float32,
                 initializer=0.0)
             alpha = tf.exp(log_alpha)
@@ -280,13 +323,12 @@ class MultiSAC(RLAlgorithm):
                 alpha_loss = -tf.reduce_mean(
                     log_alpha * tf.stop_gradient(log_pis + self._target_entropy))
 
-                self._alpha_optimizers.append(tf.compat.v1.train.AdamOptimizer(
-                    self._policy_lr, name='alpha_optimizer_{i}'))
-                self._alpha_train_ops.append(self._alpha_optimizers[i].minimize(
-                    loss=alpha_loss, var_list=[log_alpha]))
-
-                self._training_ops.update({
-                    'temperature_alpha_{i}': self._alpha_train_ops[i]
+                alpha_optimizer = tf.compat.v1.train.AdamOptimizer(
+                    self._policy_lr, name=f'alpha_optimizer_{i}')
+                self._alpha_optimizers.append(alpha_optimizer)
+                alpha_train_op = alpha_optimizer.minimize(loss=alpha_loss, var_list=[log_alpha])
+                self._training_ops_per_policy[i].update({
+                    f'temperature_alpha_{i}': alpha_train_op
                 })
 
             if self._action_prior == 'normal':
@@ -298,12 +340,12 @@ class MultiSAC(RLAlgorithm):
                 policy_prior_log_probs = 0.0
 
             Q_observations = {
-                name: self._placeholders[i]['observations'][name]
-                for name in self._Qs[i][0].observation_keys
+                name: self._placeholders['observations'][name]
+                for name in self._Qs_per_policy[i][0].observation_keys
             }
             Q_inputs = flatten_input_structure({
                 **Q_observations, 'actions': actions})
-            Q_log_targets = tuple(Q(Q_inputs) for Q in self._Qs[i])
+            Q_log_targets = tuple(Q(Q_inputs) for Q in self._Qs_per_policy[i])
             min_Q_log_target = tf.reduce_min(Q_log_targets, axis=0)
 
             if self._reparameterize:
@@ -319,99 +361,135 @@ class MultiSAC(RLAlgorithm):
             self._policy_losses.append(policy_kl_losses)
             policy_loss = tf.reduce_mean(policy_kl_losses)
 
-            self._policy_optimizers.append(tf.compat.v1.train.AdamOptimizer(
+            policy_optimizer = tf.compat.v1.train.AdamOptimizer(
                 learning_rate=self._policy_lr,
-                name="policy_optimizer_{i}"))
+                name=f"policy_optimizer_{i}")
 
-            policy_train_op = self._policy_optimizers[i].minimize(
+            self._policy_optimizers.append(policy_optimizer)
+
+            policy_train_op = policy_optimizer.minimize(
                 loss=policy_loss,
                 var_list=policy.trainable_variables)
 
-            self._training_ops.update({'policy_train_op_{i}': policy_train_op})
+            self._training_ops_per_policy[i].update({f'policy_train_op_{i}': policy_train_op})
+
+    def _init_rnd_updates(self):
+        self._rnd_errors, self._rnd_losses, self._rnd_error_stds, self._rnd_optimizers = [], [], [], []
+        for i in range(self._num_goals):
+            self._placeholders['reward'].update({
+                f'running_int_rew_std_{i}': tf.compat.v1.placeholder(
+                    tf.float32, shape=(), name=f'running_int_rew_std_{i}')
+            })
+            policy_inputs = flatten_input_structure({
+                name: self._placeholders['observations'][name]
+                for name in self._policies[i].observation_keys
+            })
+
+            targets = tf.stop_gradient(self._rnd_targets[i](policy_inputs))
+            predictions = self._rnd_predictors[i](policy_inputs)
+
+            self._rnd_errors.append(tf.expand_dims(tf.reduce_mean(
+                tf.math.squared_difference(targets, predictions), axis=-1), 1))
+            self._rnd_losses.append(tf.reduce_mean(self._rnd_errors[i]))
+            self._rnd_error_stds.append(tf.math.reduce_std(self._rnd_errors[i]))
+            self._rnd_optimizers.append(tf.compat.v1.train.AdamOptimizer(
+                learning_rate=self._rnd_lr,
+                name=f"rnd_optimizer_{i}"))
+            rnd_train_op = self._rnd_optimizers[i].minimize(
+                loss=self._rnd_losses[i])
+            self._training_ops_per_policy[i].update(
+                {f'rnd_train_op_{i}': rnd_train_op}
+            )
 
     def _init_diagnostics_ops(self):
-        diagnosables = OrderedDict((
-            ('Q_value_{i}', self._Q_values[i]),
-            ('Q_loss_{i}', self._Q_losses[i]),
-            ('policy_loss_{i}', self._policy_losses[i]),
-            ('alpha_{i}', self._alpha[i])
-            for i in range(len(self._Qs))
-        ))
+        diagnosables_per_goal = [
+            OrderedDict((
+                (f'Q_value_{i}', self._Q_values_per_policy[i]),
+                (f'Q_loss_{i}', self._Q_losses_per_policy[i]),
+                (f'policy_loss_{i}', self._policy_losses[i]),
+                (f'alpha_{i}', self._alphas[i])
+            ))
+            for i in range(self._num_goals)
+        ]
+
+        for i in range(self._num_goals):
+            if self._rnd_int_rew_coeffs[i]:
+                diagnosables_per_goal[i][f'rnd_reward_{i}'] = self._int_rewards[i]
+                diagnosables_per_goal[i][f'rnd_error_{i}'] = self._rnd_errors[i]
+                diagnosables_per_goal[i][f'running_rnd_reward_std_{i}'] = self._placeholders['reward'][f'running_int_rew_std_{i}']
+            diagnosables_per_goal[i][f'ext_reward_{i}'] = self._ext_rewards[i]
+            diagnosables_per_goal[i][f'normalized_ext_reward_{i}'] = self._normalized_ext_rewards[i]
+            diagnosables_per_goal[i][f'unnormalized_ext_reward_{i}'] = self._unscaled_ext_rewards[i]
+
+            diagnosables_per_goal[i][f'running_ext_reward_std_{i}'] = self._placeholders['reward'][f'running_ext_rew_std_{i}']
+            diagnosables_per_goal[i][f'total_reward_{i}'] = self._total_rewards[i]
 
         diagnostic_metrics = OrderedDict((
             ('mean', tf.reduce_mean),
             ('std', lambda x: tfp.stats.stddev(x, sample_axis=None)),
+            ('max', tf.math.reduce_max),
+            ('min', tf.math.reduce_min),
         ))
 
-        self._diagnostics_ops = OrderedDict([
-            (f'{key}-{metric_name}', metric_fn(values))
-            for key, values in diagnosables.items()
-            for metric_name, metric_fn in diagnostic_metrics.items()
-        ])
+        self._diagnostics_ops_per_goal = [
+            OrderedDict([
+                (f'{key}-{metric_name}', metric_fn(values))
+                for key, values in diagnosables.items()
+                for metric_name, metric_fn in diagnostic_metrics.items()
+            ])
+            for diagnosables in diagnosables_per_goal
+        ]
 
-    def _init_training(self):
-        self._update_target(tau=1.0)
+    def _training_batch(self, batch_size=None):
+        return self._samplers[self._goal_index].random_batch(batch_size)
 
-    def _update_target(self, tau=None):
+    def _evaluation_batches(self, batch_size=None):
+        return [self._samplers[i].random_batch(batch_size) for i in range(self._num_goals)]
+
+    def _update_target(self, i, tau=None):
+        """ Update target networks for policy i. """
         tau = tau or self._tau
 
-        for Qs, Q_targets in zip(self._Qs, self._Q_targets):
-            for Q, Q_target in zip(Qs, Q_targets):
-                source_params = Q.get_weights()
-                target_params = Q_target.get_weights()
-                Q_target.set_weights([
-                    tau * source + (1.0 - tau) * target
-                    for source, target in zip(source_params, target_params)
-                ])
-
-    def _split_batch_by_goals(self, batch):
-        """Split a batch into batches by goal"""
-        batches = []
-        for goal in self._goals:
-            goal_inds = (batch['observations']['goal'] == goal)
-            subbatch = {k: v[goal_inds] for k, v in batch.items()}
-            batches.append(subbatch)
-        return batches
+        for Q, Q_target in zip(self._Qs_per_policy[i], self._Q_targets_per_policy[i]):
+            source_params = Q.get_weights()
+            target_params = Q_target.get_weights()
+            Q_target.set_weights([
+                tau * source + (1.0 - tau) * target
+                for source, target in zip(source_params, target_params)
+            ])
 
     def _do_training(self, iteration, batch):
         """Runs the operations for updating training and target ops."""
-        batches = self._split_batch_by_goals(batch)
         feed_dict = self._get_feed_dict(iteration, batch)
-        self._session.run(self._training_ops, feed_dict)
 
-        # if self._her_iters:
-        #     # Q: Is it better to build a large batch and take one grad step, or
-        #     # resample many mini batches and take many grad steps?
-        #     new_batches = {}
-        #     for _ in range(self._her_iters):
-        #         new_batch = self._get_goal_resamp_batch(batch)
-        #         new_feed_dict = self._get_feed_dict(iteration, new_batch)
-        #         self._session.run(self._training_ops, new_feed_dict)
+        self._session.run(self._training_ops_per_policy[self._goal_index], feed_dict)
 
-        if iteration % self._target_update_interval == 0:
+        if self._rnd_int_rew_coeffs[self._goal_index]:
+            int_rew_std = np.maximum(np.std(self._session.run(
+                self._unscaled_int_rewards[self._goal_index], feed_dict)), 1e-3)
+            self._running_int_rew_stds[
+                self._goal_index] = self._running_int_rew_stds[self._goal_index] * self._rnd_gamma + int_rew_std * (1-self._rnd_gamma)
+
+        if self._normalize_ext_reward_gamma != 1:
+            ext_rew_std = np.maximum(np.std(self._session.run(
+                self._normalized_ext_rewards[self._goal_index], feed_dict)), 1e-3)
+            self._running_ext_rew_stds[
+                self._goal_index] = self._running_ext_rew_stds[self._goal_index] * self._normalize_ext_reward_gamma + \
+                ext_rew_std * (1-self._normalize_ext_reward_gamma)
+
+        self._num_grad_steps_taken_per_policy[self._goal_index] += 1
+
+        if self._num_grad_steps_taken_per_policy[self._goal_index] % self._target_update_interval == 0:
             # Run target ops here.
-            self._update_target()
+            self._update_target(self._goal_index)
 
-    def get_bellman_error(self, batch):
-        feed_dict = self._get_feed_dict(None, batch)
+    def _get_feed_dict(self, iteration, batch):
+        batch_flat = flatten(batch)
+        placeholders_flat = flatten(self._placeholders)
 
-        ## TO TRY: weight by bellman error without entropy
-        ## - sweep over per_alpha
-
-        ## Question: why the min over the Q's?
-        return self._session.run(self._bellman_errors, feed_dict)
-
-    def _get_feed_dict(self, iteration, batches):
-        """Construct a TensorFlow feed dictionary from multiple sample batches
-        (one per policy)."""
-
-        # TODO: funnel batch to placeholders by goal
-
-
-        if np.random.rand() < 1e-3 and 'pixels' in batch['observations']:
+        if np.random.rand() < 1e-4 and 'pixels' in batch['observations']:
             import os
             from skimage import io
-
             random_idx = np.random.randint(
                 batch['observations']['pixels'].shape[0])
             image_save_dir = os.path.join(os.getcwd(), 'pixels')
@@ -422,103 +500,47 @@ class MultiSAC(RLAlgorithm):
             io.imsave(image_save_path,
                       batch['observations']['pixels'][random_idx].copy())
 
-        feed_dict = {}
-        for i, batch in enumerate(batches):
-            batch_flat = flatten(batch)
-            placeholders_flat = flatten(self._placeholders[i])
+        feed_dict = {
+            placeholders_flat[key]: batch_flat[key]
+            for key in placeholders_flat.keys()
+            if key in batch_flat.keys()
+        }
 
-            feed_dict.update({
-                placeholders_flat[key]: batch_flat[key]
-                for key in placeholders_flat.keys()
-                if key in batch_flat.keys()
-            })
-            # if self._goal_classifier:
-            #     if 'images' in batch.keys():
-            #         images = batch['images']
-            #         goal_sin = batch['observations'][:, -2].reshape((-1, 1))
-            #         goal_cos = batch['observations'][:, -1].reshape((-1, 1))
-            #         goals = np.arctan2(goal_sin, goal_cos)
-            #     else:
-            #         images = batch['observations'][:, :32*32*3].reshape((-1, 32, 32, 3))
-            #     feed_dict[self._placeholders['rewards']] = self._classify_as_goals(images, goals)
-            # else:
-            feed_dict[self._placeholders[i]['rewards']] = batch['rewards']
+        if iteration is not None:
+            feed_dict[self._placeholders['iteration']] = iteration
 
-            if iteration is not None:
-                feed_dict[self._placeholders[i]['iteration']] = iteration
+        feed_dict[self._placeholders['reward'][f'running_ext_rew_std_{self._goal_index}']] = self._running_ext_rew_stds[self._goal_index]
+        if self._rnd_int_rew_coeffs[self._goal_index]:
+            feed_dict[self._placeholders['reward'][f'running_int_rew_std_{self._goal_index}']] = self._running_int_rew_stds[self._goal_index]
 
         return feed_dict
 
-    # def _get_goal_resamp_batch(self, batch):
-    #     new_goal = self._base_env.sample_goal()
-    #     old_goal = self._base_env.get_goal()
-    #     batch_obs = batch['observations']
-    #     batch_act = batch['actions']
-    #     batch_next_obs = batch['next_observations']
-
-    #     new_batch_obs = self._base_env.relabel_obs_w_goal(batch_obs, new_goal)
-    #     new_batch_next_obs = self._base_env.relabel_obs_w_goal(batch_next_obs, new_goal)
-
-    #     if self._base_env.use_super_state_reward():
-    #         batch_super_obs = batch['super_observations']
-    #         new_batch_super_obs = super(self._base_env).relabel_obs_w_goal(batch_super_obs, new_goal)
-    #         new_batch_rew = np.expand_dims(self._base_env.compute_rewards(new_batch_super_obs, batch_act)[0], 1)
-    #     else:
-    #         new_batch_rew = np.expand_dims(self._base_env.compute_rewards(new_batch_obs, batch_act)[0], 1)
-
-    #     new_batch = {
-    #         'rewards': new_batch_rew,
-    #         'observations': new_batch_obs,
-    #         'actions': batch['actions'],
-    #         'next_observations': new_batch_next_obs,
-    #         'terminals': batch['terminals'],
-    #     }
-    #     # (TODO) Implement relabeling of terminal flags
-    #     return new_batch
-
-    def _init_diagnostics_ops(self):
-        self._diagnostics_ops = {
-            **{
-                f'{key}-{metric_name}': metric_fn(values)
-                for key, values in (
-                        ('Q_values', self._Q_values),
-                        ('Q_losses', self._Q_losses),
-                        ('policy_losses', self._policy_losses))
-                for metric_name, metric_fn in (
-                        ('mean', tf.reduce_mean),
-                        ('std', lambda x: tfp.stats.stddev(
-                            x, sample_axis=None)))
-            },
-            'alpha': self._alpha,
-            'global_step': self.global_step,
-        }
-
-        return self._diagnostics_ops
-
     def get_diagnostics(self,
                         iteration,
-                        batch,
-                        training_paths,
-                        evaluation_paths):
+                        batches,
+                        training_paths_per_policy,
+                        evaluation_paths_per_policy):
         """Return diagnostic information as ordered dictionary.
 
         Also calls the `draw` method of the plotter, if plotter defined.
         """
+        goal_index = self._goal_index
+        diagnostics = {}
 
-        batches = self._split_batch_by_goals(batch)
-        feed_dict = self._get_feed_dict(iteration, batches)
-        # TODO(hartikainen): We need to unwrap self._diagnostics_ops from its
-        # tensorflow `_DictWrapper`.
-        diagnostics = self._session.run({**self._diagnostics_ops}, feed_dict)
-
-        diagnostics.update(OrderedDict([
-            (f'policy/{key}', value)
-            for key, value in
-            self._policy.get_diagnostics(flatten_input_structure({
-                name: batch['observations'][name]
-                for name in self._policy.observation_keys
-            })).items()
-        ]))
+        for i in range(self._num_goals):
+            self._goal_index = i
+            feed_dict = self._get_feed_dict(iteration, batches[i])
+            diagnostics.update(
+                self._session.run({**self._diagnostics_ops_per_goal[i]}, feed_dict))
+            diagnostics.update(OrderedDict([
+                (f'policy_{i}/{key}', value)
+                for key, value in self._policies[i].get_diagnostics(
+                    flatten_input_structure({
+                        name: batches[i]['observations'][name]
+                        for name in self._policies[i].observation_keys})
+                ).items()
+            ]))
+        self._goal_index = goal_index
 
         if self._goal_classifier:
             diagnostics.update({'goal_classifier/avg_reward': np.mean(feed_dict[self._rewards_ph])})
@@ -527,7 +549,7 @@ class MultiSAC(RLAlgorithm):
             import pickle
             file_name = f'eval_paths_{iteration // self.epoch_length}.pkl'
             with open(os.path.join(os.getcwd(), file_name)) as f:
-                pickle.dump(evaluation_paths, f)
+                pickle.dump(evaluation_paths_per_policy, f)
 
         if self._plotter:
             self._plotter.draw()
@@ -537,15 +559,324 @@ class MultiSAC(RLAlgorithm):
     @property
     def tf_saveables(self):
         saveables = {
-            '_policy_optimizer': self._policy_optimizer,
             **{
-                f'Q_optimizer_{i}': optimizer
-                for i, optimizer in enumerate(self._Q_optimizers)
+                f'_policy_optimizer_{i}': policy_optimizer
+                for i, policy_optimizer in enumerate(self._policy_optimizers)
             },
-            '_log_alpha': self._log_alpha,
+            **{
+                f'_log_alphas_{i}': log_alpha
+                for i, log_alpha in enumerate(self._log_alphas)
+            },
         }
+
+        Q_optimizer_saveables = [{f'Q_optimizer_{i}_{j}': Q_optimizer
+                                  for j, Q_optimizer in enumerate(Q_optimizers)}
+                                 for i, Q_optimizers in enumerate(self._Q_optimizers_per_policy)]
+
+        for Q_opt_dict in Q_optimizer_saveables:
+            saveables.update(Q_opt_dict)
 
         if hasattr(self, '_alpha_optimizer'):
             saveables['_alpha_optimizer'] = self._alpha_optimizer
 
         return saveables
+
+    def _initial_exploration_hook(self, env, initial_exploration_policy, goal_index):
+        print("start random exploration")
+        if self._n_initial_exploration_steps < 1: return
+
+        if not initial_exploration_policy:
+            raise ValueError(
+                "Initial exploration policy must be provided when"
+                " n_initial_exploration_steps > 0.")
+
+        env.set_goal(goal_index)
+
+        self._samplers[goal_index].initialize(env, initial_exploration_policy, self._pools[goal_index])
+        while self._pools[goal_index].size < self._n_initial_exploration_steps:
+            self._samplers[goal_index].sample()
+
+    def _initialize_samplers(self):
+        for i in range(self._num_goals):
+            self._samplers[i].initialize(self._training_environment, self._policies[i], self._pools[i])
+            self._samplers[i].set_save_training_video_frequency(self._save_training_video_frequency * self._num_goals)
+        self._n_episodes_elapsed = sum([self._samplers[i]._n_episodes for i in range(self._num_goals)])
+
+    def _init_training(self):
+        for i in range(self._num_goals):
+            self._update_target(i, tau=1.0)
+
+    @property
+    def ready_to_train(self):
+        return self._samplers[self._goal_index].batch_ready()
+
+    def _do_sampling(self, timestep):
+        self._sample_count += 1
+        self._samplers[self._goal_index].sample()
+
+    def _set_goal(self, goal_index):
+        """ Set goal in env. """
+        assert goal_index >= 0 and goal_index < self._num_goals
+        # print("setting goal to: ", goal_index, ", n_episodes_elapsed: ", self._n_episodes_elapsed)
+        self._goal_index = goal_index
+        self._training_environment.set_goal(self._goal_index) # TODO: implement in env
+
+    def _timestep_before_hook(self, *args, **kwargs):
+        # Check if an entire trajectory has been completed
+        n_episodes_sampled = sum([self._samplers[i]._n_episodes for i in range(self._num_goals)])
+        if n_episodes_sampled > self._n_episodes_elapsed:
+            self._n_episodes_elapsed = n_episodes_sampled
+            new_goal_index = (self._goal_index + 1) % self._num_goals
+            self._set_goal(new_goal_index)
+
+    def _train(self):
+        """Return a generator that performs RL training.
+
+        Args:
+            env (`SoftlearningEnv`): Environment used for training.
+            policy (`Policy`): Policy used for training
+            initial_exploration_policy ('Policy'): Policy used for exploration
+                If None, then all exploration is done using policy
+            pool (`PoolBase`): Sample pool to add samples to
+        """
+        import gtimer as gt
+        from itertools import count
+        training_environment = self._training_environment
+        evaluation_environment = self._evaluation_environment
+        training_metrics = [0 for _ in range(self._num_goals)]
+
+        if not self._training_started:
+            self._init_training()
+
+            for i in range(self._num_goals):
+                self._initial_exploration_hook(
+                    training_environment, self._initial_exploration_policy, i)
+
+        self._initialize_samplers()
+        self._sample_count = 0
+
+        gt.reset_root()
+        gt.rename_root('RLAlgorithm')
+        gt.set_def_unique(False)
+
+        print("starting_training")
+        self._training_before_hook()
+        import time
+
+        for self._epoch in gt.timed_for(range(self._epoch, self._n_epochs)):
+            self._epoch_before_hook()
+            gt.stamp('epoch_before_hook')
+            start_samples = sum([self._samplers[i]._total_samples for i in range(self._num_goals)])
+            sample_times = []
+            for i in count():
+                samples_now = sum([self._samplers[i]._total_samples for i in range(self._num_goals)])
+                self._timestep = samples_now - start_samples
+
+                if (samples_now >= start_samples + self._epoch_length
+                    and self.ready_to_train):
+                    break
+
+                t0 = time.time()
+                self._timestep_before_hook()
+                gt.stamp('timestep_before_hook')
+
+                self._do_sampling(timestep=self._total_timestep)
+                gt.stamp('sample')
+                sample_times.append(time.time() - t0)
+                t0 = time.time()
+                if self.ready_to_train:
+                    self._do_training_repeats(timestep=self._total_timestep)
+                gt.stamp('train')
+                # print("Train time: ", time.time() - t0)
+
+                self._timestep_after_hook()
+                gt.stamp('timestep_after_hook')
+
+            # TODO diagnostics per goal
+            print("Average Sample Time: ", np.mean(np.array(sample_times)))
+            print("Step count", self._sample_count)
+            training_paths_per_policy = self._training_paths()
+            # self.sampler.get_last_n_paths(
+            #     math.ceil(self._epoch_length / self.sampler._max_path_length))
+            gt.stamp('training_paths')
+            evaluation_paths_per_policy = self._evaluation_paths()
+            gt.stamp('evaluation_paths')
+
+            training_metrics_per_policy = self._evaluate_rollouts(
+                training_paths_per_policy, training_environment)
+            gt.stamp('training_metrics')
+
+            #should_save_path = (
+            #    self._path_save_frequency > 0
+            #    and self._epoch % self._path_save_frequency == 0)
+            #if should_save_path:
+            #    import pickle
+            #    for i, path in enumerate(training_paths):
+            #        #path.pop('images')
+            #        path_file_name = f'training_path_{self._epoch}_{i}.pkl'
+            #        path_file_path = os.path.join(
+            #            os.getcwd(), 'paths', path_file_name)
+            #        if not os.path.exists(os.path.dirname(path_file_path)):
+            #            os.makedirs(os.path.dirname(path_file_path))
+            #        with open(path_file_path, 'wb' ) as f:
+            #            pickle.dump(path, f)
+
+            if evaluation_paths_per_policy:
+                evaluation_metrics_per_policy = self._evaluate_rollouts(
+                    evaluation_paths_per_policy, evaluation_environment)
+                gt.stamp('evaluation_metrics')
+            else:
+                evaluation_metrics_per_policy = {}
+
+            self._epoch_after_hook(training_paths_per_policy)
+            gt.stamp('epoch_after_hook')
+
+            t0 = time.time()
+
+            sampler_diagnostics_per_policy = [self._samplers[i].get_diagnostics() for i in range(self._num_goals)]
+
+            diagnostics = self.get_diagnostics(
+                iteration=self._total_timestep,
+                batches=self._evaluation_batches(),
+                training_paths_per_policy=training_paths_per_policy,
+                evaluation_paths_per_policy=evaluation_paths_per_policy)
+
+            time_diagnostics = gt.get_times().stamps.itrs
+
+            print("Basic diagnostics: ", time.time() - t0)
+            print("Sample count: ", self._sample_count)
+
+            diagnostics.update(OrderedDict((
+                *(
+                    (f'times/{key}', time_diagnostics[key][-1])
+                    for key in sorted(time_diagnostics.keys())
+                ),
+                ('epoch', self._epoch),
+                ('timestep', self._timestep),
+                ('timesteps_total', self._total_timestep),
+                ('train-steps', self._num_train_steps),
+            )))
+
+            print("Other basic diagnostics: ", time.time() - t0)
+            for i, (evaluation_metrics, training_metrics, sampler_diagnostics) in enumerate(
+                    zip(evaluation_metrics_per_policy, training_metrics_per_policy, sampler_diagnostics_per_policy)):
+                diagnostics.update(OrderedDict((
+                    *(
+                        (f'evaluation_{i}/{key}', evaluation_metrics[key])
+                        for key in sorted(evaluation_metrics.keys())
+                    ),
+                    *(
+                        (f'training_{i}/{key}', training_metrics[key])
+                        for key in sorted(training_metrics.keys())
+                    ),
+                    *(
+                        (f'sampler_{i}/{key}', sampler_diagnostics[key])
+                        for key in sorted(sampler_diagnostics.keys())
+                    ),
+                )))
+
+            # if self._eval_render_kwargs and hasattr(
+            #         evaluation_environment, 'render_rollouts'):
+            #     # TODO(hartikainen): Make this consistent such that there's no
+            #     # need for the hasattr check.
+            #     training_environment.render_rollouts(evaluation_paths)
+
+            yield diagnostics
+            print("Diagnostic time: ",  time.time() - t0)
+
+        for i in range(self._num_goals):
+            self._samplers[i].terminate()
+
+        self._training_after_hook()
+
+        del evaluation_paths_per_policy
+
+        yield {'done': True, **diagnostics}
+
+    def _training_paths(self):
+        """ Override to interleave training videos between policy rollouts. """
+        paths_per_policy = [self._samplers[i].get_last_n_paths(
+            math.ceil((self._epoch_length / self._num_goals) / self._samplers[self._goal_index]._max_path_length))
+                            for i in range(self._num_goals)
+        ]
+
+        if self._save_training_video_frequency:
+            fps = 1 // getattr(self._training_environment, 'dt', 1/30)
+            i = 0
+            for rollout_num in reversed(range(len(paths_per_policy[0]))):
+                if i % self._save_training_video_frequency == 0:
+                    video_frames = []
+                    for goal_index in range(self._num_goals):
+                        video_frames.extend(paths_per_policy[goal_index][rollout_num].pop('images'))
+                    video_file_name = f'training_path_{self._epoch}_{i}.mp4'
+                    video_file_path = os.path.join(
+                        os.getcwd(), 'videos', video_file_name)
+                    save_video(video_frames, video_file_path, fps=fps)
+                    i += 1
+
+        return paths_per_policy
+
+    def _evaluation_paths(self):
+        if self._eval_n_episodes < 1: return ()
+
+        should_save_video = (
+            self._video_save_frequency > 0
+            and self._epoch % self._video_save_frequency == 0)
+
+        paths = []
+        for goal_index in range(self._num_goals):
+            with self._policies[goal_index].set_deterministic(self._eval_deterministic):
+                self._evaluation_environment.set_goal(goal_index)
+                paths.append(
+                    rollouts(
+                        self._eval_n_episodes,
+                        self._evaluation_environment,
+                        self._policies[goal_index],
+                        self._samplers[goal_index]._max_path_length,
+                        render_kwargs=(self._eval_render_kwargs
+                                       if should_save_video else {})
+                    )
+                )
+
+        # TODO: interleave videos from different policies
+        if should_save_video:
+            fps = 1 // getattr(self._evaluation_environment, 'dt', 1/30)
+            for rollout_num in range(len(paths[0])):
+                video_frames = []
+                for goal_index in range(self._num_goals):
+                    video_frames.append(paths[goal_index][rollout_num].pop('images'))
+                video_frames = np.concatenate(video_frames)
+                video_file_name = f'evaluation_path_{self._epoch}_{rollout_num}.mp4'
+                video_file_path = os.path.join(
+                    os.getcwd(), 'videos', video_file_name)
+                save_video(video_frames, video_file_path, fps=fps)
+        return paths
+
+    def _evaluate_rollouts(self, episodes_per_policy, env):
+        """Compute evaluation metrics for the given rollouts."""
+        diagnostics_per_policy = []
+        for i, episodes in enumerate(episodes_per_policy):
+            episodes_rewards = [episode['rewards'] for episode in episodes]
+            episodes_reward = [np.sum(episode_rewards)
+                               for episode_rewards in episodes_rewards]
+            episodes_length = [episode_rewards.shape[0]
+                               for episode_rewards in episodes_rewards]
+
+            diagnostics = OrderedDict((
+                ('episode-reward-mean', np.mean(episodes_reward)),
+                ('episode-reward-min', np.min(episodes_reward)),
+                ('episode-reward-max', np.max(episodes_reward)),
+                ('episode-reward-std', np.std(episodes_reward)),
+                ('episode-length-mean', np.mean(episodes_length)),
+                ('episode-length-min', np.min(episodes_length)),
+                ('episode-length-max', np.max(episodes_length)),
+                ('episode-length-std', np.std(episodes_length)),
+            ))
+
+            env_infos = env.get_path_infos(episodes)
+            for key, value in env_infos.items():
+                diagnostics[f'env_infos/{key}'] = value
+
+            diagnostics_per_policy.append(diagnostics)
+
+        return diagnostics_per_policy

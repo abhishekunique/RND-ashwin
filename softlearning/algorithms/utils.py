@@ -82,6 +82,14 @@ def create_SQL_algorithm(variant, *args, **kwargs):
     return algorithm
 
 
+def create_MultiSAC_algorithm(variant, *args, **kwargs):
+    from .multi_sac import MultiSAC
+
+    algorithm = MultiSAC(*args, **kwargs)
+
+    return algorithm
+
+
 ALGORITHM_CLASSES = {
     'SAC': create_SAC_algorithm,
     'SQL': create_SQL_algorithm,
@@ -94,6 +102,7 @@ ALGORITHM_CLASSES = {
     'VICEGANGoalConditioned': create_VICEGANGoalConditioned_algorithm,
     'VICEGANTwoGoal': create_VICEGANTwoGoal_algorithm,
     'VICEGANMultiGoal': create_VICEGANMultiGoal_algorithm,
+    'MultiSAC': create_MultiSAC_algorithm,
 }
 
 
@@ -102,6 +111,7 @@ def get_algorithm_from_variant(variant,
                                **kwargs):
     algorithm_params = variant['algorithm_params']
     algorithm_type = algorithm_params['type']
+
     algorithm_kwargs = deepcopy(algorithm_params['kwargs'])
     algorithm = ALGORITHM_CLASSES[algorithm_type](
         variant, *args, **algorithm_kwargs, **kwargs)

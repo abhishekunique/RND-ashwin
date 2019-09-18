@@ -158,7 +158,7 @@ class SAC(RLAlgorithm):
             self._rnd_lr = rnd_lr
             self._rnd_int_rew_coeff = rnd_int_rew_coeff
             self._rnd_gamma = rnd_gamma
-            self._running_int_rew_std = 0
+            self._running_int_rew_std = 1
             # self._rnd_gamma = 1
             # self._running_int_rew_std = 1
         self._build()
@@ -201,7 +201,7 @@ class SAC(RLAlgorithm):
         return goal_probs
 
     def _init_external_reward(self):
-        self._ext_reward = self._reward_scale * self._placeholders['rewards']
+        self._ext_reward = self._placeholders['rewards']
 
     def _get_Q_target(self):
         policy_inputs = flatten_input_structure({
@@ -236,7 +236,7 @@ class SAC(RLAlgorithm):
         self._total_reward = self._normalized_ext_reward + self._int_reward
 
         Q_target = td_target(
-            reward=self._total_reward,
+            reward=self._reward_scale * self._total_reward,
             discount=self._discount,
             next_value=(1 - terminals) * next_values)
         return tf.stop_gradient(Q_target)
@@ -384,7 +384,7 @@ class SAC(RLAlgorithm):
         self._rnd_error_std = tf.math.reduce_std(self._rnd_errors)
         self._rnd_optimizer = tf.compat.v1.train.AdamOptimizer(
             learning_rate=self._rnd_lr,
-            name="policy_optimizer")
+            name="rnd_optimizer")
         rnd_train_op = self._rnd_optimizer.minimize(
             loss=self._rnd_loss)
         self._training_ops.update(
@@ -458,8 +458,6 @@ class SAC(RLAlgorithm):
         if self._rnd_int_rew_coeff:
             int_rew_std = np.maximum(np.std(self._session.run(self._unscaled_int_reward, feed_dict)), 1e-3)
             self._running_int_rew_std = self._running_int_rew_std * self._rnd_gamma + int_rew_std * (1-self._rnd_gamma)
-        else:
-            self._session.run(self._training_ops, feed_dict)
 
         if self._normalize_ext_reward_gamma != 1:
             ext_rew_std = np.maximum(np.std(self._session.run(self._normalized_ext_reward, feed_dict)), 1e-3)
