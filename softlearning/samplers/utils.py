@@ -11,7 +11,8 @@ from . import (
     active_sampler,
     goal_sampler,
     pool_sampler,
-    nn_sampler)
+    nn_sampler,
+    classifier_sampler)
 
 
 def get_sampler_from_variant(variant, *args, **kwargs):
@@ -24,6 +25,8 @@ def get_sampler_from_variant(variant, *args, **kwargs):
         'GoalSampler': goal_sampler.GoalSampler,
         'PoolSampler': pool_sampler.PoolSampler,
         'NNSampler': nn_sampler.NNSampler,
+        'PoolSampler': pool_sampler.PoolSampler,
+        'ClassifierSampler': classifier_sampler.ClassifierSampler,
     }
 
     sampler_params = variant['sampler_params']
@@ -55,14 +58,23 @@ def rollout(env,
             policy,
             path_length,
             sampler_class=simple_sampler.SimpleSampler,
+            sampler_kwargs=None,
             callback=None,
             render_kwargs=None,
             break_on_terminal=True):
     pool = replay_pools.SimpleReplayPool(env, max_size=path_length)
-    sampler = sampler_class(
-        max_path_length=path_length,
-        min_pool_size=None,
-        batch_size=None)
+    if sampler_kwargs:
+        sampler = sampler_class(
+            max_path_length=path_length,
+            min_pool_size=None,
+            batch_size=None,
+            **sampler_kwargs)
+    else:
+        sampler = sampler_class(
+            max_path_length=path_length,
+            min_pool_size=None,
+            batch_size=None)
+
 
     sampler.initialize(env, policy, pool)
 

@@ -37,11 +37,13 @@ class VICE(SACClassifier):
         negatives = self.sampler.random_batch(
             self._classifier_batch_size
         )['observations']
+
         # DEBUG: Testing with the same negatives pool for each training iteration
         # negatives = type(self._pool.data)(
         #     (key[1], value[:self._classifier_batch_size])
         #     for key, value in self._pool.data.items()
         #     if key[0] == 'observations')
+
         rand_positive_ind = np.random.randint(
             self._goal_examples[next(iter(self._goal_examples))].shape[0],
             size=self._classifier_batch_size)
@@ -54,9 +56,11 @@ class VICE(SACClassifier):
             dtype=np.int32)
         labels_batch[:self._classifier_batch_size, 0] = 1
         labels_batch[self._classifier_batch_size:, 1] = 1
+
         observations_batch = {
             key: np.concatenate((negatives[key], positives[key]), axis=0)
-            for key in self._classifier.observation_keys
+            # for key in self._classifier.observation_keys
+            for key in self._policy.observation_keys
         }
 
         if self._mixup_alpha > 0:
@@ -67,7 +71,8 @@ class VICE(SACClassifier):
             **{
                 self._placeholders['observations'][key]:
                 observations_batch[key]
-                for key in self._classifier.observation_keys
+                # for key in self._classifier.observation_keys
+                for key in self._policy.observation_keys
             },
             self._placeholders['labels']: labels_batch,
         }
@@ -94,6 +99,7 @@ class VICE(SACClassifier):
         })
         sampled_actions = self._policy.actions(policy_inputs)
         log_pi = self._policy.log_pis(policy_inputs, sampled_actions)
+        # pi / (pi + f), f / (f + pi)
         log_pi_log_p_concat = tf.concat([log_pi, log_p], axis=1)
 
         self._classifier_loss_t = tf.reduce_mean(
@@ -109,6 +115,17 @@ class VICE(SACClassifier):
             feed_dict = self._get_classifier_feed_dict()
             self._train_classifier_step(feed_dict)
 
+    def get_reward(self, observations):
+        learned_reward = self._session.run(
+            self._reward_t,
+            feed_dict={
+                self._placeholders['observations'][name]: observations[name]
+                for name in self._policy.observation_keys
+                # for name in self._classifiers[0].observation_keys
+            }
+        )
+        return learned_reward
+
     def get_diagnostics(self,
                         iteration,
                         batch,
@@ -116,7 +133,6 @@ class VICE(SACClassifier):
                         evaluation_paths):
         diagnostics = super(SACClassifier, self).get_diagnostics(
             iteration, batch, training_paths, evaluation_paths)
-
         sample_observations = batch['observations']
         sample_actions = batch['actions']
         num_sample_observations = sample_observations[
@@ -128,6 +144,7 @@ class VICE(SACClassifier):
             size=sample_observations[next(iter(sample_observations))].shape[0])
         goal_observations = {
             key: values[goal_index] for key, values in self._goal_examples.items()
+            if key in self._policy.observation_keys
         }
         # Sample goal actions uniformly in action space
         # action_space_dim = sample_actions.shape[1]
@@ -135,7 +152,6 @@ class VICE(SACClassifier):
         #     low=-1, high=1, size=(num_sample_observations, action_space_dim)) 
         # goal_validation_actions = np.random.uniform(
         #     low=-1, high=1, size=(num_sample_observations, action_space_dim)) 
-      
         goal_index_validation = np.random.randint(
             self._goal_examples_validation[
                 next(iter(self._goal_examples_validation))].shape[0],
@@ -143,8 +159,9 @@ class VICE(SACClassifier):
         goal_observations_validation = {
             key: values[goal_index_validation]
             for key, values in self._goal_examples_validation.items()
+            if key in self._policy.observation_keys
         }
- 
+
         num_goal_observations = goal_observations[
             next(iter(goal_observations))].shape[0]
         goal_labels = np.repeat(((0, 1), ), num_goal_observations, axis=0)
@@ -271,7 +288,6 @@ class VICE(SACClassifier):
             #     discriminator_output_goal_training),
             # 'reward_learning/discriminator_output_goal_obs_validation_mean': np.mean(
             #     discriminator_output_goal_validation),
-   
 
             # TODO: Figure out why converting to probabilities isn't working
             # 'reward_learning/classifier_negative_obs_prob_mean': np.mean(

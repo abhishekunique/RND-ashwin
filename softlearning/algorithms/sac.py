@@ -1,5 +1,4 @@
 import os
-import uuid
 from collections import OrderedDict
 from numbers import Number
 
@@ -11,7 +10,11 @@ from flatten_dict import flatten
 
 from softlearning.models.utils import flatten_input_structure
 from .rl_algorithm import RLAlgorithm
-from softlearning.replay_pools.prioritized_experience_replay_pool import PrioritizedExperienceReplayPool
+from softlearning.replay_pools.prioritized_experience_replay_pool import (
+    PrioritizedExperienceReplayPool
+)
+from softlearning.misc.utils import angle_distance
+from softlearning.models.state_estimation import normalize
 
 tfd = tfp.distributions
 
@@ -38,6 +41,8 @@ class SAC(RLAlgorithm):
             policy,
             Qs,
             pool,
+            Q_targets=None,
+
             plotter=None,
 
             lr=3e-4,
@@ -54,6 +59,13 @@ class SAC(RLAlgorithm):
             save_eval_paths=False,
             normalize_ext_reward_gamma=1,
             per_alpha=1,
+
+            state_estimator=None,
+            state_estimator_iters=None,
+            train_state_estimator_online=False,
+
+            vae=None,
+
             rnd_networks=(),
             rnd_lr=1e-4,
             rnd_int_rew_coeff=0,
@@ -83,13 +95,15 @@ class SAC(RLAlgorithm):
         """
 
         super(SAC, self).__init__(**kwargs)
-
         self._training_environment = training_environment
         self._evaluation_environment = evaluation_environment
         self._policy = policy
 
         self._Qs = Qs
-        self._Q_targets = tuple(tf.keras.models.clone_model(Q) for Q in Qs)
+        if Q_targets:
+            self._Q_targets = Q_targets
+        else:
+            self._Q_targets = tuple(tf.keras.models.clone_model(Q) for Q in Qs)
 
         self._pool = pool
         if isinstance(self._pool, PrioritizedExperienceReplayPool) and \
@@ -123,6 +137,17 @@ class SAC(RLAlgorithm):
         self._save_full_state = save_full_state
         self._save_eval_paths = save_eval_paths
         self._goal_classifier_params_directory = goal_classifier_params_directory
+
+        # State estimator
+        self._state_estimator = state_estimator
+        self._state_estimator_iters = state_estimator_iters
+        self._train_state_estimator_online = train_state_estimator_online
+        self._state_estimator_optimizer = tf.keras.optimizers.Adam(learning_rate=3e-4)
+
+        # VAE
+        self._vae = vae
+        self._preprocessed_Q_inputs = self._Qs[0].preprocessed_inputs_fn
+
         self._normalize_ext_reward_gamma = normalize_ext_reward_gamma
         self._running_ext_rew_std = 1
         self._rnd_int_rew_coeff = 0
@@ -153,9 +178,7 @@ class SAC(RLAlgorithm):
         self._init_diagnostics_ops()
 
     def _load_goal_classifier(self, goal_classifier_params_directory):
-        import sys
         from goal_classifier.conv import CNN
-        from tensorflow.python.tools.inspect_checkpoint import print_tensors_in_checkpoint_file
 
         # print_tensors_in_checkpoint_file(goal_classifier_params_directory, all_tensors=False, tensor_name='')
         self._goal_classifier = CNN(goal_cond=True)
@@ -416,6 +439,21 @@ class SAC(RLAlgorithm):
     def _do_training(self, iteration, batch):
         """Runs the operations for updating training and target ops."""
         feed_dict = self._get_feed_dict(iteration, batch)
+        # intermediate = self._Qs[0].preprocessed_inputs_fn
+        # inputs = (
+        #     feed_dict[self._placeholders['actions']],
+        #     feed_dict[self._placeholders['observations']['claw_qpos']],
+        #     feed_dict[self._placeholders['observations']['last_action']],
+        #     feed_dict[self._placeholders['observations']['pixels']],
+        #     feed_dict[self._placeholders['observations']['target_xy_position']],
+        #     feed_dict[self._placeholders['observations']['target_z_orientation_cos']],
+        #     feed_dict[self._placeholders['observations']['target_z_orientation_sin']],
+        # )
+        # feed_dict_interm = {
+        #     input_ph: input_np
+        #     for input_ph, input_np in zip(intermediate.inputs, inputs)
+        # }
+
         self._session.run(self._training_ops, feed_dict)
         if self._rnd_int_rew_coeff:
             int_rew_std = np.maximum(np.std(self._session.run(self._unscaled_int_reward, feed_dict)), 1e-3)
@@ -459,13 +497,17 @@ class SAC(RLAlgorithm):
             from skimage import io
             random_idx = np.random.randint(
                 batch['observations']['pixels'].shape[0])
+            image = batch['observations']['pixels'][random_idx].copy()
+            if image.shape[-1] == 6:
+                img_0, img_1 = np.split(
+                    image, 2, axis=2)
+                image = np.concatenate([img_0, img_1], axis=1)
             image_save_dir = os.path.join(os.getcwd(), 'pixels')
             image_save_path = os.path.join(
                 image_save_dir, f'observation_{iteration}_batch.png')
             if not os.path.exists(image_save_dir):
                 os.makedirs(image_save_dir)
-            io.imsave(image_save_path,
-                      batch['observations']['pixels'][random_idx].copy())
+            io.imsave(image_save_path, image)
 
         feed_dict = {
             placeholders_flat[key]: batch_flat[key]
@@ -542,9 +584,163 @@ class SAC(RLAlgorithm):
                 for name in self._policy.observation_keys
             })).items()
         ]))
+        if self._vae:
+            eval_pixels = feed_dict[self._placeholders['observations']['pixels']]
+            inputs = (
+                feed_dict[self._placeholders['actions']],
+                feed_dict[self._placeholders['observations']['claw_qpos']],
+                feed_dict[self._placeholders['observations']['last_action']],
+                eval_pixels,
+                feed_dict[self._placeholders['observations']['target_xy_position']],
+                feed_dict[self._placeholders['observations']['target_z_orientation_cos']],
+                feed_dict[self._placeholders['observations']['target_z_orientation_sin']],
+            )
+            test_feed_dict = {
+                input_ph: input_np
+                for input_ph, input_np in zip(self._preprocessed_Q_inputs.inputs, inputs)
+            }
+            preprocessed_inputs = self._session.run(self._preprocessed_Q_inputs.output, feed_dict=test_feed_dict)
+            encoded_pixels = preprocessed_inputs[3]
+
+            n_images_to_save = 0
+            decoded = self._session.run(
+                self._vae.decode(encoded_pixels, apply_sigmoid=True))
+
+            image_save_dir = os.path.join(os.getcwd(), 'vae_reconstructions')
+            if not os.path.exists(image_save_dir):
+                os.makedirs(image_save_dir)
+
+
+            if n_images_to_save > 0:
+                import imageio
+                sample_idx = np.random.choice(decoded.shape[0], size=n_images_to_save)
+                concat = np.concatenate([
+                    eval_pixels[sample_idx].astype(np.float32) / 255.,
+                    decoded[sample_idx]], axis=2)
+
+                for i in range(n_images_to_save):
+                    image_save_path = os.path.join(
+                        image_save_dir, f'vae_reconstruction_{iteration}_{i}.png')
+                    imageio.imwrite(image_save_path, concat[i])
+
+            # from softlearning.models.vae import compute_elbo_loss
+            # # TODO: Make have this compute the elbo loss, on individual images
+            # loss = self._session.run(compute_elbo_loss(self._vae, eval_pixels))
+            # diagnostics.update({
+            #     'vae/elbo_loss_mean': np.mean(loss),
+            #     'vae/elbo_loss_max': np.max(loss),
+            #     'vae/elbo_loss_min': np.min(loss)
+            # })
+            # worst_idx = np.argmax(loss)
+            # reconstruction_cmp = np.concatenate([
+            #     eval_pixels[worst_idx],
+            #     skimage.util.img_as_ubyte(decoded[worst_idx])
+            # ], axis=1)
+            # skimage.io.imsave(
+            #     os.path.join(image_save_dir, f'worst_reconstruction_{iteration}.png'),
+            #     reconstruction_cmp)
+
+        if 'pixels' in self._policy.preprocessors and \
+                self._state_estimator is not None and \
+                self._state_estimator.name == 'state_estimator_preprocessor':
+            # Train the state estimator on the diagnostic batch
+            if self._train_state_estimator_online:
+                self._state_estimator.trainable = True
+                self._state_estimator.compile(optimizer=self._state_estimator_optimizer, loss='mse')
+                train_obs = batch['observations']
+                # obs_keys_to_estimate = (
+                #     'object_position',
+                #     'object_orientation_cos',
+                #     'object_orientation_sin',
+                # )
+                pos = train_obs['object_position'][:, :2]
+                pos = normalize(pos, -0.1, 0.1, -1, 1)
+                num_samples = pos.shape[0]
+                ground_truth_state = np.concatenate([
+                    pos,
+                    train_obs['object_orientation_cos'][:, 2].reshape((num_samples, 1)),
+                    train_obs['object_orientation_sin'][:, 2].reshape((num_samples, 1))
+                ], axis=1)
+
+                pixels = train_obs['pixels']
+                # ground_truth_state = np.concatenate(
+                #     [train_obs[key] for key in obs_keys_to_estimate], axis=1)
+
+                self._state_estimator.fit(
+                    x=pixels,
+                    y=ground_truth_state,
+                    batch_size=32,
+                    epochs=self._state_estimator_iters or 1
+                )
+                self._state_estimator.trainable = False
+
+                self._state_estimator.compile(optimizer=self._state_estimator_optimizer, loss='mse')
+                # Copy over weights to the other state estimators
+                for Q, Q_target in zip(self._Qs, self._Q_targets):
+                    Q.get_layer('state_estimator_preprocessor').set_weights(
+                            self._state_estimator.get_weights())
+                    Q_target.get_layer('state_estimator_preprocessor').set_weights(
+                            self._state_estimator.get_weights())
+
+            # Evaluate on the current diagnostic batch
+            state_estimators = [
+                self._state_estimator,
+                self._Qs[0].get_layer('state_estimator_preprocessor'),
+                self._Qs[1].get_layer('state_estimator_preprocessor')
+            ]
+            state_estimator_descriptors = ('policy', 'Q0', 'Q1')
+            # state_estimator = self._state_estimator
+            eval_obs = batch['observations']
+            # obs_keys_to_estimate = (
+            #     'object_position',
+            #     'object_orientation_cos',
+            #     'object_orientation_sin',
+            # )
+            pixels = eval_obs['pixels']
+            # ground_truth_state = np.concatenate(
+            #     [eval_obs[key] for key in obs_keys_to_estimate], axis=1)
+
+            # pos = eval_obs['object_position'][:, :2]
+
+            assert 'object_xy_position' in eval_obs
+            pos = eval_obs['object_xy_position']
+            from softlearning.models.state_estimation import normalize
+            pos = normalize(pos, -0.1, 0.1, -1, 1)
+            num_samples = pos.shape[0]
+            assert 'object_z_orientation_cos' in eval_obs and 'object_z_orientation_sin' in eval_obs
+            labels = np.concatenate([
+                pos,
+                eval_obs['object_z_orientation_cos'].reshape((num_samples, 1)),
+                eval_obs['object_z_orientation_sin'].reshape((num_samples, 1))
+                # eval_obs['object_orientation_cos'][:, 2].reshape((num_samples, 1)),
+                # eval_obs['object_orientation_sin'][:, 2].reshape((num_samples, 1)),
+            ], axis=1)
+            preds_per_state_estimator = [
+                state_estimator.predict(pixels)
+                for state_estimator in state_estimators
+            ]
+
+            true_angles = np.arctan2(labels[:, 3], labels[:, 2]) * 180 / np.pi
+            for preds, desc in zip(preds_per_state_estimator, state_estimator_descriptors):
+                pos_errors_xy = np.abs(labels[:, :2] - preds[:, :2])
+                pos_errors = np.linalg.norm(pos_errors_xy, axis=1)
+                pos_errors = 15 * pos_errors
+
+                pred_angles = np.arctan2(preds[:, 3], preds[:, 2]) * 180 / np.pi
+                angle_errors = angle_distance(true_angles, pred_angles)
+
+                diagnostics.update({
+                    f'state_estimator/{desc}/xy_position_error_in_cm': np.mean(
+                        pos_errors
+                    ),
+                    f'state_estimator/{desc}/angle_error_in_degrees_policy': np.mean(
+                        angle_errors
+                    )
+                })
 
         if self._goal_classifier:
-            diagnostics.update({'goal_classifier/avg_reward': np.mean(feed_dict[self._rewards_ph])})
+            diagnostics.update({
+                'goal_classifier/avg_reward': np.mean(feed_dict[self._rewards_ph])})
 
         if self._save_eval_paths:
             import pickle

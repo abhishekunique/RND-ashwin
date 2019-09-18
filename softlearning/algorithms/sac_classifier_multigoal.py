@@ -8,18 +8,18 @@ from softlearning.models.utils import flatten_input_structure
 
 class SACClassifierMultiGoal(SAC):
     def __init__(
-            self,
-            classifiers,
-            goal_example_pools,
-            goal_example_validation_pools,
-            classifier_lr=1e-4,
-            classifier_batch_size=128,
-            reward_type='logits',
-            n_classifier_train_steps=int(1e4),
-            classifier_optim_name='adam',
-            mixup_alpha=0.2,
-            goal_conditioned=False,
-            **kwargs,
+        self,
+        classifiers,
+        goal_example_pools,
+        goal_example_validation_pools,
+        classifier_lr=1e-4,
+        classifier_batch_size=128,
+        reward_type='logits',
+        n_classifier_train_steps=int(1e4),
+        classifier_optim_name='adam',
+        mixup_alpha=0.2,
+        goal_conditioned=False,
+        **kwargs,
     ):
         self._classifiers = classifiers
         self._goal_example_pools = goal_example_pools
@@ -289,7 +289,8 @@ class SACClassifierMultiGoal(SAC):
                             goal_obs[key],
                             goal_obs_validation[key]
                         ), axis=0)
-                        for key in self._classifiers[goal_index].observation_keys
+                        for key in self._policy.observation_keys
+                        # for key in self._classifiers[goal_index].observation_keys
                     },
                     self._placeholders['labels']: np.concatenate([
                         np.zeros((n_sample_obs, 1)),
@@ -346,7 +347,8 @@ class SACClassifierMultiGoal(SAC):
                     episode['observations'][name]
                     for episode in episodes
                 ])
-                for name in self._classifiers[0].observation_keys
+                for name in self._policy.observation_keys
+                # for name in self._classifiers[0].observation_keys
             })
 
         diagnostics[f'reward_learning/reward-mean'] = np.mean(learned_reward)
@@ -355,6 +357,17 @@ class SACClassifierMultiGoal(SAC):
         diagnostics[f'reward_learning/reward-std'] = np.std(learned_reward)
 
         return diagnostics
+
+    def get_reward(self, observations):
+        learned_reward = self._session.run(
+            self._reward_t,
+            feed_dict={
+                self._placeholders['observations'][name]: observations[name]
+                for name in self._policy.observation_keys
+                # for name in self._classifiers[0].observation_keys
+            }
+        )
+        return learned_reward
 
     @property
     def tf_saveables(self):

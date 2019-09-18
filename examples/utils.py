@@ -221,6 +221,23 @@ def get_parser(allow_policy_list=False):
         type=int,
         default=None,
         help="Save frequency for videos.")
+    parser.add_argument(
+        '--save-training-video-frequency',
+        type=int,
+        default=5,
+        help="Save frequency for training videos.")
+
+    from softlearning.preprocessors.utils import PREPROCESSOR_FUNCTIONS
+    parser.add_argument(
+        '--preprocessor-type',
+        type=str,
+        default=None,
+        help="Preprocessor type for observations.",
+        choices=list(PREPROCESSOR_FUNCTIONS.keys()))
+    parser.add_argument(
+        '--vision',
+        type=lambda x: bool(strtobool(x)),
+        default=True)
 
     parser = add_ray_init_args(parser)
     parser = add_ray_tune_args(parser)

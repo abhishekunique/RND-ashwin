@@ -52,7 +52,6 @@ class ExperimentRunnerClassifierRL(ExperimentRunner):
         initial_exploration_policy = self.initial_exploration_policy = (
             get_policy_from_params(
                 variant['exploration_policy_params'], training_environment))
-
         algorithm_kwargs = {
             'variant': variant,
             'training_environment': training_environment,
@@ -118,6 +117,10 @@ class ExperimentRunnerClassifierRL(ExperimentRunner):
         algorithm_kwargs['rnd_networks'] = rnd_networks
 
         self.algorithm = get_algorithm_from_variant(**algorithm_kwargs)
+
+        # Give the algorithm to the sampler to calculate reward
+        if variant['sampler_params']['type'] == 'ClassifierSampler':
+            sampler.set_algorithm(self.algorithm)
 
         initialize_tf_variables(self._session, only_uninitialized=True)
 

@@ -28,10 +28,9 @@ PUSH_TASKS = [
 ]
 
 GOAL_IMAGE_PATH_PER_ENVIRONMENT = {
-    # 'TurnFreeValve3ResetFree-v0': 'free_screw_180_less_tiny_box/',
-    'TurnFreeValve3ResetFree-v0': 'free_screw_180_less_tiny_box_state_minimal/',
+    'TurnFreeValve3ResetFree-v0': 'free_screw_180_less_tiny_box_48/',
     # 'TurnFreeValve3Fixed-v0': 'free_screw_180_regular_box_48/',
-    'TurnFreeValve3Fixed-v0': 'free_screw_180_less_tiny_box_48/',
+    'TurnFreeValve3Fixed-v0': 'free_screw_180_less_tiny_box_old_camera/',
     'TurnFixed-v0': 'fixed_screw_180_no_normalization/',
     'TurnMultiGoalResetFree-v0': 'fixed_screw_2_goals_mixed_pool_goal_index/',
 }
@@ -52,7 +51,8 @@ def get_goal_example_from_variant(variant):
     elif task in PICK_TASKS:
         goal_examples = generate_pick_goal_examples(total_goal_examples, env, variant['task'])
     elif task in GOAL_IMAGE_PATH_PER_ENVIRONMENT.keys():
-        path = goal_directory + GOAL_IMAGE_PATH_PER_ENVIRONMENT[task] + 'positives.pkl'
+        env_path = os.path.join(goal_directory, GOAL_IMAGE_PATH_PER_ENVIRONMENT[task])
+        path = os.path.join(env_path, 'positives.pkl')
         with open(path, 'rb') as file:
             goal_examples = pickle.load(file)
     else:

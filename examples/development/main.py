@@ -4,7 +4,7 @@ import copy
 import glob
 import pickle
 import sys
-
+import numpy as np
 
 import tensorflow as tf
 from ray import tune
@@ -145,11 +145,54 @@ class ExperimentRunner(tune.Trainable):
 
         replay_pool = self.replay_pool = (
             get_replay_pool_from_variant(variant, training_environment))
-        sampler = self.sampler = get_sampler_from_variant(variant)
         Qs = self.Qs = get_Q_function_from_variant(
             variant, training_environment)
+        Q_targets = self.Q_targets = get_Q_function_from_variant(
+            variant, training_environment)
+
         policy = self.policy = get_policy_from_variant(
             variant, training_environment)
+
+        try:
+            if self.policy.preprocessors['pixels'].name == 'state_estimator_preprocessor':
+                state_estimator = self.policy.preprocessors['pixels']
+
+                from softlearning.replay_pools.flexible_replay_pool import Field
+                replay_pool = self.replay_pool = (
+                    get_replay_pool_from_variant(variant, training_environment,
+                        extra_obs_keys_and_fields={
+                            'object_state_prediction': Field(
+                                name='object_state_prediction',
+                                dtype=np.float32,
+                                shape=(4,)
+                            )
+                        }))
+            else:
+                state_estimator = None
+        except:
+            state_estimator = None
+
+        # ==== LOADING IN CONVNET FROM WORKING RUN EXPERIMENT ====
+        preprocessor_params = variant['policy_params']['kwargs']['observation_preprocessors_params']
+        if ('pixels' in preprocessor_params
+            and 'ConvnetPreprocessor' == preprocessor_params['pixels']['type']
+            and preprocessor_params['pixels'].get('weights_path', None) is not None):
+            weights_path = preprocessor_params['pixels']['weights_path']
+            with open(weights_path, 'rb') as f:
+                weights = pickle.load(f)
+                def set_weights_and_fix(model):
+                    model.set_weights(weights)
+                    model.trainable = False
+
+                set_weights_and_fix(self.policy.preprocessors['pixels'])
+                set_weights_and_fix(self.Qs[0].observations_preprocessors['pixels'])
+                set_weights_and_fix(self.Qs[1].observations_preprocessors['pixels'])
+                set_weights_and_fix(self.Q_targets[0].observations_preprocessors['pixels'])
+                set_weights_and_fix(self.Q_targets[1].observations_preprocessors['pixels'])
+
+        sampler = self.sampler = get_sampler_from_variant(
+            variant,
+            state_estimator=state_estimator)
 
         last_checkpoint_dir = variant['replay_pool_params']['last_checkpoint_dir']
 
@@ -172,6 +215,18 @@ class ExperimentRunner(tune.Trainable):
             get_policy_from_params(
                 variant['exploration_policy_params'], training_environment))
 
+        # VAE
+        if ('pixels' in self.policy.preprocessors
+            and self.policy.preprocessors['pixels'].name == 'vae_preprocessor'):
+            from softlearning.models.utils import get_vae
+            vae = get_vae(**variant['policy_params']
+                                   ['kwargs']
+                                   ['observation_preprocessors_params']
+                                   ['pixels']
+                                   ['kwargs'])
+        else:
+            vae = None
+
         if variant['algorithm_params']['rnd_params']:
             from softlearning.rnd.utils import get_rnd_networks_from_variant
             rnd_networks = get_rnd_networks_from_variant(variant, training_environment)
@@ -185,9 +240,12 @@ class ExperimentRunner(tune.Trainable):
             policy=policy,
             initial_exploration_policy=initial_exploration_policy,
             Qs=Qs,
+            Q_targets=Q_targets,
             pool=replay_pool,
             sampler=sampler,
             session=self._session,
+            state_estimator=state_estimator,
+            vae=vae,
             rnd_networks=rnd_networks)
 
         if isinstance(replay_pool, PrioritizedExperienceReplayPool) and \
@@ -344,8 +402,8 @@ class ExperimentRunner(tune.Trainable):
             self.replay_pool.save_latest_experience(replay_pool_pickle_path)
 
     def _restore_replay_pool(self, current_checkpoint_dir):
-        experiment_root = os.path.dirname(current_checkpoint_dir)
-
+        # experiment_root = os.path.dirname(current_checkpoint_dir)
+        experiment_root = current_checkpoint_dir
         experience_paths = [
             self._replay_pool_pickle_path(checkpoint_dir)
             for checkpoint_dir in sorted(glob.iglob(
