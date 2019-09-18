@@ -1,15 +1,16 @@
 from copy import deepcopy
 
-def get_convnet_preprocessor(name='convnet_preprocessor', **kwargs):
+def get_convnet_preprocessor(name='convnet_preprocessor',
+                             **kwargs):
     from softlearning.models.convnet import convnet_model
-
     preprocessor = convnet_model(name=name, **kwargs)
-
     return preprocessor
 
 def get_vae_preprocessor(name='vae_preprocessor',
                          encoder_path=None,
                          decoder_path=None,
+                         trainable=False,
+                         include_decoder=False,
                          **kwargs):
     from softlearning.models.vae import VAE
     assert encoder_path is not None and decoder_path is not None, (
@@ -17,8 +18,11 @@ def get_vae_preprocessor(name='vae_preprocessor',
     vae = VAE(**kwargs)
     vae.encoder.load_weights(encoder_path)
     vae.decoder.load_weights(decoder_path)
-    preprocessor = vae.get_encoder(trainable=False, name=name)
-#     preprocessor.trainable = False
+    if include_decoder: 
+        # preprocessor = vae.get_encoder_decoder(trainable=trainable, name=name)
+        preprocessor = vae
+    else:
+        preprocessor = vae.get_encoder(trainable=trainable, name=name)
     return preprocessor
 
 def get_state_estimator_preprocessor(

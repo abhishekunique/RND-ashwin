@@ -83,6 +83,25 @@ class ExperimentRunner(tune.Trainable):
         except:
             state_estimator = None
 
+        # ==== LOADING IN CONVNET FROM WORKING RUN EXPERIMENT ====
+        preprocessor_params = variant['policy_params']['kwargs']['observation_preprocessors_params']
+        if 'pixels' in preprocessor_params and \
+            'ConvnetPreprocessor' == preprocessor_params['pixels']['type'] and \
+            preprocessor_params['pixels'].get('weights_path', None) is not None:
+            
+            weights_path = preprocessor_params['pixels']['weights_path']
+            with open(weights_path, 'rb') as f:
+                weights = pickle.load(f)
+                def set_weights_and_fix(model):
+                    model.set_weights(weights)
+                    model.trainable = False
+
+                set_weights_and_fix(self.policy.preprocessors['pixels'])
+                set_weights_and_fix(self.Qs[0].observations_preprocessors['pixels'])
+                set_weights_and_fix(self.Qs[1].observations_preprocessors['pixels'])
+                set_weights_and_fix(self.Q_targets[0].observations_preprocessors['pixels'])
+                set_weights_and_fix(self.Q_targets[1].observations_preprocessors['pixels'])
+
         sampler = self.sampler = get_sampler_from_variant(
             variant,
             state_estimator=state_estimator)

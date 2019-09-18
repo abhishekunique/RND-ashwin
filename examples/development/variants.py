@@ -725,8 +725,10 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_VISION = {
                     'target_z_orientation_sin',
                 ),
                 'init_qpos_range': (
-                    (-0.025, -0.025, 0, 0, 0, -np.pi),
-                    (0.025, 0.025, 0, 0, 0, np.pi)
+                    # (0.025, -0.025, 0, 0, 0, -np.pi),
+                    # (0.025, 0.025, 0, 0, 0, np.pi)
+                    (0, 0, 0, 0, 0, -np.pi),
+                    (0, 0, 0, 0, 0, np.pi)
                 ),
                 'target_qpos_range': [(0, 0, 0, 0, 0, np.pi)],
                 'reward_keys_and_weights': {
@@ -807,10 +809,14 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_VISION = {
                     'lookat': (0, 0, 0.03)
                 },
                 'reward_keys_and_weights': {
-                    # 'object_to_target_position_distance_reward': tune.grid_search([0.5, 1]),
-                    'object_to_target_position_distance_reward': 0.5,
+                    'object_to_target_position_distance_reward': tune.grid_search([0.1, 0.5]),
+                    # 'object_to_target_position_distance_reward': 2,
                     'object_to_target_orientation_distance_reward': 1,
                 },
+                'init_qpos_range': (
+                    (-0.025, -0.025, 0, 0, 0, -np.pi),
+                    (0.025, 0.025, 0, 0, 0, np.pi)
+                ),
                 'observation_keys': (
                     'claw_qpos',
                     'last_action',
@@ -936,8 +942,6 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_VISION = {
                 ),
                 'reset_policy_checkpoint_path': None,
             },
-
-            # Flipping Tasks
         },
     },
     'dm_control': {
@@ -1256,19 +1260,46 @@ PIXELS_PREPROCESSOR_PARAMS = {
         },
     },
     'ConvnetPreprocessor': tune.grid_search([
+       # {
+       #      'type': 'ConvnetPreprocessor',
+       #      'kwargs': {
+       #          'conv_filters': (16, 32, 64, 32),
+       #          'conv_kernel_sizes': (3, ) * 4,
+       #          'conv_strides': (2, 2, 1, 1),
+       #          'normalization_type': normalization_type,
+       #          'downsampling_type': 'conv',
+       #          'output_kwargs': {
+       #              'type': 'spatial_softmax',
+       #          }
+       #      },
+       #  },
         {
             'type': 'ConvnetPreprocessor',
             'kwargs': {
-                'conv_filters': (16, 32, 64, 32),
-                'conv_kernel_sizes': (3, ) * 4,
-                'conv_strides': (2, 2, 1, 1),
+                'conv_filters': (16, 32, 64),
+                'conv_kernel_sizes': (3, ) * 3,
+                'conv_strides': (2, ) * 3,
                 'normalization_type': normalization_type,
                 'downsampling_type': 'conv',
                 'output_kwargs': {
-                    'type': 'spatial_softmax',
+                    'type': 'flatten',
                 }
             },
         }
+        # {
+        #     'type': 'ConvnetPreprocessor',
+        #     'kwargs': {
+        #         'conv_filters': (64, ) * 4,
+        #         'conv_kernel_sizes': (3, ) * 4,
+        #         'conv_strides': (2, ) * 4,
+        #         'normalization_type': normalization_type,
+        #         'downsampling_type': 'conv',
+        #         'output_kwargs': {
+        #             'type': 'flatten',
+        #         },
+        #     },
+        #     # 'weights_path': '/root/nfs/kun1/users/justinvyu/pretrained_models/convnet_64_by_4.pkl',
+        # }
         for normalization_type in (None, )
     ]),
 }
