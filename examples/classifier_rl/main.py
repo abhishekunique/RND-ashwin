@@ -90,7 +90,7 @@ class ExperimentRunnerClassifierRL(ExperimentRunner):
 
     @property
     def picklables(self):
-        picklables = super().picklables()
+        picklables = super().picklables
 
         if hasattr(self, 'reward_classifier'):
             picklables['reward_classifier'] = self.reward_classifier

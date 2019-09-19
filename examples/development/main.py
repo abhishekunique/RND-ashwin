@@ -305,7 +305,7 @@ class ExperimentRunner(tune.Trainable):
 
     @property
     def picklables(self):
-        if self._variant['algorithm_params']['type'] == 'MultiSAC':
+        if self._multi_build:
             return {
                 'variant': self._variant,
                 'training_environment': self.training_environment,
