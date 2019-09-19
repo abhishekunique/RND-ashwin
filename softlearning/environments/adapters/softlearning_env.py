@@ -75,7 +75,7 @@ class SoftlearningEnv(metaclass=ABCMeta):
         return self._action_space
 
     @property
-    def action_shape(self, *args, **kwargs):
+    def action_shape(self, *args, discrete=False):
         action_shape = tf.TensorShape(self.action_space.shape)
 
         if len(action_shape) > 1:

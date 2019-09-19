@@ -3,7 +3,6 @@ import tensorflow as tf
 
 from .sac import SAC, td_target
 from .sac_classifier_multigoal import SACClassifierMultiGoal
-from .vice import VICE
 from softlearning.misc.utils import mixup
 from softlearning.models.utils import flatten_input_structure
 
@@ -120,7 +119,7 @@ class VICEGANTwoGoal(SAC):
     def _get_classifier_feed_dicts(self):
         # Get 2x the number of negatives, filter out by goal index
         negatives = self.sampler.random_batch(
-            2 * self._classifier_batch_size)['observations'] 
+            2 * self._classifier_batch_size)['observations']
 
         negative_ind_0 = (negatives['goal_index'] == 0).flatten()
         negative_ind_1 = (negatives['goal_index'] == 1).flatten()
@@ -274,7 +273,7 @@ class VICEGANTwoGoal(SAC):
                         evaluation_paths):
         diagnostics = super(VICEGANTwoGoal, self).get_diagnostics(
             iteration, batch, training_paths, evaluation_paths)
-        
+
         sample_observations = batch['observations']
         goal_index_0 = np.random.randint(
             self._goal_examples_0[next(iter(self._goal_examples_0))].shape[0],

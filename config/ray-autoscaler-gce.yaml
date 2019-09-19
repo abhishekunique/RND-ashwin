@@ -1,5 +1,5 @@
 # An unique identifier for the head node and workers of this cluster.
-cluster_name: softlearning
+cluster_name: henry
 
 # The minimum number of workers nodes to launch in addition to the head
 # node. This number should be >= 0.
@@ -12,7 +12,7 @@ max_workers: 100
 # The initial number of worker nodes to launch in addition to the head
 # node. When the cluster is first brought up (or when it is refreshed with a
 # subsequent `ray up`) this number of nodes will be started.
-initial_workers: 1
+initial_workers: 0
 
 # This executes all commands on all nodes in the docker container,
 # and opens all the necessary ports to support the Ray cluster.
@@ -52,7 +52,7 @@ auth:
 # For more documentation on available fields, see:
 # http://boto3.readthedocs.io/en/latest/reference/services/ec2.html#EC2.ServiceResource.create_instances
 head_node:
-    machineType: n1-highmem-2
+    machineType: n1-standard-4 # n1-highcpu-16
     disks:
       - boot: true
         autoDelete: true
@@ -60,13 +60,8 @@ head_node:
         initializeParams:
           diskSizeGb: 50
           # See https://cloud.google.com/compute/docs/images for more images
-          sourceImage: projects/abhishek-reset-free/global/images/family/softlearning-gpu
-    scheduling:
-        - preemptible: false
-          onHostMaintenance: TERMINATE
-          automaticRestart: false
+          sourceImage: projects/abhishek-reset-free/global/images/family/softlearning-cpu/
 
-          
     # Additional options can be found in in the compute docs at
     # https://cloud.google.com/compute/docs/reference/rest/v1/instances/insert
 
@@ -75,7 +70,7 @@ head_node:
 # For more documentation on available fields, see:
 # http://boto3.readthedocs.io/en/latest/reference/services/ec2.html#EC2.ServiceResource.create_instances
 worker_nodes:
-    machineType: n1-highmem-16 # n1-highcpu-16
+    machineType: n1-standard-8 # n1-highcpu-8
     disks:
       - boot: true
         autoDelete: true
@@ -83,14 +78,13 @@ worker_nodes:
         initializeParams:
           diskSizeGb: 50
           # See https://cloud.google.com/compute/docs/images for more images
-          sourceImage: projects/abhishek-reset-free/global/images/family/softlearning-gpu
-    guestAccelerators:
-      - acceleratorType: projects/abhishek-reset-free/zones/us-west1-b/acceleratorTypes/nvidia-tesla-p100
-        acceleratorCount: 2
+          sourceImage: projects/abhishek-reset-free/global/images/family/softlearning-cpu/
+    # Run workers on preemtible instance by default.
+    # Note that GCP preemptible instances automatically shut down after 24h.
+    # Comment this out to use on-demand.
     scheduling:
       - preemptible: true
-        onHostMaintenance: TERMINATE
-        automaticRestart: false
+      - onHostMaintenance: TERMINATE
 
     # Additional options can be found in in the compute docs at
     # https://cloud.google.com/compute/docs/reference/rest/v1/instances/insert
@@ -98,32 +92,24 @@ worker_nodes:
 # Files or directories to copy to the head and worker nodes. The format is a
 # dictionary from REMOTE_PATH: LOCAL_PATH, e.g.
 file_mounts: {
-    "~/softlearning-goal-conditioned": "~/Developer/softlearning-goal-conditioned",
-    "~/dsuite": "~/Developer/dsuite",
-    "~/multiworld": "~/Developer/multiworld",
     "~/.mujoco/mjkey.txt": "~/.mujoco/mjkey.txt",
+    "~/vice": "~/Libraries/vice",
+    "~/dsuite": "~/Libraries/dsuite",
 }
 
 # List of shell commands to run to set up nodes.
 setup_commands:
     - >-
-        pip install -U ray
-        && pip install -e ~/softlearning-goal-conditioned
-        && pip install -e ~/dsuite
-        && pip install -e ~/multiworld
-        && pip install -U flatten-dict dataclasses
-        && pip install -U numpy
-        && pip install -U ffmpeg scikit-video
-        && echo 'cd ~/softlearning-goal-conditioned/' >> ~/.bashrc
-        && sudo mkdir /usr/lib/nvidia-000
-        && echo 'export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/lib/nvidia-000' >> ~/.bashrc
+      pip install -e ~/vice
+      && pip install -e ~/dsuite
+
 
 # Custom commands that will be run on the head node after common setup.
 head_setup_commands: []
 
 # Custom commands that will be run on worker nodes after common setup.
 worker_setup_commands: []
-        
+
 # Command to start ray on the head node. You don't need to change this.
 head_start_ray_commands:
     - ray stop

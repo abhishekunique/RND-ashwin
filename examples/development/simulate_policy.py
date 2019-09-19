@@ -58,7 +58,7 @@ def simulate_policy(args):
         pickle_path = os.path.join(checkpoint_path, 'checkpoint.pkl')
         with open(pickle_path, 'rb') as f:
             picklable = pickle.load(f)
-    
+
     import ipdb; ipdb.set_trace()
     environment_params = (
         variant['environment_params']['evaluation']
@@ -99,15 +99,14 @@ def simulate_policy(args):
     #     ),
     #     'swap_goal_upon_completion': False,
     # }
-    import ipdb; ipdb.set_trace()
     evaluation_environment = get_environment_from_params(environment_params)
 
     policy = (
         get_policy_from_variant(variant, evaluation_environment))
     policy.set_weights(picklable['policy_weights'])
-    with open(pickle_path, 'wb') as f:
-        dump_path = os.path.join(checkpoint_path, 'policy_params.pkl')
-        pickle.dump(picklable['policy_weights'], dump_path)
+    dump_path = os.path.join(checkpoint_path, 'policy_params.pkl')
+    with open(dump_path, 'wb') as f:
+        pickle.dump(picklable['policy_weights'], f)
 
     render_kwargs = {**DEFAULT_RENDER_KWARGS, **args.render_kwargs}
 

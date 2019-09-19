@@ -146,7 +146,7 @@ for experiment_root in sorted(glob.iglob(
             pools.append(pool)
 
             obs = pool['observations']
-            screw_positions = obs['object_position'][:, :2]
+            screw_positions = obs['object_xy_position'][:, :2]
             screw_positions_total.append(screw_positions)
             object_angles = np.arctan2(
                 obs['object_orientation_sin'][:, 2],

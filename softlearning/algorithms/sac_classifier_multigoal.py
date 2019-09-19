@@ -156,11 +156,13 @@ class SACClassifierMultiGoal(SAC):
         ]
 
         # Get positives from different goal pools
+        goal_example_pool_sizes = [goal_example_pool[goal_example_pool.keys()[0]].shape[0]
+                                   for goal_example_pool in self._goal_example_pools]
         rand_positive_indices = [
             np.random.randint(
-                goal_examples[next(iter(goal_examples))].shape[0],
+                goal_example_pool_size,
                 size=self._classifier_batch_size)
-            for goal_examples in self._goal_example_pools
+            for goal_example_pool_size in goal_example_pool_sizes
         ]
         positives_per_goal = [
             {

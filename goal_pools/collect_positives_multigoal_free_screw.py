@@ -7,8 +7,7 @@ import imageio
 import pickle
 
 cur_dir = os.path.dirname(os.path.realpath(__file__))
-# directory = cur_dir + "/free_screw_2_goals_less_tiny_box_"
-directory = cur_dir + "/free_screw_2_goals_regular_box_"
+directory = cur_dir + "/free_screw_2_goals_bowl_"
 
 def main():
     pos_goals = [(0.01, 0.01), (-0.01, -0.01)]
@@ -21,7 +20,7 @@ def main():
         observations = []
         images = True
         image_shape = (32, 32, 3)
-        
+
         x, y = pos_goal
         env_kwargs = {
             'camera_settings': {
@@ -88,7 +87,7 @@ def main():
                 if env.get_goal_completion():
                     # Add observation if meets criteria
                     # some hacky shit, find a better way to do this
-                    observation['goal_index'] = np.array([goal_index]).astype(np.float32)
+                    observation['goal_index'] = np.array([goal_index])
                     observations.append(observation)
                     print(observation)
                     if images:

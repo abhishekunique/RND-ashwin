@@ -20,9 +20,27 @@ def get_uniform_policy(*args, **kwargs):
     return policy
 
 
+def get_uniform_discrete_policy(*args, **kwargs):
+    from .uniform_policy import UniformDiscretePolicy
+
+    policy = UniformDiscretePolicy(*args, **kwargs)
+
+    return policy
+
+
+def get_discrete_policy(*args, **kwargs):
+    from .discrete_policy import FeedforwardDiscretePolicy
+
+    policy = FeedforwardDiscretePolicy(*args, **kwargs)
+
+    return policy
+
+
 POLICY_FUNCTIONS = {
     'GaussianPolicy': get_gaussian_policy,
     'UniformPolicy': get_uniform_policy,
+    'UniformDiscretePolicy': get_uniform_discrete_policy,
+    'DiscretePolicy': get_discrete_policy,
 }
 
 

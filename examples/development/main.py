@@ -158,14 +158,14 @@ class ExperimentRunner(tune.Trainable):
             'sampler': sampler,
             'session': self._session,
             'rnd_networks': rnd_networks,
-            'vae': vae
+            'vae': vae,
             'state_estimator': state_estimator,
             'vae': vae,
         }
         return algorithm_kwargs
 
     def _get_multi_algorithm_kwargs(self, variant):
-        share_pool = self._variant['algorithm_params']['kwargs'].pop('share_pool')
+        share_pool = variant['algorithm_params']['kwargs'].pop('share_pool')
 
         environment_params = variant['environment_params']
         training_environment = self.training_environment = (
@@ -222,7 +222,7 @@ class ExperimentRunner(tune.Trainable):
             rnd_networks = ()
 
         algorithm_kwargs = {
-            'variant': self._variant,
+            'variant': variant,
             'training_environment': training_environment,
             'evaluation_environment': evaluation_environment,
             'policies': policies,
@@ -441,15 +441,7 @@ class ExperimentRunner(tune.Trainable):
             for i, experience_path in enumerate(experience_paths):
                 self._replay_pools[i].load_experience(experience_path)
 
-    def _restore(self, checkpoint_dir):
-        assert isinstance(checkpoint_dir, str), checkpoint_dir
-        checkpoint_dir = checkpoint_dir.rstrip('/')
-
-        self._multi_build = (self._variant['algorithm_params']['type'] == 'MultiSAC')
-        if self._multi_build:
-            self._restore_multi_sac(checkpoint_dir)
-            return
-
+    def _restore_algorithm_kwargs(self, checkpoint_dir, variant):
         with self._session.as_default():
             pickle_path = self._pickle_path(checkpoint_dir)
             with open(pickle_path, 'rb') as f:
@@ -461,49 +453,38 @@ class ExperimentRunner(tune.Trainable):
             'evaluation_environment']
 
         replay_pool = self.replay_pool = (
-            get_replay_pool_from_variant(self._variant, training_environment))
+            get_replay_pool_from_variant(variant, training_environment))
 
-        if self._variant['run_params'].get('checkpoint_replay_pool', False):
+        if variant['run_params'].get('checkpoint_replay_pool', False):
             self._restore_replay_pool(checkpoint_dir)
 
         sampler = self.sampler = picklable['sampler']
         Qs = self.Qs = get_Q_function_from_variant(
-            self._variant, training_environment)
+            variant, training_environment)
         self._restore_value_functions(checkpoint_dir)
         policy = self.policy = (
-            get_policy_from_variant(self._variant, training_environment))
+            get_policy_from_variant(variant, training_environment))
         self.policy.set_weights(picklable['policy_weights'])
         initial_exploration_policy = self.initial_exploration_policy = (
             get_policy_from_params(
-                self._variant['exploration_policy_params'],
+                variant['exploration_policy_params'],
                 training_environment))
 
-        self.algorithm = get_algorithm_from_variant(
-            variant=self._variant,
-            training_environment=training_environment,
-            evaluation_environment=evaluation_environment,
-            policy=policy,
-            initial_exploration_policy=initial_exploration_policy,
-            Qs=Qs,
-            pool=replay_pool,
-            sampler=sampler,
-            session=self._session)
-        self.algorithm.__setstate__(picklable['algorithm'].__getstate__())
+        algorithm_kwargs = {
+            'variant': variant,
+            'training_environment': training_environment,
+            'evaluation_environment': evaluation_environment,
+            'policy': policy,
+            'initial_exploration_policy': initial_exploration_policy,
+            'Qs': Qs,
+            'pool': replay_pool,
+            'sampler': sampler,
+            'session': self._session
+        }
+        return algorithm_kwargs
 
-        tf_checkpoint = self._get_tf_checkpoint()
-        status = tf_checkpoint.restore(tf.train.latest_checkpoint(
-            os.path.split(self._tf_checkpoint_prefix(checkpoint_dir))[0]))
+    def _restore_multi_algorithm_kwargs(self, checkpoint_dir, variant):
 
-        status.assert_consumed().run_restore_ops(self._session)
-        initialize_tf_variables(self._session, only_uninitialized=True)
-
-        # TODO(hartikainen): target Qs should either be checkpointed or pickled.
-        for Q, Q_target in zip(self.algorithm._Qs, self.algorithm._Q_targets):
-            Q_target.set_weights(Q.get_weights())
-
-        self._built = True
-
-    def _restore_multi_sac(self, checkpoint_dir):
         with self._session.as_default():
             pickle_path = self._pickle_path(checkpoint_dir)
             with open(pickle_path, 'rb') as f:
@@ -516,7 +497,6 @@ class ExperimentRunner(tune.Trainable):
 
         num_goals = training_environment.num_goals
 
-        variant = self._variant
         replay_pools = self._replay_pools = tuple([
             get_replay_pool_from_variant(variant, training_environment)
             for _ in range(num_goals)
@@ -537,24 +517,44 @@ class ExperimentRunner(tune.Trainable):
         for policy, policy_weights in zip(self._policies, picklable['policy_weights']):
             policy.set_weights(policy_weights)
 
-        if self._variant['run_params'].get('checkpoint_replay_pool', False):
+        if variant['run_params'].get('checkpoint_replay_pool', False):
             self._restore_replay_pools(checkpoint_dir)
 
         initial_exploration_policy = self.initial_exploration_policy = (
             get_policy_from_params(
-                self._variant['exploration_policy_params'],
+                variant['exploration_policy_params'],
                 training_environment))
 
-        self.algorithm = get_algorithm_from_variant(
-            variant=self._variant,
-            training_environment=training_environment,
-            evaluation_environment=evaluation_environment,
-            policies=policies,
-            initial_exploration_policy=initial_exploration_policy,
-            Qs_per_policy=Qs_per_policy,
-            pools=replay_pools,
-            samplers=samplers,
-            session=self._session)
+        algorithm_kwargs = {
+            'variant': variant,
+            'training_environment': training_environment,
+            'evaluation_environment': evaluation_environment,
+            'policies': policies,
+            'initial_exploration_policy': initial_exploration_policy,
+            'Qs_per_policy': Qs_per_policy,
+            'pools': replay_pools,
+            'samplers': samplers,
+            'session': self._session
+        }
+        return algorithm_kwargs
+
+    def _restore(self, checkpoint_dir):
+        assert isinstance(checkpoint_dir, str), checkpoint_dir
+        checkpoint_dir = checkpoint_dir.rstrip('/')
+
+        variant = copy.deepcopy(self._variant)
+        self._multi_build = (self._variant['algorithm_params']['type'] in ['MultiSAC', 'MultiVICEGAN'])
+        if self._multi_build:
+            algorithm_kwargs = self._restore_multi_algorithm_kwargs(checkpoint_dir, variant)
+        else:
+            algorithm_kwargs = self._restore_algorithm_kwargs(checkpoint_dir, variant)
+
+        self.algorithm = get_algorithm_from_variant(**algorithm_kwargs)
+
+        with self._session.as_default():
+            pickle_path = self._pickle_path(checkpoint_dir)
+            with open(pickle_path, 'rb') as f:
+                picklable = pickle.load(f)
         self.algorithm.__setstate__(picklable['algorithm'].__getstate__())
 
         tf_checkpoint = self._get_tf_checkpoint()
@@ -565,8 +565,13 @@ class ExperimentRunner(tune.Trainable):
         initialize_tf_variables(self._session, only_uninitialized=True)
 
         # TODO(hartikainen): target Qs should either be checkpointed or pickled.
-        # for Q, Q_target in zip(self.algorithm._Qs, self.algorithm._Q_targets):
-        #     Q_target.set_weights(Q.get_weights())
+        if self._multi_build:
+            for Qs, Q_targets in zip(self.algorithm._Qs_per_policy, self.algorithm._Q_targets_per_policy):
+                for Q, Q_target in zip(Qs, Q_targets):
+                    Q_target.set_weights(Q.get_weights())
+        else:
+            for Q, Q_target in zip(self.algorithm._Qs, self.algorithm._Q_targets):
+                Q_target.set_weights(Q.get_weights())
 
         self._built = True
 

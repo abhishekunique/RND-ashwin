@@ -35,10 +35,13 @@ class SimpleSampler(BaseSampler):
 
     @property
     def _policy_input(self):
-        observation = flatten_input_structure({
-            key: self._current_observation[key][None, ...]
+        try:
+            observation = flatten_input_structure({
+                key: self._current_observation[key][None, ...]
             for key in self.policy.observation_keys
-        })
+            })
+        except Exception:
+            from pprint import pprint; import ipdb; ipdb.set_trace(context=30)
 
         return observation
 

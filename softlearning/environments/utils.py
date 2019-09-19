@@ -1,6 +1,8 @@
 from .adapters.gym_adapter import GymAdapter
 import dsuite
 from dsuite.dclaw.turn import DClawTurnImage
+import gym_minigrid
+
 
 ADAPTERS = {
     'gym': GymAdapter,

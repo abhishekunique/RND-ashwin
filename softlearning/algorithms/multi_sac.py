@@ -109,7 +109,6 @@ class MultiSAC(SAC):
             tuple(tf.keras.models.clone_model(Q) for Q in Qs)
             for Qs in Qs_per_policy
         ]
-
         self._training_ops_per_policy = [{} for _ in range(num_goals)]
 
         self._policy_lr = lr
@@ -597,15 +596,15 @@ class MultiSAC(SAC):
         while self._pools[goal_index].size < self._n_initial_exploration_steps:
             self._samplers[goal_index].sample()
 
+    def _init_training(self):
+        for i in range(self._num_goals):
+            self._update_target(i, tau=1.0)
+
     def _initialize_samplers(self):
         for i in range(self._num_goals):
             self._samplers[i].initialize(self._training_environment, self._policies[i], self._pools[i])
             self._samplers[i].set_save_training_video_frequency(self._save_training_video_frequency * self._num_goals)
         self._n_episodes_elapsed = sum([self._samplers[i]._n_episodes for i in range(self._num_goals)])
-
-    def _init_training(self):
-        for i in range(self._num_goals):
-            self._update_target(i, tau=1.0)
 
     @property
     def ready_to_train(self):

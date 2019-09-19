@@ -44,7 +44,6 @@ class RLAlgorithm(Checkpointable):
             video_save_frequency=0,
             save_training_video_frequency=0,
             session=None,
-            training_video_save_frequency=0,
             n_training_videos_to_save=None,
             random_epoch_freq=0,
     ):
@@ -76,10 +75,10 @@ class RLAlgorithm(Checkpointable):
         self._n_initial_exploration_steps = n_initial_exploration_steps
         self._initial_exploration_policy = initial_exploration_policy
 
-        self._training_video_save_frequency = training_video_save_frequency
-        self._n_training_videos_to_save = n_training_videos_to_save
-        if self._training_video_save_frequency > 0:
-            self.sampler.set_save_training_videos_flag(True)
+        # self._training_video_save_frequency = training_video_save_frequency
+        # self._n_training_videos_to_save = n_training_videos_to_save
+        # if self._training_video_save_frequency > 0:
+        #     self.sampler.set_save_training_videos_flag(True)
 
         self._eval_n_episodes = eval_n_episodes
         self._eval_deterministic = eval_deterministic

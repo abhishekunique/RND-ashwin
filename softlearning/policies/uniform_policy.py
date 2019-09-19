@@ -70,4 +70,38 @@ class UniformPolicy(BasePolicy):
         return self.actions_model(observations)
 
     def actions_np(self, observations):
-        return self.actions_model.predict(observations)
+        action = self.actions_model.predict(observations)
+        return action
+
+
+class UniformDiscretePolicy(UniformPolicy):
+    def __init__(self,
+                 input_shapes,
+                 output_shape,
+                 *args,
+                 preprocessors=None,
+                 **kwargs):
+        self._Serializable__initialize(locals())
+
+        super(UniformPolicy, self).__init__(*args, **kwargs)
+
+        inputs_flat = create_inputs(input_shapes)
+
+        self.inputs = inputs_flat
+
+        x = self.inputs
+
+        batch_size = tf.keras.layers.Lambda(
+            lambda x: tf.shape(x)[0]
+        )(inputs_flat[0])
+
+        actions = tf.keras.layers.Lambda(
+            lambda batch_size: tf.random.uniform(
+                (batch_size, output_shape[0]))
+        )(batch_size)
+
+        actions = tf.one_hot(tf.cast(tf.argmax(actions, axis=-1), tf.int32), output_shape[0])
+
+        self.actions_model = tf.keras.Model(self.inputs, actions)
+
+        self.actions_input = tf.keras.Input(shape=output_shape, name='actions')

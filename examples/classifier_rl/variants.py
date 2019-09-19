@@ -72,20 +72,6 @@ ALGORITHM_PARAMS_BASE = {
         'discount': 0.99,
         'tau': 5e-3,
         'reward_scale': 1.0,
-        'normalize_ext_reward_gamma': 0.99,
-        'rnd_int_rew_coeff': tune.sample_from([1]),
-    },
-    'rnd_params': {
-        'convnet_params': {
-            'conv_filters': (16, 32, 64),
-            'conv_kernel_sizes': (3, 3, 3),
-            'conv_strides': (2, 2, 2),
-            'normalization_type': None,
-        },
-        'fc_params': {
-            'hidden_layer_sizes': (256, 256),
-            'output_size': 512,
-        },
     }
 }
 
@@ -162,6 +148,38 @@ ALGORITHM_PARAMS_ADDITIONAL = {
             'mixup_alpha': 1.0,
             'save_training_video_frequency': 0,
         }
+    },
+    'MultiVICEGAN': {
+        'type': 'MultiVICEGAN',
+        'kwargs': {
+            'reparameterize': REPARAMETERIZE,
+            'lr': 3e-4,
+            'target_update_interval': 1,
+            'tau': 5e-3,
+            'target_entropy': 'auto', #tune.sample_from([-3, -5, -7]),#'auto',
+            'action_prior': 'uniform',
+            'her_iters': tune.grid_search([0]),
+            'rnd_int_rew_coeffs': tune.sample_from([[1, 1]]),
+            'ext_reward_coeffs': [1, 0], # 0 corresponds to reset policy
+            'normalize_ext_reward_gamma': 0.99,
+            'share_pool': False,
+            'n_classifier_train_steps': 5,
+            'classifier_optim_name': 'adam',
+            'n_epochs': 500,
+            'mixup_alpha': 1.0,
+        },
+        'rnd_params': {
+            'convnet_params': {
+                'conv_filters': (16, 32, 64),
+                'conv_kernel_sizes': (3, 3, 3),
+                'conv_strides': (2, 2, 2),
+                'normalization_type': None,
+            },
+            'fc_params': {
+                'hidden_layer_sizes': (256, 256),
+                'output_size': 512,
+            },
+        },
     },
     'VICEGANTwoGoal': {
         'type': 'VICEGANTwoGoal',
@@ -309,7 +327,7 @@ CLASSIFIER_PARAMS_PER_UNIVERSE_DOMAIN_TASK = {
         'DClaw': {
             **{
                 key: {'observation_keys': ('pixels', )}
-                for key in ('LiftDDFixed-v0', 'LiftDDResetFree-v0')
+                for key in ('LiftDDFixed-v0', 'LiftDDResetFree-v0', 'SlideBeadsResetFree-v0')
             },
             **{
                 key: {'observation_keys': ('pixels', 'goal_index')}
@@ -465,13 +483,12 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_VISION = {
                 },
                 'observation_keys': ('pixels', 'claw_qpos', 'last_action'),
             },
-            'TurnMultiGoalResetFree-v0': {
-                'goals': (
-                    -np.pi / 2,
-                    np.pi / 2
-                ),
-                'initial_goal_index': 0,
-                'swap_goals_upon_completion': False,
+            'TurnMultiGoalResetFree-v0': {  # training environment
+                'goals': (np.pi, 0.), # Two goal setting
+                # 'goals': (2 * np.pi / 3, 4 * np.pi / 3, 0.), #np.arange(0, 2 * np.pi, np.pi / 3),
+                # 'goals': np.arange(0, 2 * np.pi, np.pi / 2), # 4 goal setting
+                'initial_goal_index': 0, # start with np.pi
+                'swap_goals_upon_completion': False, # if false, will swap at every reset
                 'use_concatenated_goal': False,
                 'one_hot_goal_index': True,
                 'pixel_wrapper_kwargs': {
@@ -499,11 +516,9 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_VISION = {
                     'object_angle_sin',
                 ),
             },
-            'TurnMultiGoal-v0': { # eval environment
-                'goals': (
-                    -np.pi / 2,
-                    np.pi / 2
-                ),
+            'TurnMultiGoal-v0': {  # eval environment
+                'goals': (np.pi, 0.),
+                # 'goals': np.arange(0, 2 * np.pi, np.pi / 2),
                 'initial_goal_index': 0,
                 'swap_goals_upon_completion': False,
                 'use_concatenated_goal': False,
@@ -566,37 +581,96 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_VISION = {
                     'object_orientation_sin',
                     'object_orientation_cos'),
             },
-            'TurnFreeValve3Fixed-v0': {
+            'TurnFreeValve3ResetFreeSwapGoal-v0': {
+                'reset_fingers': True,
+                'reset_frequency': 0,
+                'goals': [
+                    (0, 0, 0, 0, 0, np.pi / 2),
+                    (0, 0, 0, 0, 0, -np.pi / 2),
+                ],
+                # 'goals': [(0.01, 0.01, 0, 0, 0, np.pi / 2),
+                #           (-0.01, -0.01, 0, 0, 0, -np.pi / 2),
+                #           ],
+                          # (-0.01, 0.01, 0, 0, 0, np.pi),
+                #           # (0.01, -0.01, 0, 0, 0, 0)],
                 'pixel_wrapper_kwargs': {
+                    'observation_key': 'pixels',
                     'pixels_only': False,
-                    'normalize': False,
                     'render_kwargs': {
                         'width': 32,
                         'height': 32,
-                        'camera_id': -1,
-                    }
+                    },
                 },
-                'camera_settings': {
-                    'azimuth': 45,
-                    'distance': 0.35,
-                    'elevation': -45,
-                    'lookat': (0, 0, 0.03),
-                },
-                # 'camera_settings': {
-                #     'azimuth': 0.,
-                #     'distance': 0.32,
-                #     'elevation': -45,
-                #     'lookat': (0, 0, 0.03),
-                # },
-                'init_angle_range': (0., 0.),
-                'target_angle_range': (np.pi, np.pi),
                 'observation_keys': (
-                    'pixels',
                     'claw_qpos',
-                    'last_action',
-                    'object_position',
+                    'object_xy_position',
+                    'object_orientation_cos',
                     'object_orientation_sin',
-                    'object_orientation_cos'),
+                    'last_action',
+                    'target_xy_position',
+                    'target_z_orientation_cos',
+                    'target_z_orientation_sin',
+                    'goal_index',
+                    'pixels',
+                ),
+                'camera_settings': {
+                    'azimuth': 180,
+                    'distance': 0.26,
+                    'elevation': -40,
+                    'lookat': (0, 0, 0.06),
+                }
+            },
+            'TurnFreeValve3ResetFreeSwapGoalEval-v0': {
+                'goals': [
+                    (0, 0, 0, 0, 0, np.pi / 2),
+                    (0, 0, 0, 0, 0, -np.pi / 2),
+                ],
+                'pixel_wrapper_kwargs': {
+                    'observation_key': 'pixels',
+                    'pixels_only': False,
+                    'render_kwargs': {
+                        'width': 32,
+                        'height': 32,
+                    },
+                },
+                'observation_keys': (
+                    'claw_qpos',
+                    'object_xy_position',
+                    'object_orientation_cos',
+                    'object_orientation_sin',
+                    'last_action',
+                    'target_xy_position',
+                    'target_z_orientation_cos',
+                    'target_z_orientation_sin',
+                    'goal_index',
+                    'pixels',
+                ),
+                'camera_settings': {
+                    'azimuth': 180,
+                    'distance': 0.26,
+                    'elevation': -40,
+                    'lookat': (0, 0, 0.06),
+                }
+            },
+            'TurnFreeValve3Fixed-v0': {
+               'pixel_wrapper_kwargs': {
+                   'pixels_only': False,
+                   'normalize': False,
+                   'render_kwargs': {
+                       'width': 48,
+                       'height': 48,
+                       'camera_id': -1,
+                   }
+               },
+               'camera_settings': {
+                   'azimuth': 0.,
+                   'distance': 0.35,
+                   'elevation': -38.17570837642188,
+                   'lookat': np.array([0.00046945, -0.00049496,  0.05389398]),
+               },
+               'init_angle_range': (0., 0.),
+               'target_angle_range': (np.pi, np.pi),
+               'observation_keys': ('pixels', 'claw_qpos', 'last_action'),
             },
             'TurnFreeValve3MultiGoalResetFree-v0': {
                 'goals': ((0, 0, 0, 0, 0, np.pi), (0, 0, 0, 0, 0, 0)),
@@ -687,69 +761,177 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_VISION = {
                 ),
             },
             'LiftDDFixed-v0': {
+                'reward_keys_and_weights': {
+                    'object_to_target_z_position_distance_reward': 1,
+                    'object_to_target_xy_position_distance_reward': 0,
+                    'object_to_target_orientation_distance_reward': 0, #tune.sample_from([1, 5]), #5,
+                },
+                'target_qpos_range': [(0, 0, 0.05, 0, 0, 0)],
                 'pixel_wrapper_kwargs': {
+                    'observation_key': 'pixels',
                     'pixels_only': False,
-                    'normalize': False,
                     'render_kwargs': {
                         'width': 32,
                         'height': 32,
-                        'camera_id': -1,
-                    }
+                    },
                 },
+                'observation_keys': (
+                    'claw_qpos',
+                    'object_position',
+                    'object_quaternion',
+                    'last_action',
+                    'target_position',
+                    'target_quaternion',
+                    'pixels',
+                ),
                 'camera_settings': {
                     'azimuth': 180,
                     'distance': 0.26,
-                    'elevation': -32,
-                    'lookat': (0, 0, 0.06)
-                },
-                'observation_keys': (
-                    'pixels', 'claw_qpos', 'last_action',
-                    'object_position',
-                    'object_quaternion',
-                ),
-                'reset_policy_checkpoint_path': None,
-                'init_qpos_range': (
-                    (0, 0, 0.041, 1.017, 0, 0),
-                    (0, 0, 0.041, 1.017, 0, 0),
-                    # (0, 0, 0.041, -np.pi, -np.pi, -np.pi),
-                    # (0, 0, 0.041, np.pi, np.pi, np.pi),
-                ),
-                'target_qpos_range': [
-                    (0, 0, 0.04, 0, 0, 0)
-                ],
+                    'elevation': -40,
+                    'lookat': (0, 0, 0.06),
+                }
             },
             'LiftDDResetFree-v0': {
+                'reward_keys_and_weights': {
+                    'object_to_target_z_position_distance_reward': 1,
+                    'object_to_target_xy_position_distance_reward': 0,
+                    'object_to_target_orientation_distance_reward': 0, #tune.sample_from([1, 5]), #5,
+                },
+                # 'reset_policy_checkpoint_path': '/home/abhigupta/ray_results/gym/DClaw/LiftDDResetFree-v0/2019-08-12T22-28-02-random_translate/id=1efced72-seed=3335_2019-08-12_22-28-03bqyu82da/checkpoint_1500/',
+                # 'target_qpos_range': (
+                #      (-0.1, -0.1, 0.0, 0, 0, 0),
+                #      (0.1, 0.1, 0.0, 0, 0, 0), # bgreen side up
+                #  ),
+                'target_qpos_range': [(0, 0, 0.05, 0, 0, 0)],
                 'pixel_wrapper_kwargs': {
+                    'observation_key': 'pixels',
                     'pixels_only': False,
-                    'normalize': False,
                     'render_kwargs': {
                         'width': 32,
                         'height': 32,
-                        'camera_id': -1,
-                    }
+                    },
                 },
+                'observation_keys': (
+                    'claw_qpos',
+                    'object_position',
+                    'object_quaternion',
+                    'last_action',
+                    'target_position',
+                    'target_quaternion',
+                    'pixels',
+                ),
                 'camera_settings': {
                     'azimuth': 180,
                     'distance': 0.26,
-                    'elevation': -32,
-                    'lookat': (0, 0, 0.06)
+                    'elevation': -40,
+                    'lookat': (0, 0, 0.06),
+                }
+            },
+            # Sliding Tasks
+            'SlideBeadsFixed-v0': {
+                'reward_keys_and_weights': {
+                    'objects_to_targets_mean_distance_reward': 1,
+                },
+                'init_qpos_range': [(0, 0)],
+                'target_qpos_range': [
+                    (-0.0825, 0.0825)],
+                'pixel_wrapper_kwargs': {
+                    'observation_key': 'pixels',
+                    'pixels_only': False,
+                    'render_kwargs': {
+                        'width': 32,
+                        'height': 32,
+                    },
                 },
                 'observation_keys': (
-                    'pixels', 'claw_qpos', 'last_action',
-                    'object_position',
-                    'object_quaternion',
+                    'claw_qpos',
+                    'objects_positions',
+                    'last_action',
+                    'objects_target_positions',
+                    'pixels',
                 ),
-                'reset_policy_checkpoint_path': None,
-                'init_qpos_range': (
-                    (0, 0, 0.041, 1.017, 0, 0),
-                    (0, 0, 0.041, 1.017, 0, 0),
-                    # (0, 0, 0.041, -np.pi, -np.pi, -np.pi),
-                    # (0, 0, 0.041, np.pi, np.pi, np.pi),
-                ),
+                'camera_settings': {
+                    'azimuth': 23.234042553191497,
+                    'distance': 0.2403358053524018,
+                    'elevation': -29.68085106382978,
+                    'lookat': (-0.00390331,  0.01236683,  0.01093447),
+                }
+            },
+            'SlideBeadsResetFree-v0': {
+                'reward_keys_and_weights': {
+                    'objects_to_targets_mean_distance_reward': 1,
+                },
+                'init_qpos_range': [(0, 0)],
+                'num_objects': 4,
                 'target_qpos_range': [
-                    (0, 0, 0.04, 0, 0, 0)
+                    (0, 0, 0, 0),
+                    (-0.0475, -0.0475, 0.0475, 0.0475),
                 ],
-            }
+                'cycle_goals': True,
+                'pixel_wrapper_kwargs': {
+                    'observation_key': 'pixels',
+                    'pixels_only': False,
+                    'render_kwargs': {
+                        'width': 32,
+                        'height': 32,
+                    },
+                },
+                'observation_keys': (
+                    'claw_qpos',
+                    'objects_positions',
+                    'last_action',
+                    'objects_target_positions',
+                    'pixels',
+                ),
+                'camera_settings': {
+                    'azimuth': 23.234042553191497,
+                    'distance': 0.2403358053524018,
+                    'elevation': -29.68085106382978,
+                    'lookat': (-0.00390331,  0.01236683,  0.01093447),
+                }
+            },
+            'SlideBeadsResetFreeEval-v0': {
+                'reward_keys_and_weights': {
+                    'objects_to_targets_mean_distance_reward': 1,
+                },
+                'init_qpos_range': [(0, 0)],
+                'num_objects': 4,
+                'target_qpos_range': [
+                    (0, 0, 0, 0),
+                    (-0.0475, -0.0475, 0.0475, 0.0475),
+                ],
+                # 'target_qpos_range': [
+                #     (0, 0),
+                #     (-0.0825, 0.0825),
+                #     (0.0825, 0.0825),
+                #     (-0.04, 0.04),
+                #     (-0.0825, -0.0825),
+                # ],
+                'cycle_goals': True,
+                'pixel_wrapper_kwargs': {
+                    'observation_key': 'pixels',
+                    'pixels_only': False,
+                    'render_kwargs': {
+                        'width': 32,
+                        'height': 32,
+                    },
+                },
+                'observation_keys': (
+                    'claw_qpos',
+                    'objects_positions',
+                    'last_action',
+                    'objects_target_positions',
+                    'pixels',
+                ),
+                'camera_settings': {
+                    'azimuth': 23.234042553191497,
+                    'distance': 0.2403358053524018,
+                    'elevation': -29.68085106382978,
+                    'lookat': (-0.00390331,  0.01236683,  0.01093447),
+                }
+            },
+
+
         }
     },
 }
@@ -758,14 +940,17 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_VISION = {
 Helper methods for retrieving universe/domain/task specific params.
 """
 
+
 def get_policy_params(universe, domain, task):
     policy_params = GAUSSIAN_POLICY_PARAMS_BASE.copy()
     return policy_params
+
 
 def get_max_path_length(universe, domain, task):
     max_path_length = MAX_PATH_LENGTH_PER_DOMAIN.get(domain) or \
         MAX_PATH_LENGTH_PER_DOMAIN[DEFAULT_KEY]
     return max_path_length
+
 
 def get_environment_params(universe, domain, task, from_vision):
     if from_vision:
@@ -777,12 +962,14 @@ def get_environment_params(universe, domain, task, from_vision):
         params.get(universe, {}).get(domain, {}).get(task, {}))
     return environment_params
 
+
 def get_classifier_params(universe, domain, task):
     classifier_params = CLASSIFIER_PARAMS_BASE.copy()
     classifier_params['kwargs'].update(
         CLASSIFIER_PARAMS_PER_UNIVERSE_DOMAIN_TASK.get(
             universe, {}).get(domain, {}).get(task, {}))
     return classifier_params
+
 
 def get_checkpoint_frequency(spec):
     config = spec.get('config', spec)
@@ -795,15 +982,18 @@ def get_checkpoint_frequency(spec):
 
     return checkpoint_frequency
 
+
 def is_image_env(universe, domain, task, variant_spec):
     return ('image' in task.lower()
             or 'image' in domain.lower()
             or 'pixel_wrapper_kwargs' in (
             variant_spec['environment_params']['training']['kwargs']))
 
+
 """
 Configuring variant specs
 """
+
 
 def get_variant_spec_base(universe, domain, task, task_eval,
                           policy, algorithm, from_vision):
@@ -863,7 +1053,7 @@ def get_variant_spec_base(universe, domain, task, task_eval,
         'replay_pool_params': {
             'type': 'SimpleReplayPool',
             'kwargs': {
-                'max_size': int(5e5)
+                'max_size': int(3e5), #int(1e6)
             }
         },
         'sampler_params': {
@@ -963,10 +1153,11 @@ def get_variant_spec_classifier(universe,
                 }
             },
         })
-
     return variant_spec
 
-CLASSIFIER_ALGS = ('SACClassifier', 'RAQ', 'VICE', 'VICEGAN', 'VICERAQ', 'VICEGANTwoGoal', 'VICEGANMultiGoal')
+
+CLASSIFIER_ALGS = ('SACClassifier', 'RAQ', 'VICE', 'VICEGAN', 'VICERAQ', 'VICEGANTwoGoal', 'VICEGANMultiGoal', 'MultiVICEGAN')
+
 
 def get_variant_spec(args):
     universe, domain = args.universe, args.domain
@@ -1005,7 +1196,7 @@ def get_variant_spec(args):
         #     for num_layers in (4, )
         #     for normalization_type in (None, )
         #     for num_filters in (64, 8)
-        # ]) 
+        # ])
         preprocessor_params = tune.grid_search([
             {
                 'type': 'ConvnetPreprocessor',

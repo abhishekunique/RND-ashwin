@@ -58,7 +58,7 @@ ALGORITHM_PARAMS_ADDITIONAL = {
             'target_entropy': 'auto', #tune.sample_from([-3, -5, -7]),#'auto',
             'action_prior': 'uniform',
             'her_iters': tune.grid_search([0]),
-            'rnd_int_rew_coeff': tune.sample_from([1]),
+            'rnd_int_rew_coeff': tune.sample_from([0]),
             'normalize_ext_reward_gamma': 0.99,
         },
         'rnd_params': {
@@ -656,7 +656,7 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_VISION = {
                     'object_to_target_angle_dist_cost': 1,
                 },
             },
-            'TurnMultiGoal-v0': { # eval environment
+            'TurnMultiGoal-v0': { #  eval environment
                 'goals': (
                     -np.pi / 2,
                     np.pi / 2
@@ -715,44 +715,166 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_VISION = {
                 'observation_keys': ('claw_qpos', 'last_action', 'pixels'),
             },
             'TurnFreeValve3Fixed-v0': {
-                'camera_settings': {
-                    'azimuth': 180,
-                    'distance': 0.35,
-                    'elevation': -55,
-                    'lookat': (0, 0, 0.03),
-                },
+                # 'camera_settings': {
+                #     'azimuth': 0,
+                #     'distance': 0.25,
+                #     'elevation': -45,
+                #     'lookat': np.array([0, 0, 0.02])
+                # },
+                # 'observation_keys': ('claw_qpos', 'last_action', 'pixels'),
+                # 'pixel_wrapper_kwargs': {
+                #     'pixels_only': False,
+                #     'render_kwargs': {
+                #         'camera_id': -1,
+                #         'width': 32,
+                #         'height': 32
+                #     }
+                # },
                 'pixel_wrapper_kwargs': {
+                    'observation_key': 'pixels',
                     'pixels_only': False,
-                    'normalize': False,
                     'render_kwargs': {
-                        'camera_id': -1,
                         'width': 32,
-                        'height': 32
-                    }
+                        'height': 32,
+                    },
                 },
+                'camera_settings': {
+                    'distance': 0.5,
+                    'elevation': -60
+                },
+                # 'camera_settings': {
+                #     'azimuth': 180,
+                #     'distance': 0.35,
+                #     'elevation': -55,
+                #     'lookat': (0, 0, 0.03),
+                # },
                 'observation_keys': (
                     'claw_qpos',
-                    'last_action',
-                    'pixels',
                     'object_xy_position',
-                    'object_z_orientation_cos',
-                    'object_z_orientation_sin',
+                    'object_orientation_cos',
+                    'object_orientation_sin',
+                    'last_action',
                     'target_xy_position',
                     'target_z_orientation_cos',
                     'target_z_orientation_sin',
+                    # 'object_to_target_relative_position',
+                    #    'in_corner',
+                    'pixels',
                 ),
-                'init_qpos_range': (
-                    # (0.025, -0.025, 0, 0, 0, -np.pi),
-                    # (0.025, 0.025, 0, 0, 0, np.pi)
-                    (0, 0, 0, 0, 0, -np.pi),
-                    (0, 0, 0, 0, 0, np.pi)
+                'target_qpos_range': [(0, 0, 0, 0, 0, 0), (0, 0, 0, 0, 0, 0)],
+                'init_qpos_range': ((-0.08, -0.08, 0, 0, 0, 0), (0.08, 0.08, 0, 0, 0, 0)), #((-0.04, -0.04, 0, 0, 0, 0), (0.04, 0.04, 0, 0, 0, 0)),
+                'reward_keys_and_weights': {
+                    'object_to_target_position_distance_reward': 0.1,
+                    'object_to_target_orientation_distance_reward': 1,
+                },
+            },
+            'TurnFreeValve3RandomReset-v0': {
+                'reward_keys': (
+                    'object_to_target_position_distance_cost',
+                    'object_to_target_orientation_distance_cost',
                 ),
-                'target_qpos_range': [(0, 0, 0, 0, 0, np.pi)],
+                'initial_distribution_path': '', #'/mnt/sda/ray_results/gym/DClaw/TurnFreeValve3ResetFree-v0/2019-06-30T18-53-06-baseline_both_push_and_turn_log_rew/id=38872574-seed=6880_2019-06-30_18-53-07whkq1aax/',
+                'reset_from_corners': True,
+            },
+            'TurnFreeValve3ResetFree-v0': {
+                'reward_keys_and_weights': {
+                    'object_to_target_position_distance_reward': tune.sample_from([1]),
+                    'object_to_target_orientation_distance_reward': 0,
+                },
+                'reset_fingers': True,
+                'reset_frequency': 0,
+                'reset_policy_checkpoint_path': '',
+                # 'target_qpos_range': [
+                #      (0.04, -0.04, 0, 0, 0, 0),
+                #      (-0.04, 0.04, 0, 0, 0, 0),
+                #      (0, 0, 0, 0, 0, 0),
+                #      (-0.04, -0.04, 0, 0, 0, 0),
+                #      (0.04, 0.04, 0, 0, 0, 0)
+                #  ],
+                # 'target_qpos_range': ((-0.04, -0.04, 0, 0, 0, 0), (0.04, 0.04, 0, 0, 0, 0)),
+                'target_qpos_range': [(0, 0, 0, 0, 0, 0), (0, 0, 0, 0, 0, 0)],
+                'init_qpos_range': [(0, 0, 0, 0, 0, 0)], #((-0.04, -0.04, 0, 0, 0, 0), (0.04, 0.04, 0, 0, 0, 0)),
+                'pixel_wrapper_kwargs': {
+                    'observation_key': 'pixels',
+                    'pixels_only': False,
+                    'render_kwargs': {
+                        'width': 32,
+                        'height': 32,
+                    },
+                },
+                'camera_settings': {
+                    'distance': 0.5,
+                    'elevation': -60
+                },
+                # 'camera_settings': {
+                #     'azimuth': 180,
+                #     'distance': 0.35,
+                #     'elevation': -55,
+                #     'lookat': (0, 0, 0.03),
+                # },
+                'observation_keys': (
+                    'claw_qpos',
+                    'object_xy_position',
+                    'object_orientation_cos',
+                    'object_orientation_sin',
+                    'last_action',
+                    'target_xy_position',
+                    'target_z_orientation_cos',
+                    'target_z_orientation_sin',
+                    # 'object_to_target_relative_position',
+                    #    'in_corner',
+                    'pixels',
+                ),
+            },
+            'TurnFreeValve3ResetFreeSwapGoal-v0': {
                 'reward_keys_and_weights': {
                     'object_to_target_position_distance_reward': tune.grid_search([0.1, 0.5]),
                     # 'object_to_target_position_distance_reward': tune.grid_search([0.1]),
                     'object_to_target_orientation_distance_reward': 1,
                 },
+                'reset_fingers': True,
+                'reset_frequency': 0,
+                'goals': [
+                    (0, 0, 0, 0, 0, np.pi / 2),
+                    (0, 0, 0, 0, 0, -np.pi / 2),
+                ],
+                # 'goals': [(0.01, 0.01, 0, 0, 0, np.pi / 2),
+                #           (-0.01, -0.01, 0, 0, 0, -np.pi / 2),
+                #           ],
+                          # (-0.01, 0.01, 0, 0, 0, np.pi),
+                #           # (0.01, -0.01, 0, 0, 0, 0)],
+                'pixel_wrapper_kwargs': {
+                    'observation_key': 'pixels',
+                    'pixels_only': False,
+                    'render_kwargs': {
+                        'width': 32,
+                        'height': 32,
+                    },
+                },
+                # 'reset_policy_checkpoint_path': '/mnt/sda/ray_results/gym/DClaw/TurnFreeValve3ResetFree-v0/2019-08-22T12-37-40-random_translate_centered_around_origin/id=4de1a720-seed=779_2019-08-22_12-37-41qqs0v4da/checkpoint_200/',
+                'observation_keys': (
+                    'claw_qpos',
+                    'object_xy_position',
+                    'object_orientation_cos',
+                    'object_orientation_sin',
+                    'last_action',
+                    'target_xy_position',
+                    'target_z_orientation_cos',
+                    'target_z_orientation_sin',
+                    # 'object_to_target_relative_position',
+                    #    'in_corner',
+                    'pixels',
+                ),
+                # 'camera_settings': {
+                #     'distance': 0.5,
+                #     'elevation': -60
+                # },
+                'camera_settings': {
+                    'azimuth': 180,
+                    'distance': 0.26,
+                    'elevation': -40,
+                    'lookat': (0, 0, 0.06),
+                }
             },
             'TurnFreeValve3ResetFree-v0': {
                 'reward_keys_and_weights': {
@@ -918,44 +1040,103 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_VISION = {
             # Lifting Tasks
             'LiftDDFixed-v0': {
                 'reward_keys_and_weights': {
-                    'object_to_target_z_position_distance_reward': 0,
+                    'object_to_target_z_position_distance_reward': 5,
                     'object_to_target_xy_position_distance_reward': 1,
-                    'object_to_target_orientation_distance_reward': 0,
+                    'object_to_target_orientation_distance_reward': 0, #tune.sample_from([1, 5]), #5,
                 },
                 'init_qpos_range': (
                     (0, 0, 0.041, -np.pi, -np.pi, -np.pi),
-                    (0, 0, 0.041, np.pi, np.pi, np.pi),
+                    (0, 0, 0.041, np.pi, np.pi, np.pi)
                 ),
-                'target_qpos_range': (
-                    (-0.05, -0.05, 0, 0, 0, 0),
-                    (0.05, 0.05, 0, 0, 0, 0)
-                ),
+                'target_qpos_range': [(0, 0, 0.05, 0, 0, 0)],
                 'use_bowl_arena': False,
-                # 'reward_keys_and_weights': {
-                #     'object_to_target_z_position_distance_reward': 10,
-                #     'object_to_target_xy_position_distance_reward': 0,
-                #     'object_to_target_orientation_distance_reward': 0,
+                # 'target_qpos_range': [(0, 0, 0.0, 0, 0, np.pi)],
+                # [  # target pos relative to init
+                #      (0, 0, 0, 0, 0, np.pi),
+                #      (0, 0, 0, np.pi, 0, 0), # bgreen side up
+                #      (0, 0, 0, 1.017, 0, 2*np.pi/5), # black side up
+                #  ],
+
+                # 'pixel_wrapper_kwargs': {
+                #     'observation_key': 'pixels',
+                #     'pixels_only': False,
+                #     'render_kwargs': {
+                #         'width': 64,
+                #         'height': 64,
+                #     },
                 # },
-                # 'init_qpos_range': (
-                #     (0, 0, 0.041, -np.pi, -np.pi, -np.pi),
-                #     (0, 0, 0.041, np.pi, np.pi, np.pi),
+                # 'observation_keys': (
+                #     'claw_qpos',
+                #     'object_position',
+                #     'object_quaternion',
+                #     'last_action',
+                #     'target_position',
+                #     'target_quaternion',
+                #     'pixels',
                 # ),
-                # 'target_qpos_range': [(0, 0, 0.05, 0, 0, 0)],
-                'pixel_wrapper_kwargs': {
-                    'pixels_only': False,
-                    'normalize': False,
-                    'render_kwargs': {
-                        'width': 32,
-                        'height': 32,
-                        'camera_id': -1,
-                    }
+                # 'camera_settings': {
+                #     'azimuth': 180,
+                #     'distance': 0.26,
+                #     'elevation': -40,
+                #     'lookat': (0, 0, 0.06),
+                # },
+                'reset_policy_checkpoint_path': '', #'/mnt/sda/ray_results/gym/DClaw/LiftDDFixed-v0/2019-08-01T18-06-55-just_lift_single_goal/id=3ac8c6e0-seed=5285_2019-08-01_18-06-565pn01_gq/checkpoint_1500/',
+            },
+            'LiftDDResetFree-v0': {
+                'reward_keys_and_weights': {
+                    'object_to_target_z_position_distance_reward': 1,
+                    'object_to_target_xy_position_distance_reward': 0,
+                    'object_to_target_orientation_distance_reward': 0, #tune.sample_from([1, 5]), #5,
                 },
-                # In box
+                # 'reset_policy_checkpoint_path': '/home/abhigupta/ray_results/gym/DClaw/LiftDDResetFree-v0/2019-08-12T22-28-02-random_translate/id=1efced72-seed=3335_2019-08-12_22-28-03bqyu82da/checkpoint_1500/',
+                # 'target_qpos_range': (
+                #      (-0.1, -0.1, 0.0, 0, 0, 0),
+                #      (0.1, 0.1, 0.0, 0, 0, 0), # bgreen side up
+                #  ),
+                'target_qpos_range': [(0, 0, 0.05, 0, 0, 0)],
+                'pixel_wrapper_kwargs': {
+                    'observation_key': 'pixels',
+                    'pixels_only': False,
+                    'render_kwargs': {
+                        'width': 64,
+                        'height': 64,
+                    },
+                },
+                'observation_keys': (
+                    'claw_qpos',
+                    'object_position',
+                    'object_quaternion',
+                    'last_action',
+                    'target_position',
+                    'target_quaternion',
+                    'pixels',
+                ),
                 'camera_settings': {
                     'azimuth': 180,
-                    'distance': 0.35,
-                    'elevation': -55,
-                    'lookat': (0, 0, 0.03)
+                    'distance': 0.26,
+                    'elevation': -40,
+                    'lookat': (0, 0, 0.06),
+                }
+            },
+            'LiftDDResetFreeComposedGoals-v0': {
+                'reward_keys_and_weights': {
+                    'object_to_target_z_position_distance_reward': 1,
+                    'object_to_target_xy_position_distance_reward': 1,
+                    'object_to_target_orientation_distance_reward': 1, #tune.sample_from([1, 5]), #5,
+                },
+                'reset_policy_checkpoint_path': '',
+                'goals': [
+                     (0, 0, 0, 0, 0, 0),
+                     (0, 0, 0.05, 0, 0, 0),
+                     # (0, 0, 0, np.pi, 0, 0)
+                 ],
+                'reset_frequency': 0,
+            },
+            # Flipping Tasks
+            'FlipEraserFixed-v0': {
+                'reward_keys_and_weights': {
+                    'object_to_target_position_distance_reward': 1,
+                    'object_to_target_orientation_distance_reward': 20,
                 },
                 # In bowl
                 # 'camera_settings': {
@@ -1063,13 +1244,18 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_VISION = {
                     'objects_to_targets_mean_distance_reward': 1,
                 },
                 'init_qpos_range': [(0, 0)],
+                'num_objects': 4,
                 'target_qpos_range': [
-                    (0, 0),
-                    (-0.0825, 0.0825),
-                    (0.0825, 0.0825),
-                    (-0.04, 0.04),
-                    (-0.0825, -0.0825),
+                    (0, 0, 0, 0),
+                    (-0.0475, -0.0475, 0.0475, 0.0475),
                 ],
+                # 'target_qpos_range': [
+                #     (0, 0),
+                #     (-0.0825, 0.0825),
+                #     (0.0825, 0.0825),
+                #     (-0.04, 0.04),
+                #     (-0.0825, -0.0825),
+                # ],
                 'cycle_goals': True,
                 'pixel_wrapper_kwargs': {
                     'observation_key': 'pixels',
@@ -1104,13 +1290,18 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_VISION = {
                     'objects_to_targets_mean_distance_reward': 1,
                 },
                 'init_qpos_range': [(0, 0)],
+                'num_objects': 4,
                 'target_qpos_range': [
-                    (0, 0),
-                    (-0.0825, 0.0825),
-                    (0.0825, 0.0825),
-                    (-0.04, 0.04),
-                    (-0.0825, -0.0825),
+                    (0, 0, 0, 0),
+                    (-0.0475, -0.0475, 0.0475, 0.0475),
                 ],
+                # 'target_qpos_range': [
+                #     (0, 0),
+                #     (-0.0825, 0.0825),
+                #     (0.0825, 0.0825),
+                #     (-0.04, 0.04),
+                #     (-0.0825, -0.0825),
+                # ],
                 'cycle_goals': True,
                 'pixel_wrapper_kwargs': {
                     'observation_key': 'pixels',
@@ -1157,7 +1348,7 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_VISION = {
                     'pixels_only': True,
                     'render_kwargs': {
                         'width': 84,
-                        'height': 84,
+                        'Height': 84,
                         'camera_id': 0,
                     },
                 },
@@ -1237,6 +1428,7 @@ def get_algorithm_params(universe, domain, task):
             'n_epochs': get_num_epochs(universe, domain, task),
             'n_initial_exploration_steps': tune.sample_from(
                 get_initial_exploration_steps),
+            # 'n_initial_exploration_steps': 0,
         }
     }
 

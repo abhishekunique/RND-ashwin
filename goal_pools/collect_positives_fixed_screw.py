@@ -9,7 +9,7 @@ import imageio
 import pickle
 
 cur_dir = os.path.dirname(os.path.realpath(__file__))
-directory = cur_dir + "/fixed_screw_multigoal_0"
+directory = cur_dir + "/fixed_screw_180"
 if not os.path.exists(directory):
     os.makedirs(directory)
 

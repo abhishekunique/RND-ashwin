@@ -33,7 +33,9 @@ GOAL_IMAGE_PATH_PER_ENVIRONMENT = {
     'TurnFreeValve3Fixed-v0': 'free_screw_180_less_tiny_box_old_camera/',
     'TurnFixed-v0': 'fixed_screw_180_no_normalization/',
     'TurnMultiGoalResetFree-v0': 'fixed_screw_2_goals_mixed_pool_goal_index/',
+    'LiftDDResetFree-v0': 'dodecahedron_lifting_bowl_arena/',
 }
+
 
 def get_goal_example_from_variant(variant):
     train_env_params = variant['environment_params']['training']
@@ -76,6 +78,7 @@ def get_goal_example_from_variant(variant):
     }
 
     return goal_examples_train, goal_examples_validation
+
 
 def generate_pick_goal_examples(total_goal_examples, env, task_name):
     max_attempt = 50

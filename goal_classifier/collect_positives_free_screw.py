@@ -21,7 +21,7 @@ def main():
     goal_angle = np.pi
     observations = []
     images = True
-    image_shape = (128, 128, 3)
+    image_shape = (32, 32, 3)
 
     env_kwargs = {
         'pixel_wrapper_kwargs': {
@@ -34,19 +34,19 @@ def main():
             },
             'camera_ids': (-1, 0),
         },
-        'camera_settings': { # Free camera settings
-            'azimuth': 0.,
-            'distance': 0.32,
-            'elevation': -45,
-            'lookat': (0, 0, 0.03),
-        },
+        'camera_settings': {
+            'azimuth': 180,
+            'distance': 0.26,
+            'elevation': -40,
+            'lookat': (0, 0, 0.06),
+        }
         'init_angle_range': (goal_angle - 0.05, goal_angle + 0.05),
         'target_angle_range': (goal_angle, goal_angle),
-        'observation_keys': ('pixels', 'claw_qpos', 'last_action'), 
+        'observation_keys': ('pixels', 'claw_qpos', 'last_action'),
     }
     env = GymAdapter(
         domain='DClaw',
-        task='TurnFreeValve3Fixed-v0',
+        task='LiftDDFixed-v0',
         **env_kwargs
     )
 
