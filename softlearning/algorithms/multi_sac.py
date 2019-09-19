@@ -177,14 +177,15 @@ class MultiSAC(SAC):
 
     def _init_external_rewards(self):
         self._unscaled_ext_rewards = [self._placeholders['rewards'] for _ in range(self._num_goals)]
+
+    def _get_Q_targets(self):
+        Q_targets = []
+
         self._placeholders['reward'].update({
             f'running_ext_rew_std_{i}': tf.compat.v1.placeholder(
                 tf.float32, shape=(), name=f'running_ext_rew_std_{i}')
             for i in range(self._num_goals)
         })
-
-    def _get_Q_targets(self):
-        Q_targets = []
 
         self._unscaled_int_rewards, self._int_rewards, self._normalized_ext_rewards, self._ext_rewards, self._total_rewards = [], [], [], [], []
 

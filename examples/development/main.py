@@ -45,10 +45,128 @@ class ExperimentRunner(tune.Trainable):
         tf.compat.v1.reset_default_graph()
         tf.keras.backend.clear_session()
 
-    def _multi_sac_build(self):
+    def _get_algorithm_kwargs(self, variant):
+        self._multi_build = (variant['algorithm_params']['type'] in ['MultiSAC', 'MultiVICEGAN'])
+        if self._multi_build:
+            return self._get_multi_algorithm_kwargs(variant)
+
+        environment_params = variant['environment_params']
+        training_environment = self.training_environment = (
+            get_environment_from_params(environment_params['training']))
+        evaluation_environment = self.evaluation_environment = (
+            get_environment_from_params(environment_params['evaluation'])
+            if 'evaluation' in environment_params
+            else training_environment)
+
+        replay_pool = self.replay_pool = (
+            get_replay_pool_from_variant(variant, training_environment))
+
+        try:
+            if self.policy.preprocessors['pixels'].name == 'state_estimator_preprocessor':
+                state_estimator = self.policy.preprocessors['pixels']
+
+                from softlearning.replay_pools.flexible_replay_pool import Field
+                replay_pool = self.replay_pool = (
+                    get_replay_pool_from_variant(variant, training_environment,
+                        extra_obs_keys_and_fields={
+                            'object_state_prediction': Field(
+                                name='object_state_prediction',
+                                dtype=np.float32,
+                                shape=(4,)
+                            )
+                        }))
+            else:
+                state_estimator = None
+        except:
+            state_estimator = None
+
+        sampler = self.sampler = get_sampler_from_variant(
+            variant,
+            state_estimator=state_estimator)
+
+        Qs = self.Qs = get_Q_function_from_variant(
+            variant, training_environment)
+
+        # ==== LOADING IN CONVNET FROM WORKING RUN EXPERIMENT ====
+        preprocessor_params = variant['policy_params']['kwargs']['observation_preprocessors_params']
+        if ('pixels' in preprocessor_params
+            and 'ConvnetPreprocessor' == preprocessor_params['pixels']['type']
+            and preprocessor_params['pixels'].get('weights_path', None) is not None):
+            weights_path = preprocessor_params['pixels']['weights_path']
+            with open(weights_path, 'rb') as f:
+                weights = pickle.load(f)
+                def set_weights_and_fix(model):
+                    model.set_weights(weights)
+                    model.trainable = False
+
+                set_weights_and_fix(self.policy.preprocessors['pixels'])
+                set_weights_and_fix(self.Qs[0].observations_preprocessors['pixels'])
+                set_weights_and_fix(self.Qs[1].observations_preprocessors['pixels'])
+                set_weights_and_fix(self.Q_targets[0].observations_preprocessors['pixels'])
+                set_weights_and_fix(self.Q_targets[1].observations_preprocessors['pixels'])
+
+        policy = self.policy = get_policy_from_variant(
+            variant, training_environment)
+
+        last_checkpoint_dir = variant['replay_pool_params']['last_checkpoint_dir']
+
+        if last_checkpoint_dir:
+            print('restoring')
+            self._restore_replay_pool(last_checkpoint_dir)
+
+        if isinstance(sampler, NNSampler):
+            print('restoring nn_pool')
+            nn_pool_dir = variant['sampler_params']['nn_pool_dir']
+            nn_pool = (get_replay_pool_from_variant(variant, training_environment))
+
+            replay_pool = self.replay_pool
+            self.replay_pool = nn_pool
+            self._restore_replay_pool(nn_pool_dir)
+            self.replay_pool = replay_pool
+            self.sampler.initialize_nn_pool(nn_pool)
+
+        initial_exploration_policy = self.initial_exploration_policy = (
+            get_policy_from_params(
+                variant['exploration_policy_params'], training_environment))
+
+        if variant['algorithm_params']['rnd_params']:
+            from softlearning.rnd.utils import get_rnd_networks_from_variant
+            rnd_networks = get_rnd_networks_from_variant(variant, training_environment)
+        else:
+            rnd_networks = ()
+
+        # VAE
+        if ('pixels' in self.policy.preprocessors
+            and self.policy.preprocessors['pixels'].name == 'vae_preprocessor'):
+            from softlearning.models.utils import get_vae
+            vae = get_vae(**variant['policy_params']
+                                   ['kwargs']
+                                   ['observation_preprocessors_params']
+                                   ['pixels']
+                                   ['kwargs'])
+        else:
+            vae = None
+
+        algorithm_kwargs = {
+            'variant': variant,
+            'training_environment': training_environment,
+            'evaluation_environment': evaluation_environment,
+            'policy': policy,
+            'initial_exploration_policy': initial_exploration_policy,
+            'Qs': Qs,
+            'pool': replay_pool,
+            'sampler': sampler,
+            'session': self._session,
+            'rnd_networks': rnd_networks,
+            'vae': vae
+            'state_estimator': state_estimator,
+            'vae': vae,
+        }
+        return algorithm_kwargs
+
+    def _get_multi_algorithm_kwargs(self, variant):
         share_pool = self._variant['algorithm_params']['kwargs'].pop('share_pool')
 
-        variant = copy.deepcopy(self._variant)
         environment_params = variant['environment_params']
         training_environment = self.training_environment = (
             get_environment_from_params(environment_params['training']))
@@ -58,11 +176,6 @@ class ExperimentRunner(tune.Trainable):
             else training_environment)
         num_goals = training_environment.num_goals
 
-        # replay_pools = self.replay_pools = tuple([
-        #     get_replay_pool_from_variant(variant, training_environment)
-        #     for _ in range(num_goals)
-        # ])
-        # self.replay_pool = replay_pools[0]
         if share_pool:
             replay_pool = get_replay_pool_from_variant(variant, training_environment)
             replay_pools = self._replay_pools = tuple([
@@ -88,11 +201,11 @@ class ExperimentRunner(tune.Trainable):
             get_policy_from_variant(variant, training_environment)
             for _ in range(num_goals)
         ])
-        # self.policy = policies[0]
-        # policy = self.policy = get_policy_from_variant(
-        #     variant, training_environment)
 
-        last_checkpoint_dir = variant['replay_pool_params']['last_checkpoint_dir']
+        if 'last_checkpoint_dir' in variant['replay_pool_params']:
+            last_checkpoint_dir = variant['replay_pool_params']['last_checkpoint_dir']
+        else:
+            last_checkpoint_dir = None
 
         if last_checkpoint_dir:
             print('restoring')
@@ -108,153 +221,55 @@ class ExperimentRunner(tune.Trainable):
         else:
             rnd_networks = ()
 
-        self.algorithm = get_algorithm_from_variant(
-            variant=self._variant,
-            training_environment=training_environment,
-            evaluation_environment=evaluation_environment,
-            policies=policies,
-            initial_exploration_policy=initial_exploration_policy,
-            Qs_per_policy=Qs_per_policy,
-            # Q_target_pools=Q_target_pools,
-            # pools=replay_pools,
-            pools=replay_pools,
-            samplers=samplers,
-            num_goals=num_goals,
-            rnd_networks=rnd_networks,
-            session=self._session)
-
-        initialize_tf_variables(self._session, only_uninitialized=True)
-
-        self._built = True
+        algorithm_kwargs = {
+            'variant': self._variant,
+            'training_environment': training_environment,
+            'evaluation_environment': evaluation_environment,
+            'policies': policies,
+            'initial_exploration_policy': initial_exploration_policy,
+            'Qs_per_policy': Qs_per_policy,
+            'pools': replay_pools,
+            'samplers': samplers,
+            'num_goals': num_goals,
+            'rnd_networks': rnd_networks,
+            'session': self._session
+        }
+        return algorithm_kwargs
 
     def _build(self):
         variant = copy.deepcopy(self._variant)
+        algorithm_kwargs = self._get_algorithm_kwargs(variant)
 
-        self._build_multi_sac = (variant['algorithm_params']['type'] == 'MultiSAC')
-        if self._build_multi_sac:
-            self._multi_sac_build()
-            return
+        self.algorithm = get_algorithm_from_variant(**algorithm_kwargs)
 
-        environment_params = variant['environment_params']
-        training_environment = self.training_environment = (
-            get_environment_from_params(environment_params['training']))
-        evaluation_environment = self.evaluation_environment = (
-            get_environment_from_params(environment_params['evaluation'])
-            if 'evaluation' in environment_params
-            else training_environment)
-
-        replay_pool = self.replay_pool = (
-            get_replay_pool_from_variant(variant, training_environment))
-        Qs = self.Qs = get_Q_function_from_variant(
-            variant, training_environment)
-        Q_targets = self.Q_targets = get_Q_function_from_variant(
-            variant, training_environment)
-
-        policy = self.policy = get_policy_from_variant(
-            variant, training_environment)
-
-        try:
-            if self.policy.preprocessors['pixels'].name == 'state_estimator_preprocessor':
-                state_estimator = self.policy.preprocessors['pixels']
-
-                from softlearning.replay_pools.flexible_replay_pool import Field
-                replay_pool = self.replay_pool = (
-                    get_replay_pool_from_variant(variant, training_environment,
-                        extra_obs_keys_and_fields={
-                            'object_state_prediction': Field(
-                                name='object_state_prediction',
-                                dtype=np.float32,
-                                shape=(4,)
-                            )
-                        }))
-            else:
-                state_estimator = None
-        except:
-            state_estimator = None
-
-        # ==== LOADING IN CONVNET FROM WORKING RUN EXPERIMENT ====
-        preprocessor_params = variant['policy_params']['kwargs']['observation_preprocessors_params']
-        if ('pixels' in preprocessor_params
-            and 'ConvnetPreprocessor' == preprocessor_params['pixels']['type']
-            and preprocessor_params['pixels'].get('weights_path', None) is not None):
-            weights_path = preprocessor_params['pixels']['weights_path']
-            with open(weights_path, 'rb') as f:
-                weights = pickle.load(f)
-                def set_weights_and_fix(model):
-                    model.set_weights(weights)
-                    model.trainable = False
-
-                set_weights_and_fix(self.policy.preprocessors['pixels'])
-                set_weights_and_fix(self.Qs[0].observations_preprocessors['pixels'])
-                set_weights_and_fix(self.Qs[1].observations_preprocessors['pixels'])
-                set_weights_and_fix(self.Q_targets[0].observations_preprocessors['pixels'])
-                set_weights_and_fix(self.Q_targets[1].observations_preprocessors['pixels'])
-
-        sampler = self.sampler = get_sampler_from_variant(
-            variant,
-            state_estimator=state_estimator)
-
-        last_checkpoint_dir = variant['replay_pool_params']['last_checkpoint_dir']
-
-        if last_checkpoint_dir:
-            print('restoring')
-            self._restore_replay_pool(last_checkpoint_dir)
-
-        if isinstance(sampler, NNSampler):
-            print('restoring nn_pool')
-            nn_pool_dir = variant['sampler_params']['nn_pool_dir']
-            nn_pool = (get_replay_pool_from_variant(variant, training_environment))
-
-            replay_pool = self.replay_pool
-            self.replay_pool = nn_pool
-            self._restore_replay_pool(nn_pool_dir)
-            self.replay_pool = replay_pool
-            self.sampler.initialize_nn_pool(nn_pool)
-
-        initial_exploration_policy = self.initial_exploration_policy = (
-            get_policy_from_params(
-                variant['exploration_policy_params'], training_environment))
-
-        # VAE
-        if ('pixels' in self.policy.preprocessors
-            and self.policy.preprocessors['pixels'].name == 'vae_preprocessor'):
-            from softlearning.models.utils import get_vae
-            vae = get_vae(**variant['policy_params']
-                                   ['kwargs']
-                                   ['observation_preprocessors_params']
-                                   ['pixels']
-                                   ['kwargs'])
-        else:
-            vae = None
-
-        if variant['algorithm_params']['rnd_params']:
-            from softlearning.rnd.utils import get_rnd_networks_from_variant
-            rnd_networks = get_rnd_networks_from_variant(variant, training_environment)
-        else:
-            rnd_networks = ()
-
-        self.algorithm = get_algorithm_from_variant(
-            variant=self._variant,
-            training_environment=training_environment,
-            evaluation_environment=evaluation_environment,
-            policy=policy,
-            initial_exploration_policy=initial_exploration_policy,
-            Qs=Qs,
-            Q_targets=Q_targets,
-            pool=replay_pool,
-            sampler=sampler,
-            session=self._session,
-            state_estimator=state_estimator,
-            vae=vae,
-            rnd_networks=rnd_networks)
-
-        if isinstance(replay_pool, PrioritizedExperienceReplayPool) and \
-           replay_pool._mode == 'Bellman_Error':
-            replay_pool.initialize(self.algorithm)
+        # if isinstance(replay_pool, PrioritizedExperienceReplayPool) and \
+        #    replay_pool._mode == 'Bellman_Error':
+        #     replay_pool.initialize(self.algorithm)
 
         initialize_tf_variables(self._session, only_uninitialized=True)
 
         self._built = True
+
+    # def _multi_sac_build(self):
+
+    #     self.algorithm = get_algorithm_from_variant(
+    #         variant=self._variant,
+    #         training_environment=training_environment,
+    #         evaluation_environment=evaluation_environment,
+    #         policies=policies,
+    #         initial_exploration_policy=initial_exploration_policy,
+    #         Qs_per_policy=Qs_per_policy,
+    #         # Q_target_pools=Q_target_pools,
+    #         # pools=replay_pools,
+    #         pools=replay_pools,
+    #         samplers=samplers,
+    #         num_goals=num_goals,
+    #         rnd_networks=rnd_networks,
+    #         session=self._session)
+
+    #     initialize_tf_variables(self._session, only_uninitialized=True)
+
+    #     self._built = True
 
     def _train(self):
         if not self._built:
@@ -309,7 +324,7 @@ class ExperimentRunner(tune.Trainable):
         }
 
     def _save_value_functions(self, checkpoint_dir):
-        if self._build_multi_sac:
+        if self._multi_build:
             for i, Qs in enumerate(self._Qs_per_policy):
                 for j, Q in enumerate(Qs):
                     checkpoint_path = os.path.join(
@@ -330,7 +345,7 @@ class ExperimentRunner(tune.Trainable):
                 Q.save_weights(checkpoint_path)
 
     def _restore_value_functions(self, checkpoint_dir):
-        if self._build_multi_sac:
+        if self._multi_build:
             for i, Qs in enumerate(self._Qs_per_policy):
                 for j, Q in enumerate(Qs):
                     checkpoint_path = os.path.join(
@@ -390,7 +405,7 @@ class ExperimentRunner(tune.Trainable):
         return os.path.join(checkpoint_dir, '')
 
     def _save_replay_pool(self, checkpoint_dir):
-        if self._build_multi_sac:
+        if self._multi_build:
             replay_pools_pickle_paths = self._replay_pools_pickle_paths(
                 checkpoint_dir)
             for i, replay_pool in enumerate(self._replay_pools):
@@ -430,8 +445,8 @@ class ExperimentRunner(tune.Trainable):
         assert isinstance(checkpoint_dir, str), checkpoint_dir
         checkpoint_dir = checkpoint_dir.rstrip('/')
 
-        self._build_multi_sac = (self._variant['algorithm_params']['type'] == 'MultiSAC')
-        if self._build_multi_sac:
+        self._multi_build = (self._variant['algorithm_params']['type'] == 'MultiSAC')
+        if self._multi_build:
             self._restore_multi_sac(checkpoint_dir)
             return
 

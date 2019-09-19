@@ -1347,7 +1347,7 @@ def get_variant_spec_base(universe, domain, task, task_eval, policy, algorithm, 
         },
     }
 
-    # Set this flag if you don't want to save the pixels in the replay pool 
+    # Set this flag if you don't want to save the pixels in the replay pool
     no_pixel_information = False
 
     env_kwargs = variant_spec['environment_params']['training']['kwargs']
@@ -1452,30 +1452,40 @@ PIXELS_PREPROCESSOR_PARAMS = {
         },
     },
     'ConvnetPreprocessor': tune.grid_search([
-       # {
-       #      'type': 'ConvnetPreprocessor',
-       #      'kwargs': {
-       #          'conv_filters': (16, 32, 64, 32),
-       #          'conv_kernel_sizes': (3, ) * 4,
-       #          'conv_strides': (2, 2, 1, 1),
-       #          'normalization_type': normalization_type,
-       #          'downsampling_type': 'conv',
-       #          'output_kwargs': {
-       #              'type': 'spatial_softmax',
-       #          }
-       #      },
-       #  },
+        # {
+        #      'type': 'ConvnetPreprocessor',
+        #      'kwargs': {
+        #          'conv_filters': (16, 32, 64, 32),
+        #          'conv_kernel_sizes': (3, ) * 4,
+        #          'conv_strides': (2, 2, 1, 1),
+        #          'normalization_type': normalization_type,
+        #          'downsampling_type': 'conv',
+        #          'output_kwargs': {
+        #              'type': 'spatial_softmax',
+        #          }
+        #      },
+        #  },
+        # {
+        #     'type': 'ConvnetPreprocessor',
+        #     'kwargs': {
+        #         'conv_filters': (16, 32, 64),
+        #         'conv_kernel_sizes': (3, ) * 3,
+        #         'conv_strides': (2, ) * 3,
+        #         'normalization_type': normalization_type,
+        #         'downsampling_type': 'conv',
+        #         'output_kwargs': {
+        #             'type': 'flatten',
+        #         }
+        #     },
+        # }
         {
             'type': 'ConvnetPreprocessor',
             'kwargs': {
-                'conv_filters': (16, 32, 64),
+                'conv_filters': (8, 16, 32),
                 'conv_kernel_sizes': (3, ) * 3,
                 'conv_strides': (2, ) * 3,
-                'normalization_type': normalization_type,
+                'normalization_type': tune.sample_from([None]),
                 'downsampling_type': 'conv',
-                'output_kwargs': {
-                    'type': 'flatten',
-                }
             },
         }
         # {

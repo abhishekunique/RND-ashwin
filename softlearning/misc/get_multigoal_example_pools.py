@@ -30,9 +30,13 @@ GOAL_POOL_PATHS_PER_ENV_PER_NUM_GOALS = {
     'LiftDDResetFree-v0': {
         '1': ('dodecahedron_lifting_bowl_arena/', ),
     },
-    'TranslatePuckResetFree-v0': {
-        '1': ('2_beads_{goal}/' for goal in (np.array([0, 0]), np.array([-0.0875, 0.0875]))),
-        },
+    'SlideBeadsResetFree-v0': {
+        # '2': ('2_beads_{goal}/' for goal in (np.array([0, 0]), np.array([-0.0875, 0.0875]))),
+        '2': (f'4_beads_{goal}/' for goal in (
+            np.array([0, 0, 0, 0]),
+            np.array([-0.0475, -0.0475, 0.0475, 0.0475]))
+        ),
+    },
     # 'TurnMultiGoalResetFree-v0': (f'fixed_screw_multigoal_{goal}/' for goal in [180, 0]),
     # 'TurnMultiGoalResetFree-v0': (f'fixed_screw_multigoal_{goal}/' for goal in [120, 240, 0]),
     # 'TurnMultiGoalResetFree-v0': (f'fixed_screw_5_goals_{goal}/' for goal in [72, 144, 216, 288, 0]),

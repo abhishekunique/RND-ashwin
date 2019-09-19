@@ -66,6 +66,7 @@ def create_VICEGANGoalConditioned_algorithm(variant, *args, **kwargs):
 
     return algorithm
 
+
 def create_SAC_algorithm(variant, *args, **kwargs):
     from .sac import SAC
 
@@ -90,6 +91,14 @@ def create_MultiSAC_algorithm(variant, *args, **kwargs):
     return algorithm
 
 
+def create_MultiVICEGAN_algorithm(variant, *args, **kwargs):
+    from .multi_vice import MultiVICEGAN
+
+    algorithm = MultiVICEGAN(*args, **kwargs)
+
+    return algorithm
+
+
 ALGORITHM_CLASSES = {
     'SAC': create_SAC_algorithm,
     'SQL': create_SQL_algorithm,
@@ -103,6 +112,7 @@ ALGORITHM_CLASSES = {
     'VICEGANTwoGoal': create_VICEGANTwoGoal_algorithm,
     'VICEGANMultiGoal': create_VICEGANMultiGoal_algorithm,
     'MultiSAC': create_MultiSAC_algorithm,
+    'MultiVICEGAN': create_MultiVICEGAN_algorithm,
 }
 
 
