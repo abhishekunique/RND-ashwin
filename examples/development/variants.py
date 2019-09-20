@@ -57,10 +57,11 @@ ALGORITHM_PARAMS_ADDITIONAL = {
             'lr': 3e-4,
             'target_update_interval': 1,
             'tau': 5e-3,
+            # 'n_initial_exploration_steps': int(1e4),
             'target_entropy': 'auto', #tune.sample_from([-3, -5, -7]),#'auto',
             'action_prior': 'uniform',
             'her_iters': tune.grid_search([0]),
-            'rnd_int_rew_coeff': tune.sample_from([0]),
+            'rnd_int_rew_coeff': tune.sample_from([1]), # 1
             'normalize_ext_reward_gamma': 0.99,
         },
         'rnd_params': {
@@ -367,6 +368,53 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_STATE = {
                     'object_to_target_position_distance_reward': tune.grid_search([1]),
                     'object_to_target_orientation_distance_reward': 1,
                 },
+            },
+            'TurnFreeValve3ResetFree-v0': {
+                'reward_keys_and_weights': {
+                    'object_to_target_position_distance_reward': tune.sample_from([1]),
+                    'object_to_target_orientation_distance_reward': 0,
+                },
+                'reset_fingers': True,
+                'reset_frequency': 0,
+                'reset_policy_checkpoint_path': '',
+                # 'target_qpos_range': [
+                #      (0.04, -0.04, 0, 0, 0, 0),
+                #      (-0.04, 0.04, 0, 0, 0, 0),
+                #      (0, 0, 0, 0, 0, 0),
+                #      (-0.04, -0.04, 0, 0, 0, 0),
+                #      (0.04, 0.04, 0, 0, 0, 0)
+                #  ],
+                # 'target_qpos_range': ((-0.04, -0.04, 0, 0, 0, 0), (0.04, 0.04, 0, 0, 0, 0)),
+                'target_qpos_range': [(0, 0, 0, 0, 0, 0), (0, 0, 0, 0, 0, 0)],
+                'init_qpos_range': [(0, 0, 0, 0, 0, 0)], #((-0.04, -0.04, 0, 0, 0, 0), (0.04, 0.04, 0, 0, 0, 0)),
+                # === BELOW IS FOR SAVING INTO THE REPLAY POOL. ===
+                # MAKE SURE TO SET `no_pixel_information = True` below in order
+                # to remove the pixels from the policy inputs/Q inputs.
+                'pixel_wrapper_kwargs': {
+                    'observation_key': 'pixels',
+                    'pixels_only': False,
+                    'render_kwargs': {
+                        'width': 32,
+                        'height': 32,
+                    },
+                },
+                'camera_settings': {
+                    'azimuth': 180,
+                    'distance': 0.35,
+                    'elevation': -55,
+                    'lookat': (0, 0, 0.03),
+                },
+                'observation_keys': (
+                    'claw_qpos',
+                    'object_xy_position',
+                    'object_orientation_cos',
+                    'object_orientation_sin',
+                    'last_action',
+                    'target_xy_position',
+                    'target_z_orientation_cos',
+                    'target_z_orientation_sin',
+                    'pixels',
+                ),
             },
             'TurnFreeValve3RandomReset-v0': {
                 'reward_keys': (
@@ -849,16 +897,16 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_VISION = {
                         'height': 32,
                     },
                 },
-                'camera_settings': {
-                    'distance': 0.5,
-                    'elevation': -60
-                },
                 # 'camera_settings': {
-                #     'azimuth': 180,
-                #     'distance': 0.35,
-                #     'elevation': -55,
-                #     'lookat': (0, 0, 0.03),
+                #     'distance': 0.5,
+                #     'elevation': -60
                 # },
+                'camera_settings': {
+                    'azimuth': 180,
+                    'distance': 0.35,
+                    'elevation': -55,
+                    'lookat': (0, 0, 0.03),
+                },
                 'observation_keys': (
                     'claw_qpos',
                     'object_xy_position',
@@ -894,11 +942,11 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_VISION = {
                     'object_to_target_orientation_distance_reward': 1,
                 },
                 'reset_fingers': True,
-                'target_qpos_range': [(0, 0, 0, 0, 0, -np.pi / 2), (0, 0, 0, 0, 0, 0)],
+                # 'target_qpos_range': [(0, 0, 0, 0, 0, -np.pi / 2), (0, 0, 0, 0, 0, 0)],
                 'observation_keys': (
                     'claw_qpos',
                     'last_action',
-                    'pixels', 
+                    'pixels',
                     'target_xy_position',
                     'target_z_orientation_cos',
                     'target_z_orientation_sin',
@@ -924,11 +972,10 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_VISION = {
                     'elevation': -55,
                     'lookat': (0, 0, 0.03)
                 },
-                'target_qpos_range': [(0, 0, 0, 0, 0, -np.pi / 2), (0, 0, 0, 0, 0, 0)],
+                # 'target_qpos_range': [(0, 0, 0, 0, 0, -np.pi / 2), (0, 0, 0, 0, 0, 0)],
                 # 'reward_keys_and_weights': {
-                    # 'object_to_target_position_distance_reward': tune.grid_search([1, 2]),
-                    # 'object_to_target_position_distance_reward': 2,
-                    # 'object_to_target_orientation_distance_reward': 1,
+                #     'object_to_target_position_distance_reward': tune.grid_search([0.1, 0.5]),
+                #     'object_to_target_orientation_distance_reward': 1,
                 # },
                 # 'init_qpos_range': (
                 #     (-0.025, -0.025, 0, 0, 0, -np.pi),
@@ -1517,7 +1564,7 @@ def get_variant_spec_base(universe, domain, task, task_eval, policy, algorithm, 
         },
     }
 
-    # Set this flag if you don't want to save the pixels in the replay pool
+    # Set this flag if you don't want to pass pixels into the policy/Qs
     no_pixel_information = False
 
     env_kwargs = variant_spec['environment_params']['training']['kwargs']
@@ -1619,15 +1666,12 @@ PIXELS_PREPROCESSOR_PARAMS = {
     'VAEPreprocessor': {
         'type': 'VAEPreprocessor',
         'kwargs': {
-            'image_shape': (32, 32, 3),
-            # 'include_decoder': False,
-            # 'trainable': False,
-            # 'latent_dim': 4,
+            'image_shape': (33, 32, 3),
             'latent_dim': 16,
-            'encoder_path': '/root/softlearning/softlearning/models/vae_16_dim_beta_3_invisible_claw_l2_reg/encoder_16_dim_3.0_beta.h5',
-            'decoder_path': '/root/softlearning/softlearning/models/vae_16_dim_beta_3_invisible_claw_l2_reg/decoder_16_dim_3.0_beta.h5',
-            # 'encoder_path': '/home/justinvyu/dev/softlearning-vice/softlearning/models/vae_weights/invisible_claw_encoder_weights_4_final.h5',
-            # 'decoder_path': '/home/justinvyu/dev/softlearning-vice/softlearning/models/vae_weights/invisible_claw_decoder_weights_4_final.h5',
+            'encoder_path': '/nfs/kun1/users/justinvyu/pretrained_models/vae_16_dim_beta_3_invisible_claw_l2_reg/encoder_16_dim_3.0_beta.h5',
+            'decoder_path': '/nfs/kun1/users/justinvyu/pretrained_models/vae_16_dim_beta_3_invisible_claw_l2_reg/decoder_16_dim_3.0_beta.h5',
+            # 'latent_dim': 32,
+            # 'include_decoder': True,
         },
     },
     'ConvnetPreprocessor': tune.grid_search([
@@ -1705,7 +1749,7 @@ def get_variant_spec_image(universe,
         from_vision,
         *args, **kwargs)
 
-    if is_image_env(universe, domain, task, variant_spec):
+    if from_vision and is_image_env(universe, domain, task, variant_spec):
         assert preprocessor_type in PIXELS_PREPROCESSOR_PARAMS
         preprocessor_params = PIXELS_PREPROCESSOR_PARAMS[preprocessor_type]
 
