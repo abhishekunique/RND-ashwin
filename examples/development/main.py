@@ -175,7 +175,6 @@ class ExperimentRunner(tune.Trainable):
             if 'evaluation' in environment_params
             else training_environment)
         num_goals = training_environment.num_goals
-
         if share_pool:
             replay_pool = get_replay_pool_from_variant(variant, training_environment)
             replay_pools = self._replay_pools = tuple([
@@ -193,6 +192,10 @@ class ExperimentRunner(tune.Trainable):
         ])
 
         Qs_per_policy = self._Qs_per_policy = tuple([
+            get_Q_function_from_variant(variant, training_environment)
+            for _ in range(num_goals)
+        ])
+        Q_targets_per_policy = self._Qs_per_policy = tuple([
             get_Q_function_from_variant(variant, training_environment)
             for _ in range(num_goals)
         ])
@@ -228,6 +231,7 @@ class ExperimentRunner(tune.Trainable):
             'policies': policies,
             'initial_exploration_policy': initial_exploration_policy,
             'Qs_per_policy': Qs_per_policy,
+            'Q_targets_per_policy': Q_targets_per_policy,
             'pools': replay_pools,
             'samplers': samplers,
             'num_goals': num_goals,

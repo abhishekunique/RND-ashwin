@@ -1,8 +1,11 @@
 from .adapters.gym_adapter import GymAdapter
 import dsuite
 from dsuite.dclaw.turn import DClawTurnImage
-import gym_minigrid
 
+try:
+    import gym_minigrid
+except:
+    print('Warning: gym_minigrid package not found.')
 
 ADAPTERS = {
     'gym': GymAdapter,

@@ -10,6 +10,8 @@ DEFAULT_KEY = "__DEFAULT_KEY__"
 # N = number of hidden layers
 M = 256
 N = 2
+# M = 512
+# N = 3
 
 REPARAMETERIZE = True
 
@@ -872,77 +874,6 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_VISION = {
                 ),
             },
             'TurnFreeValve3ResetFreeSwapGoal-v0': {
-                'reward_keys_and_weights': {
-                    'object_to_target_position_distance_reward': tune.grid_search([0.1, 0.5]),
-                    # 'object_to_target_position_distance_reward': tune.grid_search([0.1]),
-                    'object_to_target_orientation_distance_reward': 1,
-                },
-                'reset_fingers': True,
-                'reset_frequency': 0,
-                'goals': [
-                    (0, 0, 0, 0, 0, np.pi / 2),
-                    (0, 0, 0, 0, 0, -np.pi / 2),
-                ],
-                # 'goals': [(0.01, 0.01, 0, 0, 0, np.pi / 2),
-                #           (-0.01, -0.01, 0, 0, 0, -np.pi / 2),
-                #           ],
-                          # (-0.01, 0.01, 0, 0, 0, np.pi),
-                #           # (0.01, -0.01, 0, 0, 0, 0)],
-                'pixel_wrapper_kwargs': {
-                    'observation_key': 'pixels',
-                    'pixels_only': False,
-                    'render_kwargs': {
-                        'width': 32,
-                        'height': 32,
-                    },
-                },
-                # 'reset_policy_checkpoint_path': '/mnt/sda/ray_results/gym/DClaw/TurnFreeValve3ResetFree-v0/2019-08-22T12-37-40-random_translate_centered_around_origin/id=4de1a720-seed=779_2019-08-22_12-37-41qqs0v4da/checkpoint_200/',
-                'observation_keys': (
-                    'claw_qpos',
-                    'object_xy_position',
-                    'object_orientation_cos',
-                    'object_orientation_sin',
-                    'last_action',
-                    'target_xy_position',
-                    'target_z_orientation_cos',
-                    'target_z_orientation_sin',
-                    # 'object_to_target_relative_position',
-                    #    'in_corner',
-                    'pixels',
-                ),
-                # 'camera_settings': {
-                #     'distance': 0.5,
-                #     'elevation': -60
-                # },
-                'camera_settings': {
-                    'azimuth': 180,
-                    'distance': 0.26,
-                    'elevation': -40,
-                    'lookat': (0, 0, 0.06),
-                }
-            },
-            'TurnFreeValve3ResetFree-v0': {
-                'reward_keys_and_weights': {
-                    'object_to_target_position_distance_reward': 1,
-                    'object_to_target_orientation_distance_reward': 0,
-                },
-                'observation_keys': (
-                    'claw_qpos',
-                    'object_position',
-                    # 'object_orientation_cos',
-                    # 'object_orientation_sin',
-                    'last_action',
-                    'target_orientation',
-                    #    'target_orientation_cos',
-                    #    'target_orientation_sin',
-                    # 'object_to_target_relative_position',
-                    #    'in_corner',
-                    'pixels',
-                ),
-            },
-            'TurnFreeValve3ResetFreeRandomGoal-v0': {
-            },
-            'TurnFreeValve3ResetFreeSwapGoal-v0': {
                 'pixel_wrapper_kwargs': {
                     'pixels_only': False,
                     'normalize': False,
@@ -959,21 +890,22 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_VISION = {
                     'lookat': (0, 0, 0.03),
                 },
                 'reward_keys_and_weights': {
-                    'object_to_target_position_distance_reward': tune.grid_search([1, 2]),
-                    # 'object_to_target_position_distance_reward': 0.5,
+                    'object_to_target_position_distance_reward': tune.grid_search([0.5, 1]),
                     'object_to_target_orientation_distance_reward': 1,
                 },
                 'reset_fingers': True,
+                'target_qpos_range': [(0, 0, 0, 0, 0, -np.pi / 2), (0, 0, 0, 0, 0, 0)],
                 'observation_keys': (
                     'claw_qpos',
                     'last_action',
-                    'pixels',
-                    'object_xy_position',
-                    'object_z_orientation_cos',
-                    'object_z_orientation_sin',
+                    'pixels', 
                     'target_xy_position',
                     'target_z_orientation_cos',
                     'target_z_orientation_sin',
+                    # === BELOW JUST FOR LOGGING ===
+                    'object_xy_position',
+                    'object_z_orientation_cos',
+                    'object_z_orientation_sin',
                 ),
             },
             'TurnFreeValve3ResetFreeSwapGoalEval-v0': {
@@ -992,15 +924,16 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_VISION = {
                     'elevation': -55,
                     'lookat': (0, 0, 0.03)
                 },
-                'reward_keys_and_weights': {
-                    'object_to_target_position_distance_reward': tune.grid_search([0.1, 0.5]),
+                'target_qpos_range': [(0, 0, 0, 0, 0, -np.pi / 2), (0, 0, 0, 0, 0, 0)],
+                # 'reward_keys_and_weights': {
+                    # 'object_to_target_position_distance_reward': tune.grid_search([1, 2]),
                     # 'object_to_target_position_distance_reward': 2,
-                    'object_to_target_orientation_distance_reward': 1,
-                },
-                'init_qpos_range': (
-                    (-0.025, -0.025, 0, 0, 0, -np.pi),
-                    (0.025, 0.025, 0, 0, 0, np.pi)
-                ),
+                    # 'object_to_target_orientation_distance_reward': 1,
+                # },
+                # 'init_qpos_range': (
+                #     (-0.025, -0.025, 0, 0, 0, -np.pi),
+                #     (0.025, 0.025, 0, 0, 0, np.pi)
+                # ),
                 'observation_keys': (
                     'claw_qpos',
                     'last_action',
@@ -1606,13 +1539,13 @@ def get_variant_spec_base(universe, domain, task, task_eval, policy, algorithm, 
 
     if 'ResetFree' not in task:
         variant_spec['algorithm_params']['kwargs']['save_training_video_frequency'] = 0
-    if task == 'TurnFreeValve3ResetFreeSwapGoal-v0':
-        variant_spec['environment_params']['evaluation']['kwargs']['goals'] = (
-            tune.sample_from(lambda spec: (
-                spec.get('config', spec)
-                ['environment_params']['training']['kwargs'].get('goals')
-            ))
-        )
+    # if task == 'TurnFreeValve3ResetFreeSwapGoal-v0':
+    #     variant_spec['environment_params']['evaluation']['kwargs']['goals'] = (
+    #         tune.sample_from(lambda spec: (
+    #             spec.get('config', spec)
+    #             ['environment_params']['training']['kwargs'].get('goals')
+    #         ))
+    #     )
     if domain == 'MiniGrid':
         variant_spec['algorithm_params']['kwargs']['reparameterize'] = False
         variant_spec['policy_params']['type'] = 'DiscretePolicy'
@@ -1660,32 +1593,41 @@ STATE_PREPROCESSOR_PARAMS = {
     'None': None,
 }
 
+
+# TODO: Create a helper function to retrieve models from relative path
 PIXELS_PREPROCESSOR_PARAMS = {
     'StateEstimatorPreprocessor': {
         'type': 'StateEstimatorPreprocessor',
         'kwargs': {
-            # 'domain': domain,
-            # 'task': task,
-            # 'obs_keys_to_estimate': (
-            #     'object_position',
-            #     'object_orientation_cos',
-            #     'object_orientation_sin',
-            # ),
             'input_shape': (32, 32, 3),
-            # 'num_hidden_units': 256,
-            # 'num_hidden_layers': 2,
             'num_hidden_units': 512,
-            'num_hidden_layers': 4,
-            'state_estimator_path': '/home/justinvyu/dev/softlearning-vice/softlearning/models/state_estimators/state_estimator_antialias_larger_network.h5'
+            'num_hidden_layers': 2,
+            'state_estimator_path': '/root/softlearning/softlearning/models/state_estimators/state_estimator_from_vae_latents.h5',
+            'preprocessor_params': {
+                'type': 'VAEPreprocessor',
+                'kwargs': {
+                    'encoder_path': '/root/softlearning/softlearning/models/vae_16_dim_beta_3_invisible_claw_l2_reg/encoder_16_dim_3.0_beta.h5',
+                    'decoder_path': '/root/softlearning/softlearning/models/vae_16_dim_beta_3_invisible_claw_l2_reg/decoder_16_dim_3.0_beta.h5',
+                    'trainable': False,
+                    'image_shape': (32, 32, 3),
+                    'latent_dim': 16,
+                    'include_decoder': False,
+                }
+            }
         }
     },
     'VAEPreprocessor': {
         'type': 'VAEPreprocessor',
         'kwargs': {
             'image_shape': (32, 32, 3),
-            'latent_dim': 4,
-            'encoder_path': '/home/justinvyu/dev/softlearning-vice/softlearning/models/vae_weights/invisible_claw_encoder_weights_4_final.h5',
-            'decoder_path': '/home/justinvyu/dev/softlearning-vice/softlearning/models/vae_weights/invisible_claw_decoder_weights_4_final.h5',
+            # 'include_decoder': False,
+            # 'trainable': False,
+            # 'latent_dim': 4,
+            'latent_dim': 16,
+            'encoder_path': '/root/softlearning/softlearning/models/vae_16_dim_beta_3_invisible_claw_l2_reg/encoder_16_dim_3.0_beta.h5',
+            'decoder_path': '/root/softlearning/softlearning/models/vae_16_dim_beta_3_invisible_claw_l2_reg/decoder_16_dim_3.0_beta.h5',
+            # 'encoder_path': '/home/justinvyu/dev/softlearning-vice/softlearning/models/vae_weights/invisible_claw_encoder_weights_4_final.h5',
+            # 'decoder_path': '/home/justinvyu/dev/softlearning-vice/softlearning/models/vae_weights/invisible_claw_decoder_weights_4_final.h5',
         },
     },
     'ConvnetPreprocessor': tune.grid_search([

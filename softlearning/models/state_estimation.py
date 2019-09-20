@@ -34,6 +34,7 @@ def state_estimator_model(input_shape,
                           kernel_regularizer=None,
                           preprocessor_params=None,
                           preprocessor=None,
+                          kernel_regularizer=None,
                           name='state_estimator_preprocessor'):
     # TODO: Make this take in observation keys instead of this hardcoded output size.
     obs_preprocessor_params = (

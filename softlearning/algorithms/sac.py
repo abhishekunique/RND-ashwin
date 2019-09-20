@@ -610,7 +610,6 @@ class SAC(RLAlgorithm):
             if not os.path.exists(image_save_dir):
                 os.makedirs(image_save_dir)
 
-
             if n_images_to_save > 0:
                 import imageio
                 sample_idx = np.random.choice(decoded.shape[0], size=n_images_to_save)
