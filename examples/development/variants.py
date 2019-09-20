@@ -287,7 +287,8 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_STATE = {
                 'observation_keys': (
                     'claw_qpos',
                     'last_action',
-                    'one_hot_goal_index',
+                    'goal_index',
+                    # 'one_hot_goal_index',
                     'object_angle_cos',
                     'object_angle_sin',
                 ),
@@ -307,7 +308,7 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_STATE = {
                 'observation_keys': (
                     'claw_qpos',
                     'last_action',
-                    'one_hot_goal_index',
+                    'goal_index',
                     'object_angle_cos',
                     'object_angle_sin',
                 ),
@@ -391,9 +392,10 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_STATE = {
             },
             'TurnFreeValve3ResetFreeSwapGoal-v0': {
                 'reward_keys_and_weights': {
-                    # 'object_to_target_position_distance_reward': tune.grid_search([1, 2]),
-                    'object_to_target_position_distance_reward': tune.grid_search([2]),
+                    'object_to_target_position_distance_reward': tune.grid_search([1, 2]),
                     'object_to_target_orientation_distance_reward': 1,
+                    # 'object_to_target_position_distance_reward': tune.grid_search([1]),
+                    # 'object_to_target_orientation_distance_reward': 0,
                 },
                 'reset_fingers': True,
                 'observation_keys': (
@@ -402,10 +404,15 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_STATE = {
                     'object_xy_position',
                     'object_z_orientation_cos',
                     'object_z_orientation_sin',
+                    'target_xy_position',
                     'target_z_orientation_cos',
                     'target_z_orientation_sin',
-                    'target_xy_position',
                 ),
+                'goals': tune.grid_search([
+                    [(0, 0, 0, 0, 0, np.pi / 2), (-0.05, -0.06, 0, 0, 0, 0)],
+                    # [(0.05, 0.06, 0, 0, 0, 0), (-0.05, -0.06, 0, 0, 0, 0)],
+                    # [(0, 0, 0, 0, 0, 0), (-0.05, -0.06, 0, 0, 0, 0)],
+                ]),
             },
             'TurnFreeValve3ResetFreeSwapGoalEval-v0': {
                 'reward_keys_and_weights': {
@@ -423,6 +430,11 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_STATE = {
                     'target_z_orientation_sin',
                     'target_xy_position',
                 ),
+                # 'goals': tune.grid_search([
+                #     [(0, 0, 0, 0, 0, np.pi / 2), (-0.05, -0.06, 0, 0, 0, 0)],
+                #     [(0.05, 0.06, 0, 0, 0, 0), (-0.05, -0.06, 0, 0, 0, 0)],
+                #     [(0, 0, 0, 0, 0, 0), (-0.05, -0.06, 0, 0, 0, 0)],
+                # ]),
             },
             'TurnFreeValve3ResetFreeCurriculum-v0': {
                 'reward_keys': (
@@ -467,32 +479,65 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_STATE = {
             'ScrewRandomDynamics-v0': {},
 
             # Lifting Tasks
+            # 'LiftDDFixed-v0': {
+            #     'reward_keys_and_weights': {
+            #         'object_to_target_z_position_distance_reward': 10,
+            #         'object_to_target_xy_position_distance_reward': 0,
+            #         'object_to_target_orientation_distance_reward': 0, #5,
+            #     },
+            #     'init_qpos_range': [(0, 0, 0.041, 1.017, 0, 0)],
+            #     'target_qpos_range': [(0, 0, 0.05, 0, 0, 0)]
+            #     # [  # target pos relative to init
+            #     #      (0, 0, 0, 0, 0, np.pi),
+            #     #      (0, 0, 0, np.pi, 0, 0), # bgreen side up
+            #     #      (0, 0, 0, 1.017, 0, 2*np.pi/5), # black side up
+            #     #  ],
+            # },
             'LiftDDFixed-v0': {
                 'reward_keys_and_weights': {
                     'object_to_target_z_position_distance_reward': 10,
                     'object_to_target_xy_position_distance_reward': 0,
                     'object_to_target_orientation_distance_reward': 0, #5,
                 },
-                'init_qpos_range': [(0, 0, 0.041, 1.017, 0, 0)],
-                'target_qpos_range': [(0, 0, 0.05, 0, 0, 0)]
-                # [  # target pos relative to init
-                #      (0, 0, 0, 0, 0, np.pi),
-                #      (0, 0, 0, np.pi, 0, 0), # bgreen side up
-                #      (0, 0, 0, 1.017, 0, 2*np.pi/5), # black side up
-                #  ],
+                'init_qpos_range': (
+                    (-0.05, -0.05, 0.041, -np.pi, -np.pi, -np.pi),
+                    (0.05, 0.05, 0.041, np.pi, np.pi, np.pi)
+                ),
+                'target_qpos_range': (
+                    (-0.05, -0.05, 0, 0, 0, 0),
+                    (0.05, 0.05, 0, 0, 0, 0)
+                ),
+                'use_bowl_arena': False,
             },
+
+            # 'LiftDDResetFree-v0': {
+            #     'reward_keys_and_weights': {
+            #         'object_to_target_z_position_distance_reward': 10,
+            #         'object_to_target_xy_position_distance_reward': 0,
+            #         'object_to_target_orientation_distance_reward': 0,
+            #     },
+            #     # 'init_qpos_range': [(0, 0, 0.041, 1.017, 0, 0)],
+            #     'init_qpos_range': (
+            #         (0, 0, 0.041, -np.pi, -np.pi, -np.pi),
+            #         (0, 0, 0.041, np.pi, np.pi, np.pi),
+            #     ),
+            #     'target_qpos_range': [(0, 0, 0.05, 0, 0, 0)],
+            # },
             'LiftDDResetFree-v0': {
                 'reward_keys_and_weights': {
-                    'object_to_target_z_position_distance_reward': 10,
-                    'object_to_target_xy_position_distance_reward': 0,
+                    'object_to_target_z_position_distance_reward': 0,
+                    'object_to_target_xy_position_distance_reward': 1,
                     'object_to_target_orientation_distance_reward': 0,
                 },
-                # 'init_qpos_range': [(0, 0, 0.041, 1.017, 0, 0)],
                 'init_qpos_range': (
                     (0, 0, 0.041, -np.pi, -np.pi, -np.pi),
                     (0, 0, 0.041, np.pi, np.pi, np.pi),
                 ),
-                'target_qpos_range': [(0, 0, 0.05, 0, 0, 0)],
+                'target_qpos_range': (
+                    (-0.05, -0.05, 0, 0, 0, 0),
+                    (0.05, 0.05, 0, 0, 0, 0)
+                ),
+                'use_bowl_arena': False,
             },
 
             # Flipping Tasks
@@ -914,7 +959,7 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_VISION = {
                     'lookat': (0, 0, 0.03),
                 },
                 'reward_keys_and_weights': {
-                    'object_to_target_position_distance_reward': tune.grid_search([0.1, 0.5]),
+                    'object_to_target_position_distance_reward': tune.grid_search([1, 2]),
                     # 'object_to_target_position_distance_reward': 0.5,
                     'object_to_target_orientation_distance_reward': 1,
                 },

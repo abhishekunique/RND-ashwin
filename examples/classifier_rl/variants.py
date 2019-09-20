@@ -72,6 +72,20 @@ ALGORITHM_PARAMS_BASE = {
         'discount': 0.99,
         'tau': 5e-3,
         'reward_scale': 1.0,
+        'normalize_ext_reward_gamma': 0.99,
+        'rnd_int_rew_coeff': tune.sample_from([0]),
+    },
+    'rnd_params': {
+        'convnet_params': {
+            'conv_filters': (16, 32, 64),
+            'conv_kernel_sizes': (3, 3, 3),
+            'conv_strides': (2, 2, 2),
+            'normalization_type': None,
+        },
+        'fc_params': {
+            'hidden_layer_sizes': (256, 256),
+            'output_size': 512,
+        },
     }
 }
 
@@ -249,7 +263,7 @@ ALGORITHM_PARAMS_ADDITIONAL = {
             'classifier_lr': 1e-4,
             'classifier_batch_size': 128,
             'n_initial_exploration_steps': int(1e3),
-            'n_classifier_train_steps': 10,
+            'n_classifier_train_steps': tune.grid_search([5]), # ==== TUNE THIS ====
             'classifier_optim_name': 'adam',
             'active_query_frequency': 1,
             'n_epochs': 200,
@@ -356,9 +370,10 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_STATE = {
                 'observation_keys': (
                     'claw_qpos',
                     'last_action',
-                    'one_hot_goal_index',
-                    'object_angle_cos',
-                    'object_angle_sin',
+                    'goal_index',
+                    # 'one_hot_goal_index',
+                    # 'object_angle_cos',
+                    # 'object_angle_sin',
                 ),
             },
             'TurnMultiGoal-v0': { # eval environment
@@ -376,9 +391,10 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_STATE = {
                 'observation_keys': (
                     'claw_qpos',
                     'last_action',
-                    'one_hot_goal_index',
-                    'object_angle_cos',
-                    'object_angle_sin',
+                    'goal_index',
+                    # 'one_hot_goal_index',
+                    # 'object_angle_cos',
+                    # 'object_angle_sin',
                 ),
             },
 

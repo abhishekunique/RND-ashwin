@@ -9,19 +9,17 @@ import imageio
 import pickle
 
 cur_dir = os.path.dirname(os.path.realpath(__file__))
-directory = cur_dir + "/fixed_screw_2_goals_mixed_pool_goal_index"
+directory = cur_dir + "/fixed_screw_2_goals"
 
 def main():
-    # goals = np.arange(0, 360, 360 / 4)
-    # goals = [120, 240, 0]
-    mixed_goal_pool = True
+    mixed_goal_pool = False
     one_hot_goal_index = False
     images = True
-    goals = [180, 0]
+    goals = [90, -90]
     num_goals = len(goals)
 
     image_shape = (32, 32, 3)
-    NUM_TOTAL_EXAMPLES, ROLLOUT_LENGTH, STEPS_PER_SAMPLE = 200, 25, 5
+    NUM_TOTAL_EXAMPLES, ROLLOUT_LENGTH, STEPS_PER_SAMPLE = 500, 25, 5
     observations = []
 
     for goal_index, goal in enumerate(goals):
@@ -35,8 +33,8 @@ def main():
             'camera_settings': {
                 'azimuth': 0.,
                 'distance': 0.32,
-                'elevation': -45.18,
-                'lookat': np.array([0.00047, -0.0005, 0.060])
+                'elevation': -45,
+                'lookat': np.array([0, 0, 0.06])
             },
             'goals': (goal_angle,),
             'goal_collection': True,
@@ -52,7 +50,12 @@ def main():
                 },
             },
             'swap_goals_upon_completion': True,
-            'observation_keys': ('pixels', 'claw_qpos', 'last_action', 'goal_index'), # save goal index to mask in the classifier
+            'observation_keys': (
+                'pixels',
+                'claw_qpos',
+                'last_action',
+                'goal_index'
+            ),
         }
         env = GymAdapter(
             domain='DClaw',
@@ -63,7 +66,7 @@ def main():
         if mixed_goal_pool:
             path = directory
         else:
-            path = directory + str(goal)
+            path = os.path.join(directory, str(goal))
         if not os.path.exists(path):
             os.makedirs(path)
 

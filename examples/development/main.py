@@ -57,34 +57,15 @@ class ExperimentRunner(tune.Trainable):
             get_environment_from_params(environment_params['evaluation'])
             if 'evaluation' in environment_params
             else training_environment)
-
         replay_pool = self.replay_pool = (
             get_replay_pool_from_variant(variant, training_environment))
 
-        try:
-            if self.policy.preprocessors['pixels'].name == 'state_estimator_preprocessor':
-                state_estimator = self.policy.preprocessors['pixels']
-
-                from softlearning.replay_pools.flexible_replay_pool import Field
-                replay_pool = self.replay_pool = (
-                    get_replay_pool_from_variant(variant, training_environment,
-                        extra_obs_keys_and_fields={
-                            'object_state_prediction': Field(
-                                name='object_state_prediction',
-                                dtype=np.float32,
-                                shape=(4,)
-                            )
-                        }))
-            else:
-                state_estimator = None
-        except:
-            state_estimator = None
-
-        sampler = self.sampler = get_sampler_from_variant(
-            variant,
-            state_estimator=state_estimator)
+        policy = self.policy = get_policy_from_variant(
+            variant, training_environment)
 
         Qs = self.Qs = get_Q_function_from_variant(
+            variant, training_environment)
+        Q_targets = self.Q_targets = get_Q_function_from_variant(
             variant, training_environment)
 
         # ==== LOADING IN CONVNET FROM WORKING RUN EXPERIMENT ====
@@ -105,8 +86,27 @@ class ExperimentRunner(tune.Trainable):
                 set_weights_and_fix(self.Q_targets[0].observations_preprocessors['pixels'])
                 set_weights_and_fix(self.Q_targets[1].observations_preprocessors['pixels'])
 
-        policy = self.policy = get_policy_from_variant(
-            variant, training_environment)
+        # === LOGGING STATE ESTIMATOR PREPROCESSOR OUTPUTS ===
+        if (self.policy.preprocessors.get('pixels', None)
+            and self.policy.preprocessors['pixels'].name == 'state_estimator_preprocessor'):
+            state_estimator = self.policy.preprocessors['pixels']
+
+            from softlearning.replay_pools.flexible_replay_pool import Field
+            replay_pool = self.replay_pool = (
+                get_replay_pool_from_variant(variant, training_environment,
+                    extra_obs_keys_and_fields={
+                        'object_state_prediction': Field(
+                            name='object_state_prediction',
+                            dtype=np.float32,
+                            shape=(4,)
+                        )
+                    }))
+        else:
+            state_estimator = None
+
+        sampler = self.sampler = get_sampler_from_variant(
+            variant,
+            state_estimator=state_estimator)
 
         last_checkpoint_dir = variant['replay_pool_params']['last_checkpoint_dir']
 
@@ -154,13 +154,13 @@ class ExperimentRunner(tune.Trainable):
             'policy': policy,
             'initial_exploration_policy': initial_exploration_policy,
             'Qs': Qs,
+            'Q_targets': Q_targets,
             'pool': replay_pool,
             'sampler': sampler,
             'session': self._session,
             'rnd_networks': rnd_networks,
             'vae': vae,
             'state_estimator': state_estimator,
-            'vae': vae,
         }
         return algorithm_kwargs
 
