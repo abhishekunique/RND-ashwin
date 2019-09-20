@@ -40,6 +40,7 @@ class MultiSAC(SAC):
             # goals=(),
             num_goals,
             plotter=None,
+            Q_targets_per_policy=None,
 
             # hyperparams shared across policies
             lr=3e-4,
@@ -105,10 +106,13 @@ class MultiSAC(SAC):
         assert len(self._Qs_per_policy) == num_goals, error_msg
         assert len(self._samplers) == num_goals, error_msg
 
-        self._Q_targets_per_policy = [
-            tuple(tf.keras.models.clone_model(Q) for Q in Qs)
-            for Qs in Qs_per_policy
-        ]
+        self._Q_targets_per_policy = (
+            Q_targets_per_policy if Q_targets_per_policy
+            else [
+                tuple(tf.keras.models.clone_model(Q) for Q in Qs)
+                for Qs in Qs_per_policy
+            ]
+        )
         self._training_ops_per_policy = [{} for _ in range(num_goals)]
 
         self._policy_lr = lr

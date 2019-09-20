@@ -32,6 +32,7 @@ def state_estimator_model(input_shape,
                           num_hidden_layers=2,
                           output_size=4, # (x, y, z_cos, z_sin)
                           preprocessor_params=None,
+                          kernel_regularizer=None,
                           name='state_estimator_preprocessor'):
     # TODO: Make this take in observation keys instead of this hardcoded output size.
     obs_preprocessor_params = (
@@ -44,7 +45,7 @@ def state_estimator_model(input_shape,
         hidden_layer_sizes=(num_hidden_units, ) * num_hidden_layers,
         output_size=output_size,
         output_activation=tf.keras.activations.tanh,
-        kernel_regularizer=tf.keras.regularizers.l2(0.001),
+        kernel_regularizer=kernel_regularizer, # tf.keras.regularizers.l2(0.001)
         name='feedforward_state_est'
     )
     model = tfk.Sequential([
