@@ -13,12 +13,13 @@ def get_vae_preprocessor(name='vae_preprocessor',
                          include_decoder=False,
                          **kwargs):
     from softlearning.models.vae import VAE
-    assert encoder_path is not None and decoder_path is not None, (
-        "Must specify paths for the encoder/decoder models.")
+    # assert encoder_path is not None and decoder_path is not None, (
+    #     "Must specify paths for the encoder/decoder models.")
     vae = VAE(**kwargs)
-    vae.encoder.load_weights(encoder_path)
-    vae.decoder.load_weights(decoder_path)
-    if include_decoder: 
+    if encoder_path and decoder_path:
+        vae.encoder.load_weights(encoder_path)
+        vae.decoder.load_weights(decoder_path)
+    if include_decoder:
         # preprocessor = vae.get_encoder_decoder(trainable=trainable, name=name)
         preprocessor = vae
     else:

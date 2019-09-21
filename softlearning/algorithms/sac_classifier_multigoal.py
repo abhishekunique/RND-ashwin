@@ -156,8 +156,10 @@ class SACClassifierMultiGoal(SAC):
         ]
 
         # Get positives from different goal pools
-        goal_example_pool_sizes = [goal_example_pool[goal_example_pool.keys()[0]].shape[0]
-                                   for goal_example_pool in self._goal_example_pools]
+        goal_example_pool_sizes = [
+            goal_example_pool[next(iter(goal_example_pool.keys()))].shape[0]
+            for goal_example_pool in self._goal_example_pools
+        ]
         rand_positive_indices = [
             np.random.randint(
                 goal_example_pool_size,
@@ -282,18 +284,38 @@ class SACClassifierMultiGoal(SAC):
             # observation_logits_0, observation_logits_1 = self._observation_logits_per_classifier
             # goal_index_mask_0, goal_index_mask_1 = self._goal_index_masks
 
+            try:
+                obs_feed_dict = {
+                    self._placeholders['observations'][key]: np.concatenate((
+                        sample_obs[key],
+                        goal_obs[key],
+                        goal_obs_validation[key]
+                    ), axis=0)
+                    for key in self._policy.observation_keys
+                }
+            except:
+                obs_feed_dict = {
+                    self._placeholders['observations'][key]: np.concatenate((
+                        sample_obs[key],
+                        goal_obs[key],
+                        goal_obs_validation[key]
+                    ), axis=0)
+                    for key in self._classifiers[goal_index].observation_keys
+                }
+
             reward_sample_goal_observations, classifier_loss = self._session.run(
                 (self._reward_t, self._classifier_losses_t[goal_index]),
                 feed_dict={
-                    **{
-                        self._placeholders['observations'][key]: np.concatenate((
-                            sample_obs[key],
-                            goal_obs[key],
-                            goal_obs_validation[key]
-                        ), axis=0)
-                        for key in self._policy.observation_keys
-                        # for key in self._classifiers[goal_index].observation_keys
-                    },
+                    **obs_feed_dict,
+                    # **{
+                    #     self._placeholders['observations'][key]: np.concatenate((
+                    #         sample_obs[key],
+                    #         goal_obs[key],
+                    #         goal_obs_validation[key]
+                    #     ), axis=0)
+                    #     for key in self._policy.observation_keys
+                    #     # for key in self._classifiers[goal_index].observation_keys
+                    # },
                     self._placeholders['labels']: np.concatenate([
                         np.zeros((n_sample_obs, 1)),
                         np.ones((n_goal_obs, 1)),

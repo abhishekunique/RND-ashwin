@@ -8,10 +8,15 @@ from softlearning.misc.generate_goal_examples import (
 from softlearning.misc.get_multigoal_example_pools import (
     get_example_pools_from_variant)
 import dsuite
+import os
 
 DEFAULT_KEY = '__DEFAULT_KEY__'
 
-M = 256
+# M = 256
+# N = 2
+M = 512
+N = 3
+
 REPARAMETERIZE = True
 
 NUM_COUPLING_LAYERS = 2
@@ -72,8 +77,8 @@ ALGORITHM_PARAMS_BASE = {
         'discount': 0.99,
         'tau': 5e-3,
         'reward_scale': 1.0,
-        'normalize_ext_reward_gamma': 0.99,
-        'rnd_int_rew_coeff': tune.sample_from([0]),
+        # 'normalize_ext_reward_gamma': 0.99,
+        # 'rnd_int_rew_coeff': tune.sample_from([0]),
     },
     'rnd_params': {
         'convnet_params': {
@@ -231,7 +236,25 @@ ALGORITHM_PARAMS_ADDITIONAL = {
             'n_epochs': 500,
             'mixup_alpha': 1.0,
             'save_training_video_frequency': 5,
-        }
+
+            # RND options inherited from SAC
+            'normalize_ext_reward_gamma': 0.99,
+            'rnd_int_rew_coeff': tune.sample_from([1]),
+
+        },
+        'rnd_params': {
+            'convnet_params': {
+                'conv_filters': (16, 32, 64),
+                'conv_kernel_sizes': (3, 3, 3),
+                'conv_strides': (2, 2, 2),
+                'normalization_type': None,
+            },
+            'fc_params': {
+                'hidden_layer_sizes': (256, 256),
+                'output_size': 512,
+            },
+        },
+
     },
     'VICEGAN': {
         'type': 'VICEGAN',
@@ -341,11 +364,19 @@ CLASSIFIER_PARAMS_PER_UNIVERSE_DOMAIN_TASK = {
         'DClaw': {
             **{
                 key: {'observation_keys': ('pixels', )}
-                for key in ('LiftDDFixed-v0', 'LiftDDResetFree-v0', 'SlideBeadsResetFree-v0')
+                for key in (
+                    'LiftDDFixed-v0',
+                    'LiftDDResetFree-v0',
+                    'SlideBeadsResetFree-v0',
+                    'TurnFreeValve3ResetFree-v0',
+                )
             },
             **{
                 key: {'observation_keys': ('pixels', 'goal_index')}
-                for key in ('TurnMultiGoalResetFree-v0', )
+                for key in (
+                    'TurnMultiGoalResetFree-v0',
+                    'TurnFreeValve3ResetFreeSwapGoal-v0',
+                )
             },
         }
     }
@@ -476,6 +507,24 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_STATE = {
     },
 }
 
+BASE_VISION_KWARGS = {
+    'pixel_wrapper_kwargs': {
+        'pixels_only': False,
+        'normalize': False,
+        'render_kwargs': {
+           'width': 32,
+           'height': 32,
+           'camera_id': -1,
+        }
+    },
+    'camera_settings': {
+        'azimuth': 180,
+        'distance': 0.35,
+        'elevation': -55,
+        'lookat': np.array([0, 0, 0.03]),
+    },
+}
+
 ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_VISION = {
     'gym': {
         'DClaw': {
@@ -564,216 +613,86 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_VISION = {
                     'object_angle_sin',
                 ),
             },
+            # Serving as random init 1 goal eval env for ResetFree
+            'TurnFreeValve3Fixed-v0': {
+                **BASE_VISION_KWARGS,
+                'init_qpos_range': (
+                    (-0.075, -0.075, 0, 0, 0, -np.pi),
+                    (0.075, 0.075, 0, 0, 0, np.pi)
+                ),
+                'target_qpos_range': [
+                    (0, 0, 0, 0, 0, -np.pi / 2),
+                    (0, 0, 0, 0, 0, -np.pi / 2), # Second goal is arbitrary
+                ],
+                'observation_keys': (
+                    'pixels',
+                    'claw_qpos',
+                    'last_action',
+                    # === BELOW IS JUST FOR LOGGING ===
+                    'object_xy_position',
+                    'object_z_orientation_cos',
+                    'object_z_orientation_sin',
+                ),
+            },
             'TurnFreeValve3ResetFree-v0': {
-                'pixel_wrapper_kwargs': {
-                   'pixels_only': False,
-                   'normalize': False,
-                   'render_kwargs': {
-                       'width': 48,
-                       'height': 48,
-                       'camera_id': -1,
-                   }
-                },
-                'camera_settings': {
-                    'azimuth': 45,
-                    'distance': 0.32,
-                    'elevation': -55.88,
-                    'lookat': np.array([0.00097442, 0.00063182, 0.03435371]),
-                },
-                # 'camera_settings': {
-                #    'azimuth': 0.,
-                #    'distance': 0.35,
-                #    'elevation': -38.17570837642188,
-                #    'lookat': np.array([0.00046945, -0.00049496, 0.05389398]),
-                # },
-                'init_angle_range': (0., 0.),
-                'target_angle_range': (np.pi, np.pi),
+                **BASE_VISION_KWARGS,
+                'init_qpos_range': [(0, 0, 0, 0, 0, 0)],
+                # Below needs to be 2 for a MultiVICEGAN run, since the goals switch
+                'target_qpos_range': [
+                    (0, 0, 0, 0, 0, -np.pi / 2),
+                    (0, 0, 0, 0, 0, -np.pi / 2), # Second goal is arbitrary
+                ],
                 'swap_goal_upon_completion': False,
                 'observation_keys': (
                     'pixels',
                     'claw_qpos',
                     'last_action',
-                    'object_position',
-                    'object_orientation_sin',
-                    'object_orientation_cos'),
+                    # === BELOW IS JUST FOR LOGGING ===
+                    'object_xy_position',
+                    'object_z_orientation_cos',
+                    'object_z_orientation_sin',
+                ),
             },
             'TurnFreeValve3ResetFreeSwapGoal-v0': {
+                **BASE_VISION_KWARGS,
                 'reset_fingers': True,
                 'reset_frequency': 0,
                 'goals': [
                     (0, 0, 0, 0, 0, np.pi / 2),
                     (0, 0, 0, 0, 0, -np.pi / 2),
                 ],
-                # 'goals': [(0.01, 0.01, 0, 0, 0, np.pi / 2),
-                #           (-0.01, -0.01, 0, 0, 0, -np.pi / 2),
-                #           ],
-                          # (-0.01, 0.01, 0, 0, 0, np.pi),
-                #           # (0.01, -0.01, 0, 0, 0, 0)],
-                'pixel_wrapper_kwargs': {
-                    'observation_key': 'pixels',
-                    'pixels_only': False,
-                    'render_kwargs': {
-                        'width': 32,
-                        'height': 32,
-                    },
-                },
                 'observation_keys': (
                     'claw_qpos',
-                    'object_xy_position',
-                    'object_orientation_cos',
-                    'object_orientation_sin',
                     'last_action',
                     'target_xy_position',
                     'target_z_orientation_cos',
                     'target_z_orientation_sin',
                     'goal_index',
                     'pixels',
+                    # === BELOW IS JUST FOR LOGGING ===
+                    'object_xy_position',
+                    'object_orientation_cos',
+                    'object_orientation_sin',
                 ),
-                'camera_settings': {
-                    'azimuth': 180,
-                    'distance': 0.26,
-                    'elevation': -40,
-                    'lookat': (0, 0, 0.06),
-                }
             },
             'TurnFreeValve3ResetFreeSwapGoalEval-v0': {
+                **BASE_VISION_KWARGS,
                 'goals': [
                     (0, 0, 0, 0, 0, np.pi / 2),
                     (0, 0, 0, 0, 0, -np.pi / 2),
                 ],
-                'pixel_wrapper_kwargs': {
-                    'observation_key': 'pixels',
-                    'pixels_only': False,
-                    'render_kwargs': {
-                        'width': 32,
-                        'height': 32,
-                    },
-                },
                 'observation_keys': (
                     'claw_qpos',
-                    'object_xy_position',
-                    'object_orientation_cos',
-                    'object_orientation_sin',
                     'last_action',
                     'target_xy_position',
                     'target_z_orientation_cos',
                     'target_z_orientation_sin',
                     'goal_index',
                     'pixels',
-                ),
-                'camera_settings': {
-                    'azimuth': 180,
-                    'distance': 0.26,
-                    'elevation': -40,
-                    'lookat': (0, 0, 0.06),
-                }
-            },
-            'TurnFreeValve3Fixed-v0': {
-               'pixel_wrapper_kwargs': {
-                   'pixels_only': False,
-                   'normalize': False,
-                   'render_kwargs': {
-                       'width': 48,
-                       'height': 48,
-                       'camera_id': -1,
-                   }
-               },
-               'camera_settings': {
-                   'azimuth': 0.,
-                   'distance': 0.35,
-                   'elevation': -38.17570837642188,
-                   'lookat': np.array([0.00046945, -0.00049496,  0.05389398]),
-               },
-               'init_angle_range': (0., 0.),
-               'target_angle_range': (np.pi, np.pi),
-               'observation_keys': ('pixels', 'claw_qpos', 'last_action'),
-            },
-            'TurnFreeValve3MultiGoalResetFree-v0': {
-                'goals': ((0, 0, 0, 0, 0, np.pi), (0, 0, 0, 0, 0, 0)),
-                'goal_completion_position_threshold': 0.04,
-                'goal_completion_orientation_threshold': 0.15,
-                'camera_settings': {
-                    'azimuth': 0,
-                    'distance': 0.32,
-                    'elevation': -45,
-                    'lookat': (0, 0, 0.03)
-                },
-
-                # 'camera_settings': {
-                #     'azimuth': 45.,
-                #     'distance': 0.32,
-                #     'elevation': -55.88,
-                #     'lookat': np.array([0.00097442, 0.00063182, 0.03435371])
-                # },
-                # 'camera_settings': {
-                #     'azimuth': 30.,
-                #     'distance': 0.35,
-                #     'elevation': -38.18,
-                #     'lookat': np.array([0.00047, -0.0005, 0.054])
-                # },
-                'pixel_wrapper_kwargs': {
-                    'pixels_only': False,
-                    'normalize': False,
-                    'render_kwargs': {
-                        'width': 32,    # 48
-                        'height': 32,   # 48
-                        'camera_id': -1
-                    },
-                },
-                'swap_goals_upon_completion': False,
-                'observation_keys': (
-                    'pixels',
-                    'claw_qpos',
-                    'last_action',
-                    'goal_index',
-                    'object_position',
-                    'object_orientation_sin',
+                    # === BELOW IS JUST FOR LOGGING ===
+                    'object_xy_position',
                     'object_orientation_cos',
-
-                ),
-            },
-            'TurnFreeValve3MultiGoal-v0': {
-                'goals': ((0, 0, 0, 0, 0, np.pi), (0, 0, 0, 0, 0, 0)),
-                'camera_settings': {
-                    'azimuth': 0,
-                    'distance': 0.32,
-                    'elevation': -45,
-                    'lookat': (0, 0, 0.03)
-                },
-
-                # 'camera_settings': {
-                #     'azimuth': 45.,
-                #     'distance': 0.32,
-                #     'elevation': -55.88,
-                #     'lookat': np.array([0.00097442, 0.00063182, 0.03435371])
-                # },
-                # 'camera_settings': {
-                #     'azimuth': 30.,
-                #     'distance': 0.35,
-                #     'elevation': -38.18,
-                #     'lookat': np.array([0.00047, -0.0005, 0.054])
-                # },
-                'pixel_wrapper_kwargs': {
-                    'pixels_only': False,
-                    'normalize': False,
-                    'render_kwargs': {
-                        'width': 32,
-                        'height': 32,
-                        # 'width': 48,
-                        # 'height': 48,
-                        'camera_id': -1
-                    },
-                },
-                'swap_goals_upon_completion': False,
-                'random_goal_sampling': True,
-                'observation_keys': (
-                    'pixels',
-                    'claw_qpos',
-                    'last_action',
-                    'goal_index',
-                    'object_position',
                     'object_orientation_sin',
-                    'object_orientation_cos'
                 ),
             },
             'LiftDDFixed-v0': {
@@ -1007,6 +926,115 @@ def is_image_env(universe, domain, task, variant_spec):
 
 
 """
+Preprocessor params
+"""
+STATE_PREPROCESSOR_PARAMS = {
+    'ReplicationPreprocessor': {
+        'type': 'ReplicationPreprocessor',
+        'kwargs': {
+            'n': 0,
+            'scale_factor': 1,
+        }
+    },
+    'RandomNNPreprocessor': {
+        'type': 'RandomNNPreprocessor',
+        'kwargs': {
+            'hidden_layer_sizes': (32, 32),
+            'activation': 'linear',
+            'output_activation': 'linear',
+        }
+    },
+    'RandomMatrixPreprocessor': {
+        'type': 'RandomMatrixPreprocessor',
+        'kwargs': {
+            'output_size_scale_factor': 1,
+            'coefficient_range': (-1., 1.),
+        }
+    },
+    'None': None,
+}
+
+
+from softlearning.misc.utils import PROJECT_PATH
+PIXELS_PREPROCESSOR_PARAMS = {
+    'StateEstimatorPreprocessor': {
+        'type': 'StateEstimatorPreprocessor',
+        'kwargs': {
+            'input_shape': (32, 32, 3),
+            'num_hidden_units': 512,
+            'num_hidden_layers': 2,
+            'state_estimator_path': os.path.join(PROJECT_PATH,
+                                                'softlearning',
+                                                'models',
+                                                'state_estimators',
+                                                'state_estimator_from_vae_latents.h5'),
+            # === INCLUDE A PRETRAINED VAE === 
+            'preprocessor_params': {
+                'type': 'VAEPreprocessor',
+                'kwargs': {
+                    'encoder_path': os.path.join(PROJECT_PATH,
+                                                'softlearning',
+                                                'models',
+                                                'vae_16_dim_beta_3_invisible_claw_l2_reg',
+                                                'encoder_16_dim_3.0_beta.h5'),
+                    'decoder_path': os.path.join(PROJECT_PATH,
+                                                'softlearning',
+                                                'models',
+                                                'vae_16_dim_beta_3_invisible_claw_l2_reg',
+                                                'decoder_16_dim_3.0_beta.h5'),
+                    'trainable': False,
+                    'image_shape': (32, 32, 3),
+                    'latent_dim': 16,
+                    'include_decoder': False,
+                }
+            }
+        }
+    },
+    'VAEPreprocessor': {
+        'type': 'VAEPreprocessor',
+        'kwargs': {
+            'image_shape': (33, 32, 3),
+            'latent_dim': 16,
+            'encoder_path': '/nfs/kun1/users/justinvyu/pretrained_models/vae_16_dim_beta_3_invisible_claw_l2_reg/encoder_16_dim_3.0_beta.h5',
+            'decoder_path': '/nfs/kun1/users/justinvyu/pretrained_models/vae_16_dim_beta_3_invisible_claw_l2_reg/decoder_16_dim_3.0_beta.h5',
+            # 'latent_dim': 32,
+            # 'include_decoder': True,
+        },
+    },
+    'ConvnetPreprocessor': tune.grid_search([
+        {
+            'type': 'ConvnetPreprocessor',
+            'kwargs': {
+                'conv_filters': (16, 32, 64),
+                'conv_kernel_sizes': (3, ) * 3,
+                'conv_strides': (2, ) * 3,
+                'normalization_type': normalization_type,
+                'downsampling_type': 'conv',
+                'output_kwargs': {
+                    'type': 'flatten',
+                }
+            },
+        }
+        # {
+        #     'type': 'ConvnetPreprocessor',
+        #     'kwargs': {
+        #         'conv_filters': (64, ) * 4,
+        #         'conv_kernel_sizes': (3, ) * 4,
+        #         'conv_strides': (2, ) * 4,
+        #         'normalization_type': normalization_type,
+        #         'downsampling_type': 'conv',
+        #         'output_kwargs': {
+        #             'type': 'flatten',
+        #         },
+        #     },
+        #     # 'weights_path': '/root/nfs/kun1/users/justinvyu/pretrained_models/convnet_64_by_4.pkl',
+        # }
+        for normalization_type in (None, )
+    ]),
+}
+
+
+"""
 Configuring variant specs
 """
 
@@ -1069,7 +1097,7 @@ def get_variant_spec_base(universe, domain, task, task_eval,
         'replay_pool_params': {
             'type': 'SimpleReplayPool',
             'kwargs': {
-                'max_size': int(3e5), #int(1e6)
+                'max_size': int(5e5),
             }
         },
         'sampler_params': {
@@ -1094,8 +1122,8 @@ def get_variant_spec_base(universe, domain, task, task_eval,
 
     # Filter out parts of the state relating to the object when training from pixels
     env_kwargs = variant_spec['environment_params']['training']['kwargs']
-    if "pixel_wrapper_kwargs" in env_kwargs.keys() and \
-       "device_path" not in env_kwargs.keys():
+    if from_vision or ("pixel_wrapper_kwargs" in env_kwargs.keys() and \
+       "device_path" not in env_kwargs.keys()):
         env_obs_keys = env_kwargs['observation_keys']
 
         non_image_obs_keys = tuple(key for key in env_obs_keys if key != 'pixels')
@@ -1104,7 +1132,7 @@ def get_variant_spec_base(universe, domain, task, task_eval,
         non_object_obs_keys = tuple(key for key in env_obs_keys if 'object' not in key)
         variant_spec['policy_params']['kwargs']['observation_keys'] = variant_spec[
             'exploration_policy_params']['kwargs']['observation_keys'] = variant_spec[
-                'Q_params']['kwargs']['observation_keys'] = non_object_obs_keys
+            'Q_params']['kwargs']['observation_keys'] = non_object_obs_keys
 
     return variant_spec
 
@@ -1123,24 +1151,21 @@ def get_variant_spec_classifier(universe,
         universe, domain, task, task_eval, policy, algorithm, from_vision, *args, **kwargs)
 
     variant_spec['reward_classifier_params'] = get_classifier_params(universe, domain, task)
-    # variant_spec['reward_classifier_params']['kwargs']['observation_keys'] = (
-    #     'object_position', 'object_orientation_cos', 'object_orientation_sin')# , 'goal_index')
-
     variant_spec['data_params'] = {
         'n_goal_examples': n_goal_examples,
         'n_goal_examples_validation_max': 100,
     }
 
-    variant_spec['sampler_params']['type'] = 'ClassifierSampler'
-    # Add classifier rewards to the replay pool
-    from softlearning.replay_pools.flexible_replay_pool import Field
-    variant_spec['replay_pool_params']['kwargs']['extra_fields'] = {
-        'learned_rewards': Field(
-            name='learned_rewards',
-            dtype='float32',
-            shape=(1, )
-        )
-    }
+    # variant_spec['sampler_params']['type'] = 'ClassifierSampler'
+    # # Add classifier rewards to the replay pool
+    # from softlearning.replay_pools.flexible_replay_pool import Field
+    # variant_spec['replay_pool_params']['kwargs']['extra_fields'] = {
+    #     'learned_rewards': Field(
+    #         name='learned_rewards',
+    #         dtype='float32',
+    #         shape=(1, )
+    #     )
+    # }
 
     if algorithm in ['RAQ', 'VICERAQ']:
         if task in DOOR_TASKS:
@@ -1172,7 +1197,16 @@ def get_variant_spec_classifier(universe,
     return variant_spec
 
 
-CLASSIFIER_ALGS = ('SACClassifier', 'RAQ', 'VICE', 'VICEGAN', 'VICERAQ', 'VICEGANTwoGoal', 'VICEGANMultiGoal', 'MultiVICEGAN')
+CLASSIFIER_ALGS = (
+    'SACClassifier',
+    'RAQ',
+    'VICE',
+    'VICEGAN',
+    'VICERAQ',
+    'VICEGANTwoGoal',
+    'VICEGANMultiGoal',
+    'MultiVICEGAN'
+)
 
 
 def get_variant_spec(args):
@@ -1197,51 +1231,40 @@ def get_variant_spec(args):
 
     variant_spec['algorithm_params']['kwargs']['n_epochs'] = n_epochs
 
+    preprocessor_type = args.preprocessor_type
+
     if is_image_env(universe, domain, task, variant_spec):
+        assert preprocessor_type in PIXELS_PREPROCESSOR_PARAMS
+        preprocessor_params = PIXELS_PREPROCESSOR_PARAMS[preprocessor_type]
         # preprocessor_params = tune.grid_search([
         #     {
         #         'type': 'ConvnetPreprocessor',
         #         'kwargs': {
-        #             'conv_filters': (num_filters, ) * num_layers,
-        #             'conv_kernel_sizes': (3, ) * num_layers,
-        #             'conv_strides': (2, ) * num_layers,
-        #             'normalization_type': normalization_type,
+        #             'conv_filters': (64, 32, 16),
+        #             'conv_kernel_sizes': (3, ) * 3,
+        #             'conv_strides': (2, 1, 1),
+        #             'normalization_type': None,
         #             'downsampling_type': 'conv',
+        #             'output_kwargs': {
+        #                 'type': 'spatial_softmax'
+        #             }
         #         },
-        #     }
-        #     for num_layers in (4, )
-        #     for normalization_type in (None, )
-        #     for num_filters in (64, 8)
+        #     },
+        #     # Std architecture
+        #     {
+        #         'type': 'ConvnetPreprocessor',
+        #         'kwargs': {
+        #             'conv_filters': (64, 64, 64),
+        #             'conv_kernel_sizes': (3, ) * 3,
+        #             'conv_strides': (2, 2, 2),
+        #             'normalization_type': None,
+        #             'downsampling_type': 'conv',
+        #             'output_kwargs': {
+        #                 'type': 'flatten',
+        #             }
+        #         },
+        #     },
         # ])
-        preprocessor_params = tune.grid_search([
-            {
-                'type': 'ConvnetPreprocessor',
-                'kwargs': {
-                    'conv_filters': (64, 32, 16),
-                    'conv_kernel_sizes': (3, ) * 3,
-                    'conv_strides': (2, 1, 1),
-                    'normalization_type': None,
-                    'downsampling_type': 'conv',
-                    'output_kwargs': {
-                        'type': 'spatial_softmax'
-                    }
-                },
-            },
-            # Std architecture
-            {
-                'type': 'ConvnetPreprocessor',
-                'kwargs': {
-                    'conv_filters': (64, 64, 64),
-                    'conv_kernel_sizes': (3, ) * 3,
-                    'conv_strides': (2, 2, 2),
-                    'normalization_type': None,
-                    'downsampling_type': 'conv',
-                    'output_kwargs': {
-                        'type': 'flatten',
-                    }
-                },
-            },
-        ])
 
         variant_spec['policy_params']['kwargs']['hidden_layer_sizes'] = (M, M)
         variant_spec['policy_params']['kwargs'][
@@ -1267,16 +1290,35 @@ def get_variant_spec(args):
                 )))
             )
         if args.algorithm in CLASSIFIER_ALGS:
+            reward_classifier_preprocessor_params = {
+                'type': 'ConvnetPreprocessor',
+                'kwargs': {
+                    'conv_filters': (64, 64, 64),
+                    'conv_kernel_sizes': (3, ) * 3,
+                    'conv_strides': (2, 2, 2),
+                    'normalization_type': None,
+                    'downsampling_type': 'conv',
+                    'output_kwargs': {
+                        'type': 'flatten',
+                    }
+                },
+            }
             (variant_spec
              ['reward_classifier_params']
              ['kwargs']
-             ['observation_preprocessors_params']) = (
-                tune.sample_from(lambda spec: (
-                    spec.get('config', spec)
-                    ['policy_params']
-                    ['kwargs']
-                    ['observation_preprocessors_params']
-                )))
+             ['observation_preprocessors_params']) = {
+                'pixels': reward_classifier_preprocessor_params
+            }
+            # (variant_spec
+            #  ['reward_classifier_params']
+            #  ['kwargs']
+            #  ['observation_preprocessors_params']) = (
+            #     tune.sample_from(lambda spec: (
+            #         spec.get('config', spec)
+            #         ['policy_params']
+            #         ['kwargs']
+            #         ['observation_preprocessors_params']
+            #     )))
 
     if args.checkpoint_replay_pool is not None:
         variant_spec['run_params']['checkpoint_replay_pool'] = (

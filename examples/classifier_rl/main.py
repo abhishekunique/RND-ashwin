@@ -27,6 +27,7 @@ from softlearning.environments.adapters.gym_adapter import GymAdapter
 class ExperimentRunnerClassifierRL(ExperimentRunner):
     def _get_algorithm_kwargs(self, variant):
         algorithm_kwargs = super()._get_algorithm_kwargs(variant)
+        # === LOAD SINGLE GOAL POOL ===
         if variant['algorithm_params']['type'] in ['SACClassifier', 'RAQ', 'VICE', 'VICEGAN', 'VICERAQ']:
             reward_classifier = self.reward_classifier = (
                 get_reward_classifier_from_variant(
@@ -38,6 +39,8 @@ class ExperimentRunnerClassifierRL(ExperimentRunner):
             algorithm_kwargs['goal_examples'] = goal_examples_train
             algorithm_kwargs['goal_examples_validation'] = (
                 goal_examples_validation)
+
+        # === LOAD GOAL POOLS FOR MULTI GOAL ===
         elif variant['algorithm_params']['type'] in ['VICEGANMultiGoal', 'MultiVICEGAN']:
             goal_pools_train, goal_pools_validation = (
                 get_example_pools_from_variant(variant))

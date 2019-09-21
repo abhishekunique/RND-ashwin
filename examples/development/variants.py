@@ -8,10 +8,10 @@ DEFAULT_KEY = "__DEFAULT_KEY__"
 
 # M = number of hidden units per layer
 # N = number of hidden layers
-M = 256
-N = 2
-# M = 512
-# N = 3
+# M = 256
+# N = 2
+M = 512
+N = 3
 
 REPARAMETERIZE = True
 
@@ -1568,9 +1568,9 @@ def get_variant_spec_base(universe, domain, task, task_eval, policy, algorithm, 
     no_pixel_information = False
 
     env_kwargs = variant_spec['environment_params']['training']['kwargs']
+    env_obs_keys = env_kwargs['observation_keys']
     if from_vision and "pixel_wrapper_kwargs" in env_kwargs.keys() and \
        "device_path" not in env_kwargs.keys():
-        env_obs_keys = env_kwargs['observation_keys']
         non_image_obs_keys = tuple(key for key in env_obs_keys if key != 'pixels')
         variant_spec['replay_pool_params']['kwargs']['obs_save_keys'] = non_image_obs_keys
 

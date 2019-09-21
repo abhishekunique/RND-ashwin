@@ -108,8 +108,8 @@ class ExperimentRunner(tune.Trainable):
             variant,
             state_estimator=state_estimator)
 
-        last_checkpoint_dir = variant['replay_pool_params']['last_checkpoint_dir']
-
+        last_checkpoint_dir = variant['replay_pool_params'].get(
+            'last_checkpoint_dir', None)
         if last_checkpoint_dir:
             print('restoring')
             self._restore_replay_pool(last_checkpoint_dir)
@@ -129,23 +129,32 @@ class ExperimentRunner(tune.Trainable):
             get_policy_from_params(
                 variant['exploration_policy_params'], training_environment))
 
-        if variant['algorithm_params']['rnd_params']:
-            from softlearning.rnd.utils import get_rnd_networks_from_variant
-            rnd_networks = get_rnd_networks_from_variant(variant, training_environment)
-        else:
-            rnd_networks = ()
+        # === INITIALIZE RND NETWORKS ===
+        from softlearning.rnd.utils import get_rnd_networks_from_variant
+        rnd_networks = (
+            get_rnd_networks_from_variant(variant, training_environment)
+            if 'rnd_params' in variant['algorithm_params']
+            else ()
+        )
+        # if variant['algorithm_params']['rnd_params']:
+        #     from softlearning.rnd.utils import get_rnd_networks_from_variant
+        #     rnd_networks = get_rnd_networks_from_variant(variant, training_environment)
+        # else:
+        #     rnd_networks = ()
 
-        # VAE
-        if ('pixels' in self.policy.preprocessors
-            and self.policy.preprocessors['pixels'].name == 'vae_preprocessor'):
-            from softlearning.models.utils import get_vae
-            vae = get_vae(**variant['policy_params']
-                                   ['kwargs']
-                                   ['observation_preprocessors_params']
-                                   ['pixels']
-                                   ['kwargs'])
-        else:
-            vae = None
+        # === PASS VAE INTO ALGORITHM TO GET DIAGNOSTICS ===
+        using_vae = (
+            'pixels' in self.policy.preprocessors
+            and self.policy.preprocessors['pixels'].name == 'vae_preprocessor')
+        from softlearning.models.utils import get_vae
+        vae = (
+            get_vae(**variant['policy_params']
+                             ['kwargs']
+                             ['observation_preprocessors_params']
+                             ['pixels']
+                             ['kwargs'])
+            if using_vae else None
+        )
 
         algorithm_kwargs = {
             'variant': variant,
@@ -245,10 +254,6 @@ class ExperimentRunner(tune.Trainable):
         algorithm_kwargs = self._get_algorithm_kwargs(variant)
 
         self.algorithm = get_algorithm_from_variant(**algorithm_kwargs)
-
-        # if isinstance(replay_pool, PrioritizedExperienceReplayPool) and \
-        #    replay_pool._mode == 'Bellman_Error':
-        #     replay_pool.initialize(self.algorithm)
 
         initialize_tf_variables(self._session, only_uninitialized=True)
 

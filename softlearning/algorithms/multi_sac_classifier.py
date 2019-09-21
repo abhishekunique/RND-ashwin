@@ -184,7 +184,10 @@ class MultiSACClassifier(MultiSAC):
     def _init_training(self):
         super()._init_training()
         for i in range(self._num_goals):
-            self._samplers[i].set_algorithm(self)
+            try:
+                self._samplers[i].set_algorithm(self)
+            except:
+                pass
 
     def _epoch_after_hook(self, *args, **kwargs):
         losses_per_classifier = [[] for _ in range(self._num_goals)]

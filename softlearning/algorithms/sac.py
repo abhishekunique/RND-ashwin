@@ -535,33 +535,6 @@ class SAC(RLAlgorithm):
 
         return feed_dict
 
-    # def _get_goal_resamp_batch(self, batch):
-    #     new_goal = self._base_env.sample_goal()
-    #     old_goal = self._base_env.get_goal()
-    #     batch_obs = batch['observations']
-    #     batch_act = batch['actions']
-    #     batch_next_obs = batch['next_observations']
-
-    #     new_batch_obs = self._base_env.relabel_obs_w_goal(batch_obs, new_goal)
-    #     new_batch_next_obs = self._base_env.relabel_obs_w_goal(batch_next_obs, new_goal)
-
-    #     if self._base_env.use_super_state_reward():
-    #         batch_super_obs = batch['super_observations']
-    #         new_batch_super_obs = super(self._base_env).relabel_obs_w_goal(batch_super_obs, new_goal)
-    #         new_batch_rew = np.expand_dims(self._base_env.compute_rewards(new_batch_super_obs, batch_act)[0], 1)
-    #     else:
-    #         new_batch_rew = np.expand_dims(self._base_env.compute_rewards(new_batch_obs, batch_act)[0], 1)
-
-    #     new_batch = {
-    #         'rewards': new_batch_rew,
-    #         'observations': new_batch_obs,
-    #         'actions': batch['actions'],
-    #         'next_observations': new_batch_next_obs,
-    #         'terminals': batch['terminals'],
-    #     }
-    #     # (TODO) Implement relabeling of terminal flags
-    #     return new_batch
-
     def get_diagnostics(self,
                         iteration,
                         batch,
@@ -584,47 +557,53 @@ class SAC(RLAlgorithm):
                 for name in self._policy.observation_keys
             })).items()
         ]))
-        if self._vae:
-            eval_pixels = feed_dict[self._placeholders['observations']['pixels']]
-            inputs = (
-                feed_dict[self._placeholders['actions']],
-                feed_dict[self._placeholders['observations']['claw_qpos']],
-                feed_dict[self._placeholders['observations']['last_action']],
-                eval_pixels,
-                feed_dict[self._placeholders['observations']['target_xy_position']],
-                feed_dict[self._placeholders['observations']['target_z_orientation_cos']],
-                feed_dict[self._placeholders['observations']['target_z_orientation_sin']],
-            )
-            test_feed_dict = {
-                input_ph: input_np
-                for input_ph, input_np in zip(self._preprocessed_Q_inputs.inputs, inputs)
-            }
-            preprocessed_inputs = self._session.run(self._preprocessed_Q_inputs.output, feed_dict=test_feed_dict)
-            encoded_pixels = preprocessed_inputs[3]
+        # if self._vae:
+        #     eval_pixels = feed_dict[self._placeholders['observations']['pixels']]
+        #     inputs = (
+        #         feed_dict[self._placeholders['actions']],
+        #         feed_dict[self._placeholders['observations']['claw_qpos']],
+        #         feed_dict[self._placeholders['observations']['goal_index']],
+        #         feed_dict[self._placeholders['observations']['last_action']],
+        #         eval_pixels,
+        #         feed_dict[self._placeholders['observations']['target_xy_position']],
+        #         feed_dict[self._placeholders['observations']['target_z_orientation_cos']],
+        #         feed_dict[self._placeholders['observations']['target_z_orientation_sin']],
+        #     )
+        #     test_feed_dict = {
+        #         input_ph: input_np
+        #         for input_ph, input_np in zip(self._preprocessed_Q_inputs.inputs, inputs)
+        #     }
+        #     preprocessed_inputs = self._session.run(
+        #         self._preprocessed_Q_inputs.output, feed_dict=test_feed_dict)
+        #     encoded_pixels = preprocessed_inputs[4]
 
-            n_images_to_save = 0
-            decoded = self._session.run(
-                self._vae.decode(encoded_pixels, apply_sigmoid=True))
+        #     n_images_to_save = 0
+        #     decoded = self._session.run(
+        #         self._vae.decode(encoded_pixels, apply_sigmoid=True))
 
-            image_save_dir = os.path.join(os.getcwd(), 'vae_reconstructions')
-            if not os.path.exists(image_save_dir):
-                os.makedirs(image_save_dir)
+        #     image_save_dir = os.path.join(os.getcwd(), 'vae_reconstructions')
+        #     if not os.path.exists(image_save_dir):
+        #         os.makedirs(image_save_dir)
 
-            if n_images_to_save > 0:
-                import imageio
-                sample_idx = np.random.choice(decoded.shape[0], size=n_images_to_save)
-                concat = np.concatenate([
-                    eval_pixels[sample_idx].astype(np.float32) / 255.,
-                    decoded[sample_idx]], axis=2)
+        #     if n_images_to_save > 0:
+        #         import imageio
+        #         sample_idx = np.random.choice(decoded.shape[0], size=n_images_to_save)
+        #         concat = np.concatenate([
+        #             eval_pixels[sample_idx].astype(np.float32) / 255.,
+        #             decoded[sample_idx]], axis=2)
 
-                for i in range(n_images_to_save):
-                    image_save_path = os.path.join(
-                        image_save_dir, f'vae_reconstruction_{iteration}_{i}.png')
-                    imageio.imwrite(image_save_path, concat[i])
+        #         for i in range(n_images_to_save):
+        #             image_save_path = os.path.join(
+        #                 image_save_dir, f'vae_reconstruction_{iteration}_{i}.png')
+        #             imageio.imwrite(image_save_path, concat[i])
 
-            # from softlearning.models.vae import compute_elbo_loss
-            # # TODO: Make have this compute the elbo loss, on individual images
-            # loss = self._session.run(compute_elbo_loss(self._vae, eval_pixels))
+        #     from softlearning.models.vae import compute_elbo_loss
+        #     # # TODO: Make have this compute the elbo loss, on individual images
+        #     loss = self._session.run(compute_elbo_loss(self._vae, eval_pixels))
+        #     diagnostics.update({
+        #         'vae/elbo_loss': np.mean(loss),
+        #     })
+
             # diagnostics.update({
             #     'vae/elbo_loss_mean': np.mean(loss),
             #     'vae/elbo_loss_max': np.max(loss),

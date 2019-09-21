@@ -23,7 +23,7 @@ def main():
                         help='Save directory name')
     parser.add_argument('--rollout-length',
                         type=int,
-                        default=100,
+                        default=32,
                         help='Number of timesteps per rollout')
     parser.add_argument('--dump-frequency',
                         type=int,
@@ -68,9 +68,9 @@ def main():
         },
         'camera_settings': {
             'azimuth': 180,
-            'distance': 0.4,
-            'elevation': -65,
-            'lookat': (1e-3, 0, -1e-2),
+            'distance': 0.35,
+            'elevation': -55,
+            'lookat': (0, 0, 0.03),
         },
         'init_qpos_range': (
             (-0.075, -0.075, 0, 0, 0, -np.pi),
@@ -151,7 +151,6 @@ def main():
                 pickle.dump(trajectories_since_last_dump, f)
             trajectories_since_last_dump = []
 
-    import ipdb; ipdb.set_trace()
     # Save everything
 
     # TODO: Fix to make one dictionary of np arrays instead of one array of many dicts
