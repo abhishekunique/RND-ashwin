@@ -8,10 +8,15 @@ from softlearning.misc.generate_goal_examples import (
 from softlearning.misc.get_multigoal_example_pools import (
     get_example_pools_from_variant)
 import dsuite
+import os
 
 DEFAULT_KEY = '__DEFAULT_KEY__'
 
-M = 256
+# M = 256
+# N = 2
+M = 512
+N = 3
+
 REPARAMETERIZE = True
 
 NUM_COUPLING_LAYERS = 2
@@ -72,8 +77,8 @@ ALGORITHM_PARAMS_BASE = {
         'discount': 0.99,
         'tau': 5e-3,
         'reward_scale': 1.0,
-        'normalize_ext_reward_gamma': 0.99,
-        'rnd_int_rew_coeff': tune.sample_from([0]),
+        # 'normalize_ext_reward_gamma': 0.99,
+        # 'rnd_int_rew_coeff': tune.sample_from([0]),
     },
     'rnd_params': {
         'convnet_params': {
@@ -231,7 +236,25 @@ ALGORITHM_PARAMS_ADDITIONAL = {
             'n_epochs': 500,
             'mixup_alpha': 1.0,
             'save_training_video_frequency': 5,
-        }
+
+            # RND options inherited from SAC
+            'normalize_ext_reward_gamma': 0.99,
+            'rnd_int_rew_coeff': tune.sample_from([1]),
+
+        },
+        'rnd_params': {
+            'convnet_params': {
+                'conv_filters': (16, 32, 64),
+                'conv_kernel_sizes': (3, 3, 3),
+                'conv_strides': (2, 2, 2),
+                'normalization_type': None,
+            },
+            'fc_params': {
+                'hidden_layer_sizes': (256, 256),
+                'output_size': 512,
+            },
+        },
+
     },
     'VICEGAN': {
         'type': 'VICEGAN',
@@ -341,11 +364,19 @@ CLASSIFIER_PARAMS_PER_UNIVERSE_DOMAIN_TASK = {
         'DClaw': {
             **{
                 key: {'observation_keys': ('pixels', )}
-                for key in ('LiftDDFixed-v0', 'LiftDDResetFree-v0', 'SlideBeadsResetFree-v0')
+                for key in (
+                    'LiftDDFixed-v0',
+                    'LiftDDResetFree-v0',
+                    'SlideBeadsResetFree-v0',
+                    'TurnFreeValve3ResetFree-v0',
+                )
             },
             **{
                 key: {'observation_keys': ('pixels', 'goal_index')}
-                for key in ('TurnMultiGoalResetFree-v0', )
+                for key in (
+                    'TurnMultiGoalResetFree-v0',
+                    'TurnFreeValve3ResetFreeSwapGoal-v0',
+                )
             },
         }
     }
@@ -476,6 +507,24 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_STATE = {
     },
 }
 
+BASE_VISION_KWARGS = {
+    'pixel_wrapper_kwargs': {
+        'pixels_only': False,
+        'normalize': False,
+        'render_kwargs': {
+           'width': 32,
+           'height': 32,
+           'camera_id': -1,
+        }
+    },
+    'camera_settings': {
+        'azimuth': 180,
+        'distance': 0.35,
+        'elevation': -55,
+        'lookat': np.array([0, 0, 0.03]),
+    },
+}
+
 ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_VISION = {
     'gym': {
         'DClaw': {
@@ -564,216 +613,86 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_VISION = {
                     'object_angle_sin',
                 ),
             },
+            # Serving as random init 1 goal eval env for ResetFree
+            'TurnFreeValve3Fixed-v0': {
+                **BASE_VISION_KWARGS,
+                'init_qpos_range': (
+                    (-0.075, -0.075, 0, 0, 0, -np.pi),
+                    (0.075, 0.075, 0, 0, 0, np.pi)
+                ),
+                'target_qpos_range': [
+                    (0, 0, 0, 0, 0, -np.pi / 2),
+                    (0, 0, 0, 0, 0, -np.pi / 2), # Second goal is arbitrary
+                ],
+                'observation_keys': (
+                    'pixels',
+                    'claw_qpos',
+                    'last_action',
+                    # === BELOW IS JUST FOR LOGGING ===
+                    'object_xy_position',
+                    'object_z_orientation_cos',
+                    'object_z_orientation_sin',
+                ),
+            },
             'TurnFreeValve3ResetFree-v0': {
-                'pixel_wrapper_kwargs': {
-                   'pixels_only': False,
-                   'normalize': False,
-                   'render_kwargs': {
-                       'width': 48,
-                       'height': 48,
-                       'camera_id': -1,
-                   }
-                },
-                'camera_settings': {
-                    'azimuth': 45,
-                    'distance': 0.32,
-                    'elevation': -55.88,
-                    'lookat': np.array([0.00097442, 0.00063182, 0.03435371]),
-                },
-                # 'camera_settings': {
-                #    'azimuth': 0.,
-                #    'distance': 0.35,
-                #    'elevation': -38.17570837642188,
-                #    'lookat': np.array([0.00046945, -0.00049496, 0.05389398]),
-                # },
-                'init_angle_range': (0., 0.),
-                'target_angle_range': (np.pi, np.pi),
+                **BASE_VISION_KWARGS,
+                'init_qpos_range': [(0, 0, 0, 0, 0, 0)],
+                # Below needs to be 2 for a MultiVICEGAN run, since the goals switch
+                'target_qpos_range': [
+                    (0, 0, 0, 0, 0, -np.pi / 2),
+                    (0, 0, 0, 0, 0, -np.pi / 2), # Second goal is arbitrary
+                ],
                 'swap_goal_upon_completion': False,
                 'observation_keys': (
                     'pixels',
                     'claw_qpos',
                     'last_action',
-                    'object_position',
-                    'object_orientation_sin',
-                    'object_orientation_cos'),
+                    # === BELOW IS JUST FOR LOGGING ===
+                    'object_xy_position',
+                    'object_z_orientation_cos',
+                    'object_z_orientation_sin',
+                ),
             },
             'TurnFreeValve3ResetFreeSwapGoal-v0': {
+                **BASE_VISION_KWARGS,
                 'reset_fingers': True,
                 'reset_frequency': 0,
                 'goals': [
                     (0, 0, 0, 0, 0, np.pi / 2),
                     (0, 0, 0, 0, 0, -np.pi / 2),
                 ],
-                # 'goals': [(0.01, 0.01, 0, 0, 0, np.pi / 2),
-                #           (-0.01, -0.01, 0, 0, 0, -np.pi / 2),
-                #           ],
-                          # (-0.01, 0.01, 0, 0, 0, np.pi),
-                #           # (0.01, -0.01, 0, 0, 0, 0)],
-                'pixel_wrapper_kwargs': {
-                    'observation_key': 'pixels',
-                    'pixels_only': False,
-                    'render_kwargs': {
-                        'width': 32,
-                        'height': 32,
-                    },
-                },
                 'observation_keys': (
                     'claw_qpos',
-                    'object_xy_position',
-                    'object_orientation_cos',
-                    'object_orientation_sin',
                     'last_action',
                     'target_xy_position',
                     'target_z_orientation_cos',
                     'target_z_orientation_sin',
                     'goal_index',
                     'pixels',
+                    # === BELOW IS JUST FOR LOGGING ===
+                    'object_xy_position',
+                    'object_orientation_cos',
+                    'object_orientation_sin',
                 ),
-                'camera_settings': {
-                    'azimuth': 180,
-                    'distance': 0.26,
-                    'elevation': -40,
-                    'lookat': (0, 0, 0.06),
-                }
             },
             'TurnFreeValve3ResetFreeSwapGoalEval-v0': {
+                **BASE_VISION_KWARGS,
                 'goals': [
                     (0, 0, 0, 0, 0, np.pi / 2),
                     (0, 0, 0, 0, 0, -np.pi / 2),
                 ],
-                'pixel_wrapper_kwargs': {
-                    'observation_key': 'pixels',
-                    'pixels_only': False,
-                    'render_kwargs': {
-                        'width': 32,
-                        'height': 32,
-                    },
-                },
                 'observation_keys': (
                     'claw_qpos',
-                    'object_xy_position',
-                    'object_orientation_cos',
-                    'object_orientation_sin',
                     'last_action',
                     'target_xy_position',
                     'target_z_orientation_cos',
                     'target_z_orientation_sin',
                     'goal_index',
                     'pixels',
-                ),
-                'camera_settings': {
-                    'azimuth': 180,
-                    'distance': 0.26,
-                    'elevation': -40,
-                    'lookat': (0, 0, 0.06),
-                }
-            },
-            'TurnFreeValve3Fixed-v0': {
-               'pixel_wrapper_kwargs': {
-                   'pixels_only': False,
-                   'normalize': False,
-                   'render_kwargs': {
-                       'width': 48,
-                       'height': 48,
-                       'camera_id': -1,
-                   }
-               },
-               'camera_settings': {
-                   'azimuth': 0.,
-                   'distance': 0.35,
-                   'elevation': -38.17570837642188,
-                   'lookat': np.array([0.00046945, -0.00049496,  0.05389398]),
-               },
-               'init_angle_range': (0., 0.),
-               'target_angle_range': (np.pi, np.pi),
-               'observation_keys': ('pixels', 'claw_qpos', 'last_action'),
-            },
-            'TurnFreeValve3MultiGoalResetFree-v0': {
-                'goals': ((0, 0, 0, 0, 0, np.pi), (0, 0, 0, 0, 0, 0)),
-                'goal_completion_position_threshold': 0.04,
-                'goal_completion_orientation_threshold': 0.15,
-                'camera_settings': {
-                    'azimuth': 0,
-                    'distance': 0.32,
-                    'elevation': -45,
-                    'lookat': (0, 0, 0.03)
-                },
-
-                # 'camera_settings': {
-                #     'azimuth': 45.,
-                #     'distance': 0.32,
-                #     'elevation': -55.88,
-                #     'lookat': np.array([0.00097442, 0.00063182, 0.03435371])
-                # },
-                # 'camera_settings': {
-                #     'azimuth': 30.,
-                #     'distance': 0.35,
-                #     'elevation': -38.18,
-                #     'lookat': np.array([0.00047, -0.0005, 0.054])
-                # },
-                'pixel_wrapper_kwargs': {
-                    'pixels_only': False,
-                    'normalize': False,
-                    'render_kwargs': {
-                        'width': 32,    # 48
-                        'height': 32,   # 48
-                        'camera_id': -1
-                    },
-                },
-                'swap_goals_upon_completion': False,
-                'observation_keys': (
-                    'pixels',
-                    'claw_qpos',
-                    'last_action',
-                    'goal_index',
-                    'object_position',
-                    'object_orientation_sin',
+                    # === BELOW IS JUST FOR LOGGING ===
+                    'object_xy_position',
                     'object_orientation_cos',
-
-                ),
-            },
-            'TurnFreeValve3MultiGoal-v0': {
-                'goals': ((0, 0, 0, 0, 0, np.pi), (0, 0, 0, 0, 0, 0)),
-                'camera_settings': {
-                    'azimuth': 0,
-                    'distance': 0.32,
-                    'elevation': -45,
-                    'lookat': (0, 0, 0.03)
-                },
-
-                # 'camera_settings': {
-                #     'azimuth': 45.,
-                #     'distance': 0.32,
-                #     'elevation': -55.88,
-                #     'lookat': np.array([0.00097442, 0.00063182, 0.03435371])
-                # },
-                # 'camera_settings': {
-                #     'azimuth': 30.,
-                #     'distance': 0.35,
-                #     'elevation': -38.18,
-                #     'lookat': np.array([0.00047, -0.0005, 0.054])
-                # },
-                'pixel_wrapper_kwargs': {
-                    'pixels_only': False,
-                    'normalize': False,
-                    'render_kwargs': {
-                        'width': 32,
-                        'height': 32,
-                        # 'width': 48,
-                        # 'height': 48,
-                        'camera_id': -1
-                    },
-                },
-                'swap_goals_upon_completion': False,
-                'random_goal_sampling': True,
-                'observation_keys': (
-                    'pixels',
-                    'claw_qpos',
-                    'last_action',
-                    'goal_index',
-                    'object_position',
                     'object_orientation_sin',
-                    'object_orientation_cos'
                 ),
             },
             'LiftDDFixed-v0': {
@@ -1213,7 +1132,7 @@ def get_variant_spec_base(universe, domain, task, task_eval,
         non_object_obs_keys = tuple(key for key in env_obs_keys if 'object' not in key)
         variant_spec['policy_params']['kwargs']['observation_keys'] = variant_spec[
             'exploration_policy_params']['kwargs']['observation_keys'] = variant_spec[
-                'Q_params']['kwargs']['observation_keys'] = non_object_obs_keys
+            'Q_params']['kwargs']['observation_keys'] = non_object_obs_keys
 
     return variant_spec
 
