@@ -36,8 +36,8 @@ UNIVERSES = set(ADAPTERS.keys())
 
 def get_environment(universe, domain, task, environment_kwargs):
     return ADAPTERS[universe](
-            domain, 
-            task, 
+            domain,
+            task,
             **environment_kwargs)
 
 def get_environment_from_params(environment_params):
@@ -50,7 +50,7 @@ def get_environment_from_params(environment_params):
 
 def get_goal_example_environment_from_variant(environment_name, gym_adapter=True, eval=False):
     import gym
-    
+
     if environment_name not in [env.id for env  in gym.envs.registry.all()]:
         from multiworld.envs.mujoco import register_goal_example_envs
         register_goal_example_envs()
