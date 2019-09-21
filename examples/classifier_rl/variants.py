@@ -1007,6 +1007,115 @@ def is_image_env(universe, domain, task, variant_spec):
 
 
 """
+Preprocessor params
+"""
+STATE_PREPROCESSOR_PARAMS = {
+    'ReplicationPreprocessor': {
+        'type': 'ReplicationPreprocessor',
+        'kwargs': {
+            'n': 0,
+            'scale_factor': 1,
+        }
+    },
+    'RandomNNPreprocessor': {
+        'type': 'RandomNNPreprocessor',
+        'kwargs': {
+            'hidden_layer_sizes': (32, 32),
+            'activation': 'linear',
+            'output_activation': 'linear',
+        }
+    },
+    'RandomMatrixPreprocessor': {
+        'type': 'RandomMatrixPreprocessor',
+        'kwargs': {
+            'output_size_scale_factor': 1,
+            'coefficient_range': (-1., 1.),
+        }
+    },
+    'None': None,
+}
+
+
+from softlearning.misc.utils import PROJECT_PATH
+PIXELS_PREPROCESSOR_PARAMS = {
+    'StateEstimatorPreprocessor': {
+        'type': 'StateEstimatorPreprocessor',
+        'kwargs': {
+            'input_shape': (32, 32, 3),
+            'num_hidden_units': 512,
+            'num_hidden_layers': 2,
+            'state_estimator_path': os.path.join(PROJECT_PATH,
+                                                'softlearning',
+                                                'models',
+                                                'state_estimators',
+                                                'state_estimator_from_vae_latents.h5'),
+            # === INCLUDE A PRETRAINED VAE === 
+            'preprocessor_params': {
+                'type': 'VAEPreprocessor',
+                'kwargs': {
+                    'encoder_path': os.path.join(PROJECT_PATH,
+                                                'softlearning',
+                                                'models',
+                                                'vae_16_dim_beta_3_invisible_claw_l2_reg',
+                                                'encoder_16_dim_3.0_beta.h5'),
+                    'decoder_path': os.path.join(PROJECT_PATH,
+                                                'softlearning',
+                                                'models',
+                                                'vae_16_dim_beta_3_invisible_claw_l2_reg',
+                                                'decoder_16_dim_3.0_beta.h5'),
+                    'trainable': False,
+                    'image_shape': (32, 32, 3),
+                    'latent_dim': 16,
+                    'include_decoder': False,
+                }
+            }
+        }
+    },
+    'VAEPreprocessor': {
+        'type': 'VAEPreprocessor',
+        'kwargs': {
+            'image_shape': (33, 32, 3),
+            'latent_dim': 16,
+            'encoder_path': '/nfs/kun1/users/justinvyu/pretrained_models/vae_16_dim_beta_3_invisible_claw_l2_reg/encoder_16_dim_3.0_beta.h5',
+            'decoder_path': '/nfs/kun1/users/justinvyu/pretrained_models/vae_16_dim_beta_3_invisible_claw_l2_reg/decoder_16_dim_3.0_beta.h5',
+            # 'latent_dim': 32,
+            # 'include_decoder': True,
+        },
+    },
+    'ConvnetPreprocessor': tune.grid_search([
+        {
+            'type': 'ConvnetPreprocessor',
+            'kwargs': {
+                'conv_filters': (16, 32, 64),
+                'conv_kernel_sizes': (3, ) * 3,
+                'conv_strides': (2, ) * 3,
+                'normalization_type': normalization_type,
+                'downsampling_type': 'conv',
+                'output_kwargs': {
+                    'type': 'flatten',
+                }
+            },
+        }
+        # {
+        #     'type': 'ConvnetPreprocessor',
+        #     'kwargs': {
+        #         'conv_filters': (64, ) * 4,
+        #         'conv_kernel_sizes': (3, ) * 4,
+        #         'conv_strides': (2, ) * 4,
+        #         'normalization_type': normalization_type,
+        #         'downsampling_type': 'conv',
+        #         'output_kwargs': {
+        #             'type': 'flatten',
+        #         },
+        #     },
+        #     # 'weights_path': '/root/nfs/kun1/users/justinvyu/pretrained_models/convnet_64_by_4.pkl',
+        # }
+        for normalization_type in (None, )
+    ]),
+}
+
+
+"""
 Configuring variant specs
 """
 
@@ -1069,7 +1178,7 @@ def get_variant_spec_base(universe, domain, task, task_eval,
         'replay_pool_params': {
             'type': 'SimpleReplayPool',
             'kwargs': {
-                'max_size': int(3e5), #int(1e6)
+                'max_size': int(5e5),
             }
         },
         'sampler_params': {
@@ -1094,8 +1203,8 @@ def get_variant_spec_base(universe, domain, task, task_eval,
 
     # Filter out parts of the state relating to the object when training from pixels
     env_kwargs = variant_spec['environment_params']['training']['kwargs']
-    if "pixel_wrapper_kwargs" in env_kwargs.keys() and \
-       "device_path" not in env_kwargs.keys():
+    if from_vision or ("pixel_wrapper_kwargs" in env_kwargs.keys() and \
+       "device_path" not in env_kwargs.keys()):
         env_obs_keys = env_kwargs['observation_keys']
 
         non_image_obs_keys = tuple(key for key in env_obs_keys if key != 'pixels')
@@ -1123,24 +1232,21 @@ def get_variant_spec_classifier(universe,
         universe, domain, task, task_eval, policy, algorithm, from_vision, *args, **kwargs)
 
     variant_spec['reward_classifier_params'] = get_classifier_params(universe, domain, task)
-    # variant_spec['reward_classifier_params']['kwargs']['observation_keys'] = (
-    #     'object_position', 'object_orientation_cos', 'object_orientation_sin')# , 'goal_index')
-
     variant_spec['data_params'] = {
         'n_goal_examples': n_goal_examples,
         'n_goal_examples_validation_max': 100,
     }
 
-    variant_spec['sampler_params']['type'] = 'ClassifierSampler'
-    # Add classifier rewards to the replay pool
-    from softlearning.replay_pools.flexible_replay_pool import Field
-    variant_spec['replay_pool_params']['kwargs']['extra_fields'] = {
-        'learned_rewards': Field(
-            name='learned_rewards',
-            dtype='float32',
-            shape=(1, )
-        )
-    }
+    # variant_spec['sampler_params']['type'] = 'ClassifierSampler'
+    # # Add classifier rewards to the replay pool
+    # from softlearning.replay_pools.flexible_replay_pool import Field
+    # variant_spec['replay_pool_params']['kwargs']['extra_fields'] = {
+    #     'learned_rewards': Field(
+    #         name='learned_rewards',
+    #         dtype='float32',
+    #         shape=(1, )
+    #     )
+    # }
 
     if algorithm in ['RAQ', 'VICERAQ']:
         if task in DOOR_TASKS:
@@ -1172,7 +1278,16 @@ def get_variant_spec_classifier(universe,
     return variant_spec
 
 
-CLASSIFIER_ALGS = ('SACClassifier', 'RAQ', 'VICE', 'VICEGAN', 'VICERAQ', 'VICEGANTwoGoal', 'VICEGANMultiGoal', 'MultiVICEGAN')
+CLASSIFIER_ALGS = (
+    'SACClassifier',
+    'RAQ',
+    'VICE',
+    'VICEGAN',
+    'VICERAQ',
+    'VICEGANTwoGoal',
+    'VICEGANMultiGoal',
+    'MultiVICEGAN'
+)
 
 
 def get_variant_spec(args):
@@ -1197,51 +1312,40 @@ def get_variant_spec(args):
 
     variant_spec['algorithm_params']['kwargs']['n_epochs'] = n_epochs
 
+    preprocessor_type = args.preprocessor_type
+
     if is_image_env(universe, domain, task, variant_spec):
+        assert preprocessor_type in PIXELS_PREPROCESSOR_PARAMS
+        preprocessor_params = PIXELS_PREPROCESSOR_PARAMS[preprocessor_type]
         # preprocessor_params = tune.grid_search([
         #     {
         #         'type': 'ConvnetPreprocessor',
         #         'kwargs': {
-        #             'conv_filters': (num_filters, ) * num_layers,
-        #             'conv_kernel_sizes': (3, ) * num_layers,
-        #             'conv_strides': (2, ) * num_layers,
-        #             'normalization_type': normalization_type,
+        #             'conv_filters': (64, 32, 16),
+        #             'conv_kernel_sizes': (3, ) * 3,
+        #             'conv_strides': (2, 1, 1),
+        #             'normalization_type': None,
         #             'downsampling_type': 'conv',
+        #             'output_kwargs': {
+        #                 'type': 'spatial_softmax'
+        #             }
         #         },
-        #     }
-        #     for num_layers in (4, )
-        #     for normalization_type in (None, )
-        #     for num_filters in (64, 8)
+        #     },
+        #     # Std architecture
+        #     {
+        #         'type': 'ConvnetPreprocessor',
+        #         'kwargs': {
+        #             'conv_filters': (64, 64, 64),
+        #             'conv_kernel_sizes': (3, ) * 3,
+        #             'conv_strides': (2, 2, 2),
+        #             'normalization_type': None,
+        #             'downsampling_type': 'conv',
+        #             'output_kwargs': {
+        #                 'type': 'flatten',
+        #             }
+        #         },
+        #     },
         # ])
-        preprocessor_params = tune.grid_search([
-            {
-                'type': 'ConvnetPreprocessor',
-                'kwargs': {
-                    'conv_filters': (64, 32, 16),
-                    'conv_kernel_sizes': (3, ) * 3,
-                    'conv_strides': (2, 1, 1),
-                    'normalization_type': None,
-                    'downsampling_type': 'conv',
-                    'output_kwargs': {
-                        'type': 'spatial_softmax'
-                    }
-                },
-            },
-            # Std architecture
-            {
-                'type': 'ConvnetPreprocessor',
-                'kwargs': {
-                    'conv_filters': (64, 64, 64),
-                    'conv_kernel_sizes': (3, ) * 3,
-                    'conv_strides': (2, 2, 2),
-                    'normalization_type': None,
-                    'downsampling_type': 'conv',
-                    'output_kwargs': {
-                        'type': 'flatten',
-                    }
-                },
-            },
-        ])
 
         variant_spec['policy_params']['kwargs']['hidden_layer_sizes'] = (M, M)
         variant_spec['policy_params']['kwargs'][
@@ -1267,16 +1371,35 @@ def get_variant_spec(args):
                 )))
             )
         if args.algorithm in CLASSIFIER_ALGS:
+            reward_classifier_preprocessor_params = {
+                'type': 'ConvnetPreprocessor',
+                'kwargs': {
+                    'conv_filters': (64, 64, 64),
+                    'conv_kernel_sizes': (3, ) * 3,
+                    'conv_strides': (2, 2, 2),
+                    'normalization_type': None,
+                    'downsampling_type': 'conv',
+                    'output_kwargs': {
+                        'type': 'flatten',
+                    }
+                },
+            }
             (variant_spec
              ['reward_classifier_params']
              ['kwargs']
-             ['observation_preprocessors_params']) = (
-                tune.sample_from(lambda spec: (
-                    spec.get('config', spec)
-                    ['policy_params']
-                    ['kwargs']
-                    ['observation_preprocessors_params']
-                )))
+             ['observation_preprocessors_params']) = {
+                'pixels': reward_classifier_preprocessor_params
+            }
+            # (variant_spec
+            #  ['reward_classifier_params']
+            #  ['kwargs']
+            #  ['observation_preprocessors_params']) = (
+            #     tune.sample_from(lambda spec: (
+            #         spec.get('config', spec)
+            #         ['policy_params']
+            #         ['kwargs']
+            #         ['observation_preprocessors_params']
+            #     )))
 
     if args.checkpoint_replay_pool is not None:
         variant_spec['run_params']['checkpoint_replay_pool'] = (

@@ -239,6 +239,15 @@ def get_parser(allow_policy_list=False):
         default=5,
         help="Save frequency for training videos.")
 
+    from softlearning.preprocessors.utils import PREPROCESSOR_FUNCTIONS
+    parser.add_argument(
+        '--preprocessor-type',
+        type=str,
+        default='ConvnetPreprocessor',
+        help="Preprocessor type for pixel observations.",
+        choices=list(PREPROCESSOR_FUNCTIONS.keys()))
+
+
     parser.add_argument(
         '--num-goals',
         type=int,
