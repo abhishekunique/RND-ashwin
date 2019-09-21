@@ -1,9 +1,12 @@
 import tensorflow as tf
 import numpy as np
-
+import functools
+import gzip
+import pickle
 from tensorflow.keras import regularizers
 tfk = tf.keras
 tfkl = tf.keras.layers
+
 
 """
 Training methods
@@ -75,62 +78,118 @@ class VAE(tfk.Model):
             self,
             image_shape,
             latent_dim=16,
-            kernel_regularizer=regularizers.l2(l=5e-4)):
+            beta=1.0,
+            extra_input_shape=None,
+            kernel_regularizer=regularizers.l2(l=5e-4),
+            optimizer=tf.keras.optimizers.Adam(1e-4)):
         super().__init__()
         self.image_shape = image_shape
         self.latent_dim = latent_dim
-        self.encoder = self.create_encoder_model()
+        self.encoder = self.create_encoder_model(
+            extra_input_shape=extra_input_shape)
         self.decoder = self.create_decoder_model()
+        self.beta = beta
+
+        # Set up variables for online training
+        self.optimizer = optimizer
+        self.elbo_history = []
+        self.kl_history = []
+        self.reconstruct_loss_history = []
+
+    def compute_elbo_loss(self, x):
+        mean, logvar = self.encode(x)
+        z = self.reparameterize(mean, logvar)
+        x_logit = self.decode(z)
+        # Cross entropy reconstruction loss assumes that the pixels
+        # are all independent Bernoulli r.v.s
+        # Need to preprocess the label, so the output will be normalized.
+        cross_ent = tf.nn.sigmoid_cross_entropy_with_logits(
+            logits=x_logit, labels=self.preprocess(x))
+        # Sum across all pixels (row/col) + channels
+        logpx_z = -tf.reduce_sum(cross_ent, axis=[1, 2, 3])
+        # Calculate the KL divergence (difference between log of unit
+        # normal prior and posterior)
+        logpz = log_normal_pdf(z, 0., 0.)  # Prior PDF
+        logqz_x = log_normal_pdf(z, mean, logvar)  # Posterior
+        reconstruction_loss = logpx_z
+        kl_divergence = logpz - logqz_x
+        loss = reconstruction_loss + self.beta * kl_divergence
+        return -tf.reduce_mean(loss)
+
+    def train_iter(self, x):
+        """
+        Performs one step of gradient descent on the batch `x`.
+        """
+        with tf.GradientTape() as tape:
+            loss = self.compute_elbo_loss(x)
+        gradients = tape.gradient(loss, self.trainable_variables)
+        self.optimizer.apply_gradients(
+            zip(gradients, self.trainable_variables))
+        return loss
 
     def preprocess(self, x):
-        # Turn integers into floats normalized between [0, 1]
-        x = tf.image.convert_image_dtype(x, tf.float32)
-        return x
+        """
+        Turn integers into floats normalized between [0, 1]
+        """
+        return tf.image.convert_image_dtype(x, tf.float32)
 
     def create_encoder_model(self,
                              image_shape=None,
                              latent_dim=None,
                              trainable=True,
                              kernel_regularizer=None,
+                             extra_input_shape=None,
+                             padding='VALID', # CHANGE THIS BACK FOR OLD MODELS
+                             # padding='SAME', # CHANGE THIS BACK FOR OLD MODELS
                              name='encoder'):
         if image_shape is None:
             image_shape = self.image_shape
         if latent_dim is None:
             latent_dim = self.latent_dim
-        return tfk.Sequential([
-            tfkl.InputLayer(input_shape=image_shape),
-            tfkl.Lambda(self.preprocess),
-            tfkl.Conv2D(
-                filters=64,
-                kernel_size=3,
-                strides=(2, 2),
-                activation=tfkl.LeakyReLU(),
-                trainable=trainable,
-                kernel_regularizer=kernel_regularizer
-            ),
-            tfkl.Conv2D(
-                filters=64,
-                kernel_size=3,
-                strides=(2, 2),
-                activation=tfkl.LeakyReLU(),
-                trainable=trainable,
-                kernel_regularizer=kernel_regularizer
-            ),
-            tfkl.Conv2D(
-                filters=32,
-                kernel_size=3,
-                strides=(1, 1),
-                activation=tfkl.LeakyReLU(),
-                trainable=trainable,
-                kernel_regularizer=kernel_regularizer
-            ),
-            tfkl.Flatten(),
-            tfkl.Dense(
-                latent_dim + latent_dim,
-                trainable=trainable,
-                kernel_regularizer=kernel_regularizer
-            )
-        ], name=name)
+        conv2d = functools.partial(
+            tfkl.Conv2D,
+            kernel_size=3,
+            activation=tfkl.LeakyReLU(),
+            trainable=trainable,
+            kernel_regularizer=kernel_regularizer,
+            padding=padding,
+        )
+        # Functional model, need to debug this
+        x = tfkl.Input(shape=image_shape, name='pixel_input')
+        preprocessed_x = tfkl.Lambda(self.preprocess)(x)
+        conv_output_0 = conv2d(filters=64, strides=2)(preprocessed_x)
+        conv_output_1 = conv2d(filters=64, strides=2)(conv_output_0)
+        conv_output_2 = conv2d(filters=32, strides=1)(conv_output_1)
+        # conv_output_2 = conv2d(filters=32, strides=2)(conv_output_1)
+        output = tfkl.Flatten()(conv_output_2)
+        if extra_input_shape:
+            s = tfkl.Input(shape=extra_input_shape, name='extra_input')
+            output = tfkl.concatenate([output, s])
+        output = tfkl.Dense(
+            latent_dim + latent_dim,
+            trainable=trainable,
+            kernel_regularizer=kernel_regularizer
+        )(output)
+
+        if extra_input_shape:
+            return tfk.Model([x, s], output, name=name)
+        else:
+            # return tfk.Model(x, output, name=name)
+            layers = [
+                tfkl.InputLayer(input_shape=image_shape, name='pixel_input'),
+                tfkl.Lambda(self.preprocess),
+                conv2d(filters=64, strides=2),
+                conv2d(filters=64, strides=2),
+                conv2d(filters=32, strides=1),
+                tfkl.Flatten(),
+                tfkl.Dense(
+                    latent_dim + latent_dim,
+                    trainable=trainable,
+                    kernel_regularizer=kernel_regularizer
+                )
+            ]
+            return tfk.Sequential(layers, name=name)
+
 
     def create_decoder_model(self,
                              latent_dim=None,
@@ -139,6 +198,15 @@ class VAE(tfk.Model):
                              name='decoder'):
         if latent_dim is None:
             latent_dim = self.latent_dim
+
+        conv2d_transpose = functools.partial(
+            tfkl.Conv2DTranspose,
+            kernel_size=3,
+            activation=tfkl.LeakyReLU(),
+            trainable=trainable,
+            kernel_regularizer=kernel_regularizer,
+            padding='SAME'
+        )
         return tfk.Sequential([
             tfkl.InputLayer(input_shape=(latent_dim,)),
             # This layer expands the dimensionality a lot.
@@ -149,54 +217,30 @@ class VAE(tfk.Model):
                 kernel_regularizer=kernel_regularizer
             ),
             tfkl.Reshape(target_shape=(4, 4, 32)),
-            tfkl.Conv2DTranspose(
-                filters=64,
-                kernel_size=3,
-                strides=(2, 2),
-                padding="SAME",
-                activation=tfkl.LeakyReLU(),
-                trainable=trainable,
-                kernel_regularizer=kernel_regularizer
-            ),
-            tfkl.Conv2DTranspose(
-                filters=64,
-                kernel_size=3,
-                strides=(2, 2),
-                padding="SAME",
-                activation=tfkl.LeakyReLU(),
-                trainable=trainable,
-                kernel_regularizer=kernel_regularizer
-            ),
-            tfkl.Conv2DTranspose(
-                filters=32,
-                kernel_size=3,
-                strides=(2, 2),
-                padding="SAME",
-                activation=tfkl.LeakyReLU(),
-                trainable=trainable,
-                kernel_regularizer=kernel_regularizer
-            ),
-            tfkl.Conv2DTranspose(
-                filters=3,
-                kernel_size=3,
-                strides=(1, 1),
-                padding="SAME",
-                trainable=trainable,
-                kernel_regularizer=kernel_regularizer
-            )
+            conv2d_transpose(filters=64, strides=2),
+            conv2d_transpose(filters=64, strides=2),
+            conv2d_transpose(filters=32, strides=2),
+            conv2d_transpose(filters=3, strides=1),
         ], name=name)
 
-    @tf.function
-    def sample(self, eps=None):
+    def sample(self, eps=None, n_samples=16):
         if eps is None:
-            eps = tf.random.normal(shape=(100, self.latent_dim))
+            eps = tf.random.normal(shape=(n_samples, self.latent_dim))
         return self.decode(eps, apply_sigmoid=True)
 
-    def encode(self, x):
+    def reconstruct(self, x):
+        mean, logvar = self.encode(x)
+        z = self.reparameterize(mean, logvar)
+        return self.decode(z, apply_sigmoid=True)
+
+    def encode(self, x, mean_only=False):
         mean, logvar = tf.split(
             self.encoder(x), num_or_size_splits=2, axis=1)
+        if mean_only:
+            return mean
         return mean, logvar
 
+    @tf.function
     def reparameterize(self, mean, logvar):
         eps = tf.random.normal(shape=mean.shape)
         return eps * tf.exp(logvar * .5) + mean
@@ -215,6 +259,10 @@ class VAE(tfk.Model):
         return logits
 
     def __call__(self, x):
+        mean = self.encode(x, mean_only=True)
+        return mean
+
+    def reconstruct(self, x):
         mean, logvar = self.encode(x)
         z = self.reparameterize(mean, logvar)
         x_reconstruct = self.decode(z, apply_sigmoid=True)
@@ -268,27 +316,44 @@ Training script
 
 
 def get_datasets(images,
+                 claw_states=None,
                  batch_size=128,
-                 shuffle=True,
+                 # shuffle=True,
                  validation_split_ratio=0.1):
-    if shuffle:
-        np.random.shuffle(images)
+    # TODO: Shuffle outside so that `claw_states` doesnt get out of order
+    # if shuffle:
+    #     np.random.shuffle(images)
     split_index = int(validation_split_ratio * len(images))
     train_images = images[split_index:]
     test_images = images[:split_index]
 
-    def train_generator():
-        for image in train_images:
-            yield image
+    if claw_states:
+        train_claw_states = claw_states[split_index:]
+        test_claw_states = claw_states[:split_index]
+        def train_generator():
+            for image, claw_state in zip(train_images, train_claw_states):
+                yield image, claw_state
 
-    def test_generator():
-        for image in test_images:
-            yield image
+        def test_generator():
+            for image, claw_state in zip(test_images, test_claw_states):
+                yield image, claw_state
+        train_dataset = tf.data.Dataset.from_generator(
+                train_generator, output_types=(tf.uint8, tf.float32)).batch(batch_size)
+        test_dataset = tf.data.Dataset.from_generator(
+                test_generator, output_types=(tf.uint8, tf.float32)).batch(batch_size)
 
-    train_dataset = tf.data.Dataset.from_generator(
-            train_generator, tf.uint8).batch(batch_size)
-    test_dataset = tf.data.Dataset.from_generator(
-            test_generator, tf.uint8).batch(batch_size)
+    else:
+        def train_generator():
+            for image in train_images:
+                yield image
+
+        def test_generator():
+            for image in test_images:
+                yield image
+        train_dataset = tf.data.Dataset.from_generator(
+                train_generator, tf.uint8).batch(batch_size)
+        test_dataset = tf.data.Dataset.from_generator(
+                test_generator, tf.uint8).batch(batch_size)
 
     return train_dataset, test_dataset
 
@@ -298,6 +363,7 @@ if __name__ == '__main__':
     import time
     import os
     import skimage
+    tf.enable_eager_execution()
 
     REGULARIZER_OPTIONS = {
         'l1': regularizers.l1,
@@ -309,7 +375,7 @@ if __name__ == '__main__':
     parser.add_argument('--latent-dim',
                         type=int,
                         help='Latent dimension of the VAE',
-                        default=4)
+                        default=32)
     parser.add_argument('--image-shape',
                         type=lambda x: eval(x),
                         help='(width, height, channels) of the image',
@@ -323,9 +389,9 @@ if __name__ == '__main__':
                         help='Number of epochs to train for',
                         default=250)
     parser.add_argument('--beta',
-                        type=float,
+                        type=lambda x: np.array(eval(x)),
                         help='Beta parameter for the VAE',
-                        default=1.0)
+                        default=[1.0])
     parser.add_argument('--n-examples-to-generate',
                         type=float,
                         help='Number of random reconstructions to generate',
@@ -343,23 +409,29 @@ if __name__ == '__main__':
                         help='Kernel regularizer to use for Conv2D and Dense layers',
                         choices=list(REGULARIZER_OPTIONS.keys()) + ['None'],
                         default='l2')
-    parser.add_argument('--regularizer_lambda',
+    parser.add_argument('--regularizer-lambda',
                         type=float,
                         help='Lambda to use with kernel regularizer',
                         default=5e-4)
+    parser.add_argument('--include-claw-state',
+                        type=lambda x: eval(x),
+                        help='Whether or not to include extra state information',
+                        default=False)
+
     args = parser.parse_args()
 
     tf.enable_eager_execution()
 
     path_name = args.save_path_name
     n_epochs = args.n_epochs
-    beta = args.beta
+    betas = args.beta # Search grid over this
     image_shape = args.image_shape
-    latent_dim = args.latent_dim
+    latent_dim = args.latent_dim # Search grid over this
     n_examples_to_generate = args.n_examples_to_generate
     save_weights_frequency = args.save_weights_frequency
     kernel_regularizer_type = args.kernel_regularizer
     lambd = args.regularizer_lambda
+    include_claw_state = args.include_claw_state
 
     regularizer = REGULARIZER_OPTIONS[kernel_regularizer_type](l=lambd)
 
@@ -373,80 +445,103 @@ if __name__ == '__main__':
     logdir = os.path.join(save_path, 'logs')
     file_writer = tf.contrib.summary.create_file_writer(logdir)
 
-    from softlearning.models.state_estimation import get_dumped_pkl_data
-    images, _ = get_dumped_pkl_data(args.data_directory)
-
-    train_dataset, test_dataset = get_datasets(images)
-
-    optimizer = tf.keras.optimizers.Adam(1e-4)
+    import ipdb; ipdb.set_trace()
     # Model creation
-    vae = VAE(
-        image_shape=image_shape,
-        latent_dim=latent_dim,
-        kernel_regularizer=regularizer
-    )
+    all_vaes = [
+        VAE(image_shape=image_shape,
+            latent_dim=latent_dim,
+            beta=_beta,
+            extra_input_shape=((18, ) if include_claw_state else None))
+        for _beta in betas
+    ]
+    optimizers = [tf.keras.optimizers.Adam(1e-4) for _ in range(len(all_vaes))]
+    all_vaes[0].encoder.summary()
+    all_vaes[0].decoder.summary()
 
-    vae.encoder.summary()
-    vae.decoder.summary()
+    # from softlearning.models.state_estimation import get_dumped_pkl_data
+    # images, _ = get_dumped_pkl_data(args.data_directory)
 
-    elbo_history = []
-    recon_history, kl_history = [], []
+    with gzip.open(args.data_directory, 'rb') as f:
+        data = pickle.load(f)
+    images = data['pixels']
+    claw_states = None
+    if include_claw_state:
+        claw_qpos = data['claw_qpos']
+        last_action = data['last_action']
+        claw_states = np.concatenate([claw_qpos, last_action], axis=1)
+
+    # Shuffle data by the same permutation
+    perm = np.random.permutation(images.shape[0])
+    images = images[perm]
+    claw_states = (claw_states[perm] if claw_states else None)
+
+    train_dataset, test_dataset = get_datasets(images, claw_states=claw_states)
+
+    # vae = VAE(
+    #     image_shape=image_shape,
+    #     latent_dim=latent_dim,
+    #     kernel_regularizer=regularizer
+    # )
+
+    # vae.encoder.summary()
+    # vae.decoder.summary()
 
     for epoch in range(1, n_epochs + 1):
         # Training loop
-        start_time = time.time()
-        for train_x in train_dataset:
-            compute_apply_gradients(vae, train_x, optimizer, beta)
-        end_time = time.time()
+        for i, vae in enumerate(all_vaes):
+            optimizer = optimizers[i]
+            beta = betas[i]
+            start_time = time.time()
+            for train_x in train_dataset:
+                compute_apply_gradients(vae, train_x, optimizer, beta)
+            end_time = time.time()
 
-        if epoch % save_weights_frequency == 0:
-            vae.encoder.save_weights(
-                os.path.join(save_path, f'encoder_{latent_dim}_dim_{beta}_beta.h5'))
-            vae.decoder.save_weights(
-                os.path.join(save_path, f'decoder_{latent_dim}_dim_{beta}_beta.h5'))
+            if epoch % save_weights_frequency == 0:
+                vae.encoder.save_weights(
+                    os.path.join(save_path,
+                        f'encoder_{latent_dim}_dim_{beta}_beta.h5'))
+                vae.decoder.save_weights(
+                    os.path.join(save_path,
+                        f'decoder_{latent_dim}_dim_{beta}_beta.h5'))
 
-        # Test on eval dataset
-        _elbo = tf.keras.metrics.Mean()
-        _recon_loss, _kl_loss = tf.keras.metrics.Mean(), tf.keras.metrics.Mean()
-        for test_x in test_dataset:
-            recon, kl = compute_elbo_loss_split(vae, test_x, beta=beta) 
-            _elbo(recon + kl)
-            _recon_loss(recon)
-            _kl_loss(kl)
-        elbo = -(_elbo.result())
-        recon_loss = -(_recon_loss.result())
-        kl_loss = -(_kl_loss.result())
-        print(f'Epoch: {epoch}, Test set ELBO: {elbo}, Reconstruction Loss: {recon_loss}, KL loss: {kl_loss}\nTime elapsed for current epoch {end_time-start_time}')
+            # Test on eval dataset
+            _elbo = tf.keras.metrics.Mean()
+            _recon_loss, _kl_loss = tf.keras.metrics.Mean(), tf.keras.metrics.Mean()
+            for test_x in test_dataset:
+                recon, kl = compute_elbo_loss_split(vae, test_x, beta=beta)
+                _elbo(recon + kl)
+                _recon_loss(recon)
+                _kl_loss(kl)
+            elbo = -(_elbo.result())
+            recon_loss = -(_recon_loss.result())
+            kl_loss = -(_kl_loss.result())
+            print(f'VAE: {i}, Epoch: {epoch}, Test set ELBO: {elbo}, Reconstruction Loss: {recon_loss}, KL loss: {kl_loss}\nTime elapsed for current epoch {end_time-start_time}')
 
-        with file_writer.as_default(), tf.contrib.summary.always_record_summaries():
-            tf.contrib.summary.scalar('elbo', elbo, step=epoch)
-            tf.contrib.summary.scalar('reconstruction_loss', recon_loss, step=epoch)
-            tf.contrib.summary.scalar('kl_div', kl_loss, step=epoch)
+            with file_writer.as_default(), tf.contrib.summary.always_record_summaries():
+                tf.contrib.summary.scalar(f'vae_{i}/elbo', elbo, step=epoch)
+                tf.contrib.summary.scalar(f'vae_{i}/reconstruction_loss', recon_loss, step=epoch)
+                tf.contrib.summary.scalar(f'vae_{i}/kl_divergence', kl_loss, step=epoch)
 
-        elbo_history.append(elbo)
-        recon_history.append(recon_loss)
-        kl_history.append(kl_loss)
+            # Evaluate qualitatively on some reconstructions
+            random_images = images[np.random.randint(images.shape[0],
+                                                     size=n_examples_to_generate)]
+            reconstructions = vae.reconstruct(random_images)
+            concat = np.concatenate([
+                skimage.util.img_as_ubyte(reconstructions),
+                random_images
+            ], axis=2)
 
-        # Evaluate qualitatively on some reconstructions
-        random_images = images[np.random.randint(images.shape[0],
-                                                 size=n_examples_to_generate)]
-        reconstructions = vae(random_images)
-        concat = np.concatenate([
-            skimage.util.img_as_ubyte(reconstructions),
-            random_images
-        ], axis=2)
+            # for i, (r, orig) in enumerate(zip(reconstructions, random_images)):
+            #     concat = np.concatenate([
+            #         skimage.util.img_as_ubyte(r), orig], axis=1)
+                # img_path = os.path.join(reconstruct_save_path, f'epoch_{epoch}_{i}.png')
+                # skimage.io.imsave(img_path, concat)
 
-        # for i, (r, orig) in enumerate(zip(reconstructions, random_images)):
-        #     concat = np.concatenate([
-        #         skimage.util.img_as_ubyte(r), orig], axis=1)
-            # img_path = os.path.join(reconstruct_save_path, f'epoch_{epoch}_{i}.png')
-            # skimage.io.imsave(img_path, concat)
-
-        sampled_vectors = tf.random.normal(
-            shape=[n_examples_to_generate, latent_dim]) 
-        decoded_samples = vae.decode(sampled_vectors)
-        with file_writer.as_default(), tf.contrib.summary.always_record_summaries():
-            tf.contrib.summary.image('reconstruction', concat, step=epoch)
-            tf.contrib.summary.image('samples', decoded_samples, step=epoch)
+            sampled_vectors = tf.random.normal(
+                shape=[n_examples_to_generate, latent_dim])
+            decoded_samples = vae.decode(sampled_vectors)
+            with file_writer.as_default(), tf.contrib.summary.always_record_summaries():
+                tf.contrib.summary.image(f'vae_{i}/reconstruction', concat, step=epoch)
+                tf.contrib.summary.image(f'vae_{i}/samples', decoded_samples, step=epoch)
 
 
