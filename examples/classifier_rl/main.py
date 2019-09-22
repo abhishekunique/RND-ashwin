@@ -46,7 +46,7 @@ class ExperimentRunnerClassifierRL(ExperimentRunner):
                 get_example_pools_from_variant(variant))
             num_goals = len(goal_pools_train)
 
-            reward_classifiers = self._reward_classifiers = [get_reward_classifier_from_variant(
+            reward_classifiers = self.reward_classifiers = [get_reward_classifier_from_variant(
                 variant, algorithm_kwargs['training_environment']) for _ in range(num_goals)]
 
             algorithm_kwargs['classifiers'] = reward_classifiers
@@ -55,12 +55,8 @@ class ExperimentRunnerClassifierRL(ExperimentRunner):
 
         return algorithm_kwargs
 
-    def _restore_algorithm_kwargs(self, checkpoint_dir):
-        with self._session.as_default():
-            pickle_path = self._pickle_path(checkpoint_dir)
-            with open(pickle_path, 'rb') as f:
-                picklable = pickle.load(f)
-        algorithm_kwargs = super()._restore_algorithm_kwargs(checkpoint_dir)
+    def _restore_algorithm_kwargs(self, picklable, checkpoint_dir, variant):
+        algorithm_kwargs = super()._restore_algorithm_kwargs(picklable, checkpoint_dir, variant)
 
         if 'reward_classifier' in picklable.keys():
             reward_classifier = self.reward_classifier = picklable[
@@ -68,28 +64,30 @@ class ExperimentRunnerClassifierRL(ExperimentRunner):
             algorithm_kwargs['classifier'] = reward_classifier
 
             goal_examples_train, goal_examples_validation = (
-                get_goal_example_from_variant(self._variant))
+                get_goal_example_from_variant(variant))
             algorithm_kwargs['goal_examples'] = goal_examples_train
             algorithm_kwargs['goal_examples_validation'] = (
                 goal_examples_validation)
 
-    def _restore_multi_algorithm_kwargs(self, checkpoint_dir):
-        with self._session.as_default():
-            pickle_path = self._pickle_path(checkpoint_dir)
-            with open(pickle_path, 'rb') as f:
-                picklable = pickle.load(f)
-        algorithm_kwargs = super()._restore_algorithm_kwargs(checkpoint_dir)
+        return algorithm_kwargs
+
+    def _restore_multi_algorithm_kwargs(self, picklable, checkpoint_dir, variant):
+        algorithm_kwargs = super()._restore_multi_algorithm_kwargs(picklable, checkpoint_dir, variant)
 
         if 'reward_classifiers' in picklable.keys():
+
             reward_classifiers = self.reward_classifiers = picklable[
                 'reward_classifiers']
-            algorithm_kwargs['classifiers'] = reward_classifiers
+            for reward_classifier in self.reward_classifiers:
+                reward_classifier.observation_keys = variant['reward_classifier_params']['kwargs']['observation_keys']
 
+            algorithm_kwargs['classifiers'] = reward_classifiers
             goal_pools_train, goal_pools_validation = (
-                get_example_pools_from_variant(self._variant))
+                get_example_pools_from_variant(variant))
             algorithm_kwargs['classifiers'] = reward_classifiers
             algorithm_kwargs['goal_example_pools'] = goal_pools_train
             algorithm_kwargs['goal_example_validation_pools'] = goal_pools_validation
+        return algorithm_kwargs
 
     @property
     def picklables(self):

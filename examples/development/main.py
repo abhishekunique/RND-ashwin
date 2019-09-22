@@ -1,4 +1,3 @@
-
 import os
 import copy
 import glob
@@ -174,7 +173,7 @@ class ExperimentRunner(tune.Trainable):
         return algorithm_kwargs
 
     def _get_multi_algorithm_kwargs(self, variant):
-        share_pool = variant['algorithm_params']['kwargs'].pop('share_pool')
+        self._share_pool = variant['algorithm_params']['kwargs'].pop('share_pool')
 
         environment_params = variant['environment_params']
         training_environment = self.training_environment = (
@@ -184,10 +183,10 @@ class ExperimentRunner(tune.Trainable):
             if 'evaluation' in environment_params
             else training_environment)
         num_goals = training_environment.num_goals
-        if share_pool:
-            replay_pool = get_replay_pool_from_variant(variant, training_environment)
+        if self._share_pool:
+            self.replay_pool = get_replay_pool_from_variant(variant, training_environment)
             replay_pools = self._replay_pools = tuple([
-                replay_pool for _ in range(num_goals)
+                self.replay_pool for _ in range(num_goals)
             ])
         else:
             replay_pools = self._replay_pools = tuple([
@@ -253,6 +252,7 @@ class ExperimentRunner(tune.Trainable):
     def _build(self):
         variant = copy.deepcopy(self._variant)
 
+        from pprint import pprint; import ipdb; ipdb.set_trace(context=30)
         algorithm_kwargs = self._get_algorithm_kwargs(variant)
 
         self.algorithm = get_algorithm_from_variant(**algorithm_kwargs)
@@ -455,7 +455,10 @@ class ExperimentRunner(tune.Trainable):
             self._save_rnd_networks(checkpoint_dir)
 
         if self._variant['run_params'].get('checkpoint_replay_pool', False):
-            self._save_replay_pool(checkpoint_dir)
+            if self._multi_build:
+                self._save_replay_pools(checkpoint_dir)
+            else:
+                self._save_replay_pool(checkpoint_dir)
 
         tf_checkpoint = self._get_tf_checkpoint()
 
@@ -466,16 +469,20 @@ class ExperimentRunner(tune.Trainable):
         return os.path.join(checkpoint_dir, '')
 
     def _save_replay_pool(self, checkpoint_dir):
-        if self._multi_build:
-            replay_pools_pickle_paths = self._replay_pools_pickle_paths(
-                checkpoint_dir)
+        replay_pool_pickle_path = self._replay_pool_pickle_path(
+            checkpoint_dir)
+        self.replay_pool.save_latest_experience(replay_pool_pickle_path)
+
+    def _save_replay_pools(self, checkpoint_dir):
+        replay_pools_pickle_paths = self._replay_pools_pickle_paths(
+            checkpoint_dir)
+
+        if self._share_pool:
+            self._save_replay_pool(checkpoint_dir)
+        else:
             for i, replay_pool in enumerate(self._replay_pools):
                 self._replay_pools[i].save_latest_experience(
                     replay_pools_pickle_paths[i])
-        else:
-            replay_pool_pickle_path = self._replay_pool_pickle_path(
-                checkpoint_dir)
-            self.replay_pool.save_latest_experience(replay_pool_pickle_path)
 
     def _restore_replay_pool(self, current_checkpoint_dir):
         # experiment_root = os.path.dirname(current_checkpoint_dir)
@@ -502,12 +509,7 @@ class ExperimentRunner(tune.Trainable):
             for i, experience_path in enumerate(experience_paths):
                 self._replay_pools[i].load_experience(experience_path)
 
-    def _restore_algorithm_kwargs(self, checkpoint_dir, variant):
-        with self._session.as_default():
-            pickle_path = self._pickle_path(checkpoint_dir)
-            with open(pickle_path, 'rb') as f:
-                picklable = pickle.load(f)
-
+    def _restore_algorithm_kwargs(self, picklable, checkpoint_dir, variant):
         training_environment = self.training_environment = picklable[
             'training_environment']
         evaluation_environment = self.evaluation_environment = picklable[
@@ -533,11 +535,10 @@ class ExperimentRunner(tune.Trainable):
 
         if variant['algorithm_params']['rnd_params']:
             from softlearning.rnd.utils import get_rnd_networks_from_variant
-            rnd_networks = get_rnd_networks_from_variant(variant, training_environment)
+            self.rnd_networks = get_rnd_networks_from_variant(variant, training_environment)
             self._restore_rnd_networks(checkpoint_dir)
         else:
-            rnd_networks = ()
-        self.rnd_networks = rnd_networks
+            self.rnd_networks = ()
 
         algorithm_kwargs = {
             'variant': variant,
@@ -549,16 +550,12 @@ class ExperimentRunner(tune.Trainable):
             'pool': replay_pool,
             'sampler': sampler,
             'session': self._session,
-            'rnd_networks': rnd_networks
+            'rnd_networks': self.rnd_networks
         }
         return algorithm_kwargs
 
-    def _restore_multi_algorithm_kwargs(self, checkpoint_dir, variant):
-
-        with self._session.as_default():
-            pickle_path = self._pickle_path(checkpoint_dir)
-            with open(pickle_path, 'rb') as f:
-                picklable = pickle.load(f)
+    def _restore_multi_algorithm_kwargs(self, picklable, checkpoint_dir, variant):
+        self._share_pool = variant['algorithm_params']['kwargs'].pop('share_pool')
 
         training_environment = self.training_environment = picklable[
             'training_environment']
@@ -567,10 +564,18 @@ class ExperimentRunner(tune.Trainable):
 
         num_goals = training_environment.num_goals
 
-        replay_pools = self._replay_pools = tuple([
-            get_replay_pool_from_variant(variant, training_environment)
-            for _ in range(num_goals)
-        ])
+        if self._share_pool:
+            self.replay_pool = get_replay_pool_from_variant(variant, training_environment)
+            self._restore_replay_pool(checkpoint_dir)
+            replay_pools = self._replay_pools = tuple([
+                self.replay_pool for _ in range(num_goals)
+            ])
+        else:
+            replay_pools = self._replay_pools = tuple([
+                get_replay_pool_from_variant(variant, training_environment)
+                for _ in range(num_goals)
+            ])
+            self._restore_replay_pools(checkpoint_dir)
 
         samplers = self._samplers = picklable['samplers']
 
@@ -587,9 +592,6 @@ class ExperimentRunner(tune.Trainable):
         for policy, policy_weights in zip(self._policies, picklable['policy_weights']):
             policy.set_weights(policy_weights)
 
-        if variant['run_params'].get('checkpoint_replay_pool', False):
-            self._restore_replay_pools(checkpoint_dir)
-
         initial_exploration_policy = self.initial_exploration_policy = (
             get_policy_from_params(
                 variant['exploration_policy_params'],
@@ -597,11 +599,10 @@ class ExperimentRunner(tune.Trainable):
 
         if variant['algorithm_params']['rnd_params']:
             from softlearning.rnd.utils import get_rnd_networks_from_variant
-            rnd_networks = [get_rnd_networks_from_variant(variant, training_environment) for _ in range(num_goals)]
+            self.rnd_networks = [get_rnd_networks_from_variant(variant, training_environment) for _ in range(num_goals)]
             self._restore_rnd_networks(checkpoint_dir)
         else:
-            rnd_networks = ()
-        self.rnd_networks = rnd_networks
+            self.rnd_networks = ()
 
         algorithm_kwargs = {
             'variant': variant,
@@ -613,7 +614,8 @@ class ExperimentRunner(tune.Trainable):
             'pools': replay_pools,
             'samplers': samplers,
             'session': self._session,
-            'rnd_networks': rnd_networks
+            'rnd_networks': self.rnd_networks,
+            'num_goals': num_goals,
         }
         return algorithm_kwargs
 
@@ -625,17 +627,19 @@ class ExperimentRunner(tune.Trainable):
 
         self._multi_build = (self._variant['algorithm_params']['type'] in ['MultiSAC', 'MultiVICEGAN'])
 
-        if self._multi_build:
-            algorithm_kwargs = self._restore_multi_algorithm_kwargs(checkpoint_dir, variant)
-        else:
-            algorithm_kwargs = self._restore_algorithm_kwargs(checkpoint_dir, variant)
-
-        self.algorithm = get_algorithm_from_variant(**algorithm_kwargs)
-
         with self._session.as_default():
             pickle_path = self._pickle_path(checkpoint_dir)
             with open(pickle_path, 'rb') as f:
                 picklable = pickle.load(f)
+        from pprint import pprint; import ipdb; ipdb.set_trace(context=30)
+
+        if self._multi_build:
+            algorithm_kwargs = self._restore_multi_algorithm_kwargs(picklable, checkpoint_dir, variant)
+        else:
+            algorithm_kwargs = self._restore_algorithm_kwargs(picklable, checkpoint_dir, variant)
+
+        self.algorithm = get_algorithm_from_variant(**algorithm_kwargs)
+
         self.algorithm.__setstate__(picklable['algorithm'].__getstate__())
 
         tf_checkpoint = self._get_tf_checkpoint()
@@ -643,6 +647,7 @@ class ExperimentRunner(tune.Trainable):
             os.path.split(self._tf_checkpoint_prefix(checkpoint_dir))[0]))
 
         status.assert_consumed().run_restore_ops(self._session)
+
         initialize_tf_variables(self._session, only_uninitialized=True)
 
         # TODO(hartikainen): target Qs should either be checkpointed or pickled.
