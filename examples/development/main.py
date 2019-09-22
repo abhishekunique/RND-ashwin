@@ -631,7 +631,6 @@ class ExperimentRunner(tune.Trainable):
             pickle_path = self._pickle_path(checkpoint_dir)
             with open(pickle_path, 'rb') as f:
                 picklable = pickle.load(f)
-        from pprint import pprint; import ipdb; ipdb.set_trace(context=30)
 
         if self._multi_build:
             algorithm_kwargs = self._restore_multi_algorithm_kwargs(picklable, checkpoint_dir, variant)
