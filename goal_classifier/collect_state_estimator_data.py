@@ -23,15 +23,15 @@ def main():
                         help='Save directory name')
     parser.add_argument('--rollout-length',
                         type=int,
-                        default=32,
+                        default=25,
                         help='Number of timesteps per rollout')
     parser.add_argument('--dump-frequency',
                         type=int,
-                        default=50,
+                        default=100,
                         help='Number of trajectories per dump')
     parser.add_argument('--image-shape',
                         type=lambda x: eval(x),
-                        default=(32, 32, 3),
+                        default=(64, 64, 3),
                         help='(width, height, channels) to save for pixels')
     parser.add_argument('--save-images',
                         type=lambda x: eval(x),
@@ -68,9 +68,9 @@ def main():
         },
         'camera_settings': {
             'azimuth': 180,
-            'distance': 0.35,
-            'elevation': -55,
-            'lookat': (0, 0, 0.03),
+            'distance': 0.38,
+            'elevation': -36,
+            'lookat': (0.04, 0.008, 0.026),
         },
         'init_qpos_range': (
             (-0.075, -0.075, 0, 0, 0, -np.pi),
@@ -102,11 +102,9 @@ def main():
             # 1. Collect and perform actions (sampled uniformly)
             action = env.action_space.sample()
 
-            # env.render()  # render on display
-            obs_dict = env.get_obs_dict()
-
             # 2. Collect observations (including claw position and pixels)
             observation, _, _, _ = env.step(action)
+            obs_dict = env.get_obs_dict()
             # Add to all the observation keys
             for k, v in observation.items():
                 if k not in trajectory:
