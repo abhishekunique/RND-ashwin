@@ -8,6 +8,7 @@ tfk = tf.keras
 tfkl = tf.keras.layers
 
 
+tf.enable_eager_execution()
 """
 Training methods
 """
@@ -159,9 +160,10 @@ class VAE(tfk.Model):
         preprocessed_x = tfkl.Lambda(self.preprocess)(x)
         conv_output_0 = conv2d(filters=64, strides=2)(preprocessed_x)
         conv_output_1 = conv2d(filters=64, strides=2)(conv_output_0)
-        conv_output_2 = conv2d(filters=32, strides=1)(conv_output_1)
+        conv_output_2 = conv2d(filters=32, strides=2)(conv_output_1)
+        conv_output_3 = conv2d(filters=32, strides=2)(conv_output_2)
         # conv_output_2 = conv2d(filters=32, strides=2)(conv_output_1)
-        output = tfkl.Flatten()(conv_output_2)
+        output = tfkl.Flatten()(conv_output_3)
         if extra_input_shape:
             s = tfkl.Input(shape=extra_input_shape, name='extra_input')
             output = tfkl.concatenate([output, s])
@@ -180,7 +182,8 @@ class VAE(tfk.Model):
                 tfkl.Lambda(self.preprocess),
                 conv2d(filters=64, strides=2),
                 conv2d(filters=64, strides=2),
-                conv2d(filters=32, strides=1),
+                conv2d(filters=32, strides=2),
+                conv2d(filters=32, strides=2),
                 tfkl.Flatten(),
                 tfkl.Dense(
                     latent_dim + latent_dim,
@@ -220,8 +223,25 @@ class VAE(tfk.Model):
             conv2d_transpose(filters=64, strides=2),
             conv2d_transpose(filters=64, strides=2),
             conv2d_transpose(filters=32, strides=2),
+            conv2d_transpose(filters=32, strides=2),
             conv2d_transpose(filters=3, strides=1),
         ], name=name)
+
+        # return tfk.Sequential([
+        #     tfkl.InputLayer(input_shape=(latent_dim,)),
+        #     # This layer expands the dimensionality a lot.
+        #     tfkl.Dense(
+        #         units=4*4*32,
+        #         activation=tfkl.LeakyReLU(),
+        #         trainable=trainable,
+        #         kernel_regularizer=kernel_regularizer
+        #     ),
+        #     tfkl.Reshape(target_shape=(4, 4, 32)),
+        #     conv2d_transpose(filters=64, strides=2),
+        #     conv2d_transpose(filters=64, strides=2),
+        #     conv2d_transpose(filters=32, strides=2),
+        #     conv2d_transpose(filters=3, strides=1),
+        # ], name=name)
 
     def sample(self, eps=None, n_samples=16):
         if eps is None:
@@ -269,7 +289,6 @@ class VAE(tfk.Model):
         return x_reconstruct
 
     def get_encoder_decoder(self, trainable=True, name='vae_encoder_decoder'):
-        import ipdb; ipdb.set_trace()
         encoder = self.create_encoder_model(
             self.image_shape, trainable=trainable)
         encoder.set_weights(self.encoder.get_weights())
@@ -363,7 +382,6 @@ if __name__ == '__main__':
     import time
     import os
     import skimage
-    tf.enable_eager_execution()
 
     REGULARIZER_OPTIONS = {
         'l1': regularizers.l1,
@@ -420,8 +438,6 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    tf.enable_eager_execution()
-
     path_name = args.save_path_name
     n_epochs = args.n_epochs
     betas = args.beta # Search grid over this
@@ -445,7 +461,6 @@ if __name__ == '__main__':
     logdir = os.path.join(save_path, 'logs')
     file_writer = tf.contrib.summary.create_file_writer(logdir)
 
-    import ipdb; ipdb.set_trace()
     # Model creation
     all_vaes = [
         VAE(image_shape=image_shape,
