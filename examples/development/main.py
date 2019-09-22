@@ -25,6 +25,7 @@ from softlearning.samplers.nn_sampler import NNSampler
 import numpy as np
 
 tf.compat.v1.disable_eager_execution()
+from softlearning.rnd.utils import get_rnd_networks_from_variant
 
 
 class ExperimentRunner(tune.Trainable):
@@ -130,8 +131,7 @@ class ExperimentRunner(tune.Trainable):
                 variant['exploration_policy_params'], training_environment))
 
         # === INITIALIZE RND NETWORKS ===
-        from softlearning.rnd.utils import get_rnd_networks_from_variant
-        rnd_networks = (
+        self.rnd_networks = (
             get_rnd_networks_from_variant(variant, training_environment)
             if 'rnd_params' in variant['algorithm_params']
             else ()
@@ -167,7 +167,7 @@ class ExperimentRunner(tune.Trainable):
             'pool': replay_pool,
             'sampler': sampler,
             'session': self._session,
-            'rnd_networks': rnd_networks,
+            'rnd_networks': self.rnd_networks,
             'vae': vae,
             'state_estimator': state_estimator,
         }
@@ -232,6 +232,7 @@ class ExperimentRunner(tune.Trainable):
             rnd_networks = [get_rnd_networks_from_variant(variant, training_environment) for _ in range(num_goals)]
         else:
             rnd_networks = ()
+        self.rnd_networks = rnd_networks
 
         algorithm_kwargs = {
             'variant': variant,
@@ -251,6 +252,7 @@ class ExperimentRunner(tune.Trainable):
 
     def _build(self):
         variant = copy.deepcopy(self._variant)
+
         algorithm_kwargs = self._get_algorithm_kwargs(variant)
 
         self.algorithm = get_algorithm_from_variant(**algorithm_kwargs)
@@ -321,7 +323,8 @@ class ExperimentRunner(tune.Trainable):
                 'evaluation_environment': self.evaluation_environment,
                 'samplers': self._samplers,
                 'algorithm': self.algorithm,
-                'policy_weights': [policy.get_weights() for policy in self._policies]
+                'policy_weights': [policy.get_weights() for policy in self._policies],
+                'rnd_networks': self.rnd_networks,
             }
         return {
             'variant': self._variant,
@@ -330,6 +333,7 @@ class ExperimentRunner(tune.Trainable):
             'sampler': self.sampler,
             'algorithm': self.algorithm,
             'policy_weights': self.policy.get_weights(),
+            'rnd_networks': self.rnd_networks,
         }
 
     def _save_value_functions(self, checkpoint_dir):
@@ -375,6 +379,52 @@ class ExperimentRunner(tune.Trainable):
                     f'Qs_{i}')
                 Q.load_weights(checkpoint_path)
 
+    def _save_rnd_networks(self, checkpoint_dir):
+        if self._multi_build:
+            for i, rnd_network_pair in enumerate(self.rnd_networks):
+                target_network, predictor_network = self.rnd_networks[i]
+                checkpoint_path = os.path.join(
+                    checkpoint_dir,
+                    f'rnd_target_{i}')
+                target_network.save_weights(checkpoint_path)
+                checkpoint_path = os.path.join(
+                    checkpoint_dir,
+                    f'rnd_predictor_{i}')
+                predictor_network.save_weights(checkpoint_path)
+        else:
+            target_network, predictor_network = self.rnd_networks
+            checkpoint_path = os.path.join(
+                checkpoint_dir,
+                f'rnd_target')
+            target_network.save_weights(checkpoint_path)
+            checkpoint_path = os.path.join(
+                checkpoint_dir,
+                f'rnd_predictor')
+            predictor_network.save_weights(checkpoint_path)
+
+    def _restore_rnd_networks(self, checkpoint_dir):
+        if self._multi_build:
+            for i, rnd_network_pair in enumerate(self.rnd_networks):
+                target_network, predictor_network = self.rnd_networks[i]
+                checkpoint_path = os.path.join(
+                    checkpoint_dir,
+                    f'rnd_target_{i}')
+                target_network.load_weights(checkpoint_path)
+                checkpoint_path = os.path.join(
+                    checkpoint_dir,
+                    f'rnd_predictor_{i}')
+                predictor_network.load_weights(checkpoint_path)
+        else:
+            target_network, predictor_network = self.rnd_networks
+            checkpoint_path = os.path.join(
+                checkpoint_dir,
+                f'rnd_target')
+            target_network.load_weights(checkpoint_path)
+            checkpoint_path = os.path.join(
+                checkpoint_dir,
+                f'rnd_predictor')
+            predictor_network.load_weights(checkpoint_path)
+
     def _save(self, checkpoint_dir):
         """Implements the checkpoint logic.
 
@@ -401,6 +451,8 @@ class ExperimentRunner(tune.Trainable):
             pickle.dump(self.picklables['policy_weights'], f)
 
         self._save_value_functions(checkpoint_dir)
+        if self.rnd_networks:
+            self._save_rnd_networks(checkpoint_dir)
 
         if self._variant['run_params'].get('checkpoint_replay_pool', False):
             self._save_replay_pool(checkpoint_dir)
@@ -479,6 +531,14 @@ class ExperimentRunner(tune.Trainable):
                 variant['exploration_policy_params'],
                 training_environment))
 
+        if variant['algorithm_params']['rnd_params']:
+            from softlearning.rnd.utils import get_rnd_networks_from_variant
+            rnd_networks = get_rnd_networks_from_variant(variant, training_environment)
+            self._restore_rnd_networks(checkpoint_dir)
+        else:
+            rnd_networks = ()
+        self.rnd_networks = rnd_networks
+
         algorithm_kwargs = {
             'variant': variant,
             'training_environment': training_environment,
@@ -488,7 +548,8 @@ class ExperimentRunner(tune.Trainable):
             'Qs': Qs,
             'pool': replay_pool,
             'sampler': sampler,
-            'session': self._session
+            'session': self._session,
+            'rnd_networks': rnd_networks
         }
         return algorithm_kwargs
 
@@ -534,6 +595,14 @@ class ExperimentRunner(tune.Trainable):
                 variant['exploration_policy_params'],
                 training_environment))
 
+        if variant['algorithm_params']['rnd_params']:
+            from softlearning.rnd.utils import get_rnd_networks_from_variant
+            rnd_networks = [get_rnd_networks_from_variant(variant, training_environment) for _ in range(num_goals)]
+            self._restore_rnd_networks(checkpoint_dir)
+        else:
+            rnd_networks = ()
+        self.rnd_networks = rnd_networks
+
         algorithm_kwargs = {
             'variant': variant,
             'training_environment': training_environment,
@@ -543,7 +612,8 @@ class ExperimentRunner(tune.Trainable):
             'Qs_per_policy': Qs_per_policy,
             'pools': replay_pools,
             'samplers': samplers,
-            'session': self._session
+            'session': self._session,
+            'rnd_networks': rnd_networks
         }
         return algorithm_kwargs
 
@@ -552,7 +622,9 @@ class ExperimentRunner(tune.Trainable):
         checkpoint_dir = checkpoint_dir.rstrip('/')
 
         variant = copy.deepcopy(self._variant)
+
         self._multi_build = (self._variant['algorithm_params']['type'] in ['MultiSAC', 'MultiVICEGAN'])
+
         if self._multi_build:
             algorithm_kwargs = self._restore_multi_algorithm_kwargs(checkpoint_dir, variant)
         else:
