@@ -252,7 +252,6 @@ class ExperimentRunner(tune.Trainable):
     def _build(self):
         variant = copy.deepcopy(self._variant)
 
-        from pprint import pprint; import ipdb; ipdb.set_trace(context=30)
         algorithm_kwargs = self._get_algorithm_kwargs(variant)
 
         self.algorithm = get_algorithm_from_variant(**algorithm_kwargs)

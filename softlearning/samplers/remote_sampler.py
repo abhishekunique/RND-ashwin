@@ -37,7 +37,7 @@ class RemoteSampler(BaseSampler):
 
     def set_save_training_video_frequency(self, flag):
         self._save_training_video_frequency = flag
-        self._remote_environment.set_render_kwargs({
+        self._remote_environment.set_render_kwargs.remote({
             'mode': 'rgb_array',
             'width': 256,
             'height': 256
@@ -130,8 +130,6 @@ class _RemoteEnv(object):
 
     def rollout(self, policy_weights, path_length):
         self._policy.set_weights(policy_weights)
-        from pprint import pprint; import ipdb; ipdb.set_trace(context=30)
-
         path = rollout(self._env, self._policy, path_length,
                        render_kwargs=self._render_kwargs)
 

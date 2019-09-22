@@ -1001,7 +1001,7 @@ PIXELS_PREPROCESSOR_PARAMS = {
                                                 'models',
                                                 'state_estimators',
                                                 'state_estimator_from_vae_latents.h5'),
-            # === INCLUDE A PRETRAINED VAE === 
+            # === INCLUDE A PRETRAINED VAE ===
             'preprocessor_params': {
                 'type': 'VAEPreprocessor',
                 'kwargs': {
@@ -1080,9 +1080,10 @@ def get_variant_spec_base(universe, domain, task, task_eval,
             ALGORITHM_PARAMS_ADDITIONAL.get(algorithm, {})
         )
 
+    num_goals = 2
     variant_spec = {
         'git_sha': get_git_rev(),
-        'num_goals': 2, # TODO: Separate classifier_rl with multigoal
+        'num_goals': num_goals, # TODO: Separate classifier_rl with multigoal
         'environment_params': {
             'training': {
                 'domain': domain,
@@ -1167,6 +1168,8 @@ def get_variant_spec_base(universe, domain, task, task_eval,
             'exploration_policy_params']['kwargs']['observation_keys'] = variant_spec[
             'Q_params']['kwargs']['observation_keys'] = non_object_obs_keys
 
+    if 'Hardware' in task:
+        env_kwargs['num_goals'] = num_goals
     return variant_spec
 
 
