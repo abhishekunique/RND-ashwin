@@ -20,7 +20,6 @@ from softlearning.value_functions.utils import get_Q_function_from_variant
 from softlearning.misc.utils import set_seed, initialize_tf_variables
 from examples.instrument import run_example_local
 
-from softlearning.replay_pools.prioritized_experience_replay_pool import PrioritizedExperienceReplayPool
 from softlearning.samplers.nn_sampler import NNSampler
 import numpy as np
 
@@ -68,14 +67,16 @@ class ExperimentRunner(tune.Trainable):
         Q_targets = self.Q_targets = get_Q_function_from_variant(
             variant, training_environment)
 
+        preprocessor_params = variant['Q_params']['kwargs']['observation_preprocessors_params']
+
         # ==== LOADING IN CONVNET FROM WORKING RUN EXPERIMENT ====
-        preprocessor_params = variant['policy_params']['kwargs']['observation_preprocessors_params']
         if ('pixels' in preprocessor_params
-            and 'ConvnetPreprocessor' == preprocessor_params['pixels']['type']
-            and preprocessor_params['pixels'].get('weights_path', None) is not None):
+                and 'ConvnetPreprocessor' == preprocessor_params['pixels']['type']
+                and preprocessor_params['pixels'].get('weights_path', None) is not None):
             weights_path = preprocessor_params['pixels']['weights_path']
             with open(weights_path, 'rb') as f:
                 weights = pickle.load(f)
+
                 def set_weights_and_fix(model):
                     model.set_weights(weights)
                     model.trainable = False
@@ -86,27 +87,27 @@ class ExperimentRunner(tune.Trainable):
                 set_weights_and_fix(self.Q_targets[0].observations_preprocessors['pixels'])
                 set_weights_and_fix(self.Q_targets[1].observations_preprocessors['pixels'])
 
-        # === LOGGING STATE ESTIMATOR PREPROCESSOR OUTPUTS ===
-        if (self.policy.preprocessors.get('pixels', None)
-            and self.policy.preprocessors['pixels'].name == 'state_estimator_preprocessor'):
-            state_estimator = self.policy.preprocessors['pixels']
+        # # === LOGGING STATE ESTIMATOR PREPROCESSOR OUTPUTS ===
+        # if (self.policy.preprocessors.get('pixels', None)
+        #     and self.policy.preprocessors['pixels'].__class__.__name__ == 'state_estimator_preprocessor'):
+        #     state_estimator = self.policy.preprocessors['pixels']
 
-            from softlearning.replay_pools.flexible_replay_pool import Field
-            replay_pool = self.replay_pool = (
-                get_replay_pool_from_variant(variant, training_environment,
-                    extra_obs_keys_and_fields={
-                        'object_state_prediction': Field(
-                            name='object_state_prediction',
-                            dtype=np.float32,
-                            shape=(4,)
-                        )
-                    }))
-        else:
-            state_estimator = None
+        #     from softlearning.replay_pools.flexible_replay_pool import Field
+        #     replay_pool = self.replay_pool = (
+        #         get_replay_pool_from_variant(variant, training_environment,
+        #             extra_obs_keys_and_fields={
+        #                 'object_state_prediction': Field(
+        #                     name='object_state_prediction',
+        #                     dtype=np.float32,
+        #                     shape=(4,)
+        #                 )
+        #             }))
+        # else:
+        #     state_estimator = None
 
         sampler = self.sampler = get_sampler_from_variant(
-            variant,
-            state_estimator=state_estimator)
+            variant)
+            # state_estimator=state_estimator)
 
         last_checkpoint_dir = variant['replay_pool_params'].get(
             'last_checkpoint_dir', None)
@@ -136,25 +137,20 @@ class ExperimentRunner(tune.Trainable):
             if 'rnd_params' in variant['algorithm_params']
             else ()
         )
-        # if variant['algorithm_params']['rnd_params']:
-        #     from softlearning.rnd.utils import get_rnd_networks_from_variant
-        #     rnd_networks = get_rnd_networks_from_variant(variant, training_environment)
-        # else:
-        #     rnd_networks = ()
 
         # === PASS VAE INTO ALGORITHM TO GET DIAGNOSTICS ===
-        using_vae = (
-            'pixels' in self.policy.preprocessors
-            and self.policy.preprocessors['pixels'].name == 'vae_preprocessor')
-        from softlearning.models.utils import get_vae
-        vae = (
-            get_vae(**variant['policy_params']
-                             ['kwargs']
-                             ['observation_preprocessors_params']
-                             ['pixels']
-                             ['kwargs'])
-            if using_vae else None
-        )
+        # using_vae = (
+        #     'pixels' in self.policy.preprocessors
+        #     and self.policy.preprocessors['pixels'].name == 'vae_preprocessor')
+        # from softlearning.models.utils import get_vae
+        # vae = (
+        #     get_vae(**variant['policy_params']
+        #                      ['kwargs']
+        #                      ['observation_preprocessors_params']
+        #                      ['pixels']
+        #                      ['kwargs'])
+        #     if using_vae else None
+        # )
 
         algorithm_kwargs = {
             'variant': variant,
@@ -168,8 +164,8 @@ class ExperimentRunner(tune.Trainable):
             'sampler': sampler,
             'session': self._session,
             'rnd_networks': rnd_networks,
-            'vae': vae,
-            'state_estimator': state_estimator,
+            # 'vae': vae,
+            # 'state_estimator': state_estimator,
         }
         return algorithm_kwargs
 
@@ -227,11 +223,13 @@ class ExperimentRunner(tune.Trainable):
             get_policy_from_params(
                 variant['exploration_policy_params'], training_environment))
 
-        if variant['algorithm_params']['rnd_params']:
-            from softlearning.rnd.utils import get_rnd_networks_from_variant
-            rnd_networks = [get_rnd_networks_from_variant(variant, training_environment) for _ in range(num_goals)]
-        else:
-            rnd_networks = ()
+        from softlearning.rnd.utils import get_rnd_networks_from_variant
+        rnd_networks = (
+            [get_rnd_networks_from_variant(variant, training_environment)
+                for _ in range(num_goals)]
+            if variant['algorithm_params'].get('rnd_params', None)
+            else ()
+        )
 
         algorithm_kwargs = {
             'variant': variant,
@@ -258,27 +256,6 @@ class ExperimentRunner(tune.Trainable):
         initialize_tf_variables(self._session, only_uninitialized=True)
 
         self._built = True
-
-    # def _multi_sac_build(self):
-
-    #     self.algorithm = get_algorithm_from_variant(
-    #         variant=self._variant,
-    #         training_environment=training_environment,
-    #         evaluation_environment=evaluation_environment,
-    #         policies=policies,
-    #         initial_exploration_policy=initial_exploration_policy,
-    #         Qs_per_policy=Qs_per_policy,
-    #         # Q_target_pools=Q_target_pools,
-    #         # pools=replay_pools,
-    #         pools=replay_pools,
-    #         samplers=samplers,
-    #         num_goals=num_goals,
-    #         rnd_networks=rnd_networks,
-    #         session=self._session)
-
-    #     initialize_tf_variables(self._session, only_uninitialized=True)
-
-    #     self._built = True
 
     def _train(self):
         if not self._built:

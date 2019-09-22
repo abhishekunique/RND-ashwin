@@ -112,13 +112,6 @@ tmp/
 vendor/*
 .pkl
 
-# goal_classifier/goal_*
-# goal_classifier/train
-# goal_classifier/*/train
-# goal_classifier/eval
-# goal_classifier/test
-# goal_classifier/screw_imgs
-
 src/plotly
 ray_playground
 MUJOCO_LOG.TXT
@@ -141,3 +134,4 @@ pixels/
 *.jpg
 *.gif
 
+softlearning/misc/get_multigoal_example_pools.py
