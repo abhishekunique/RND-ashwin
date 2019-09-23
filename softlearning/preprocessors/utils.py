@@ -16,8 +16,9 @@ def get_vae_preprocessor(name='vae_preprocessor',
     # assert encoder_path is not None and decoder_path is not None, (
     #     "Must specify paths for the encoder/decoder models.")
     vae = VAE(**kwargs)
-    if encoder_path and decoder_path:
+    if encoder_path:
         vae.encoder.load_weights(encoder_path)
+    if decoder_path:
         vae.decoder.load_weights(decoder_path)
     if include_decoder:
         # preprocessor = vae.get_encoder_decoder(trainable=trainable, name=name)
