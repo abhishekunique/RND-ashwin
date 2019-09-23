@@ -800,9 +800,15 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_VISION = {
                 'reward_keys_and_weights': {
                     'objects_to_targets_mean_distance_reward': 1,
                 },
-                'init_qpos_range': [(0, 0)],
+                'num_objects': 4,
+                'init_qpos_range': [
+                    (-0.0475, -0.0475, -0.0475, -0.0475),
+                    (0.0475, 0.0475, 0.0475, 0.0475),
+                ],
                 'target_qpos_range': [
-                    (-0.0825, 0.0825)],
+                    (-0.0475, -0.0475, 0.0475, 0.0475),
+                    (-0.0475, -0.0475, 0.0475, 0.0475),
+                ],
                 'pixel_wrapper_kwargs': {
                     'observation_key': 'pixels',
                     'pixels_only': False,
@@ -819,11 +825,17 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_VISION = {
                     'pixels',
                 ),
                 'camera_settings': {
-                    'azimuth': 23.234042553191497,
-                    'distance': 0.2403358053524018,
-                    'elevation': -29.68085106382978,
-                    'lookat': (-0.00390331,  0.01236683,  0.01093447),
-                }
+                    'azimuth': 90,
+                    'lookat': (0,  0.04581637, -0.01614516),
+                    'elevation': -45,
+                    'distance': 0.37,
+                },
+                # 'camera_settings': {
+                #     'azimuth': 23.234042553191497,
+                #     'distance': 0.2403358053524018,
+                #     'elevation': -29.68085106382978,
+                #     'lookat': (-0.00390331,  0.01236683,  0.01093447),
+                # }
             },
             'SlideBeadsResetFree-v0': {
                 'reward_keys_and_weights': {
@@ -851,12 +863,18 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_VISION = {
                     'objects_target_positions',
                     'pixels',
                 ),
+                # 'camera_settings': {
+                #     'azimuth': 23.234042553191497,
+                #     'distance': 0.2403358053524018,
+                #     'elevation': -29.68085106382978,
+                #     'lookat': (-0.00390331,  0.01236683,  0.01093447),
+                # }
                 'camera_settings': {
-                    'azimuth': 23.234042553191497,
-                    'distance': 0.2403358053524018,
-                    'elevation': -29.68085106382978,
-                    'lookat': (-0.00390331,  0.01236683,  0.01093447),
-                }
+                    'azimuth': 90,
+                    'lookat': (0,  0.04581637, -0.01614516),
+                    'elevation': -45,
+                    'distance': 0.37,
+                },
             },
             'SlideBeadsResetFreeEval-v0': {
                 'reward_keys_and_weights': {
@@ -892,11 +910,11 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_VISION = {
                     'pixels',
                 ),
                 'camera_settings': {
-                    'azimuth': 23.234042553191497,
-                    'distance': 0.2403358053524018,
-                    'elevation': -29.68085106382978,
-                    'lookat': (-0.00390331,  0.01236683,  0.01093447),
-                }
+                    'azimuth': 90,
+                    'lookat': (0,  0.04581637, -0.01614516),
+                    'elevation': -45,
+                    'distance': 0.37,
+                },
             },
 
 
