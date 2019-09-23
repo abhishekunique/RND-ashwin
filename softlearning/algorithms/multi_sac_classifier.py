@@ -192,11 +192,12 @@ class MultiSACClassifier(MultiSAC):
     def _epoch_after_hook(self, *args, **kwargs):
         losses_per_classifier = [[] for _ in range(self._num_goals)]
         if self._epoch == 0: # Why epoch == 0?
-            for i in range(self._n_classifier_train_steps):
-                classifier_index = i % self._num_goals
-                if self._ext_reward_coeffs[i]: # Don't train unused classifiers
-                    feed_dict = self._get_classifier_feed_dict(classifier_index)
-                    losses_per_classifier[classifier_index].append(self._train_classifier_step(classifier_index, feed_dict))
+            for i in range(self._num_goals):
+                if self._ext_reward_coeffs[i]:
+                    for _ in range(self._n_classifier_train_steps):
+                        feed_dict = self._get_classifier_feed_dict(i)
+                        losses_per_classifier[i].append(
+                            self._train_classifier_step(i, feed_dict))
         self._training_losses_per_classifier = [np.concatenate(loss, axis=-1) for loss in losses_per_classifier]
 
     def _train_classifier_step(self, i, feed_dict):

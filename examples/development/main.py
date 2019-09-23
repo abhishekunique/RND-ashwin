@@ -223,7 +223,7 @@ class ExperimentRunner(tune.Trainable):
                 variant['exploration_policy_params'], training_environment))
 
         from softlearning.rnd.utils import get_rnd_networks_from_variant
-        rnd_networks = (
+        self.rnd_networks = (
             [get_rnd_networks_from_variant(variant, training_environment)
                 for _ in range(num_goals)]
             if variant['algorithm_params'].get('rnd_params', None)
@@ -241,7 +241,7 @@ class ExperimentRunner(tune.Trainable):
             'pools': replay_pools,
             'samplers': samplers,
             'num_goals': num_goals,
-            'rnd_networks': rnd_networks,
+            'rnd_networks': self.rnd_networks,
             'session': self._session
         }
         return algorithm_kwargs

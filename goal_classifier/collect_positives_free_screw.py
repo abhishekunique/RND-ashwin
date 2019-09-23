@@ -2,22 +2,21 @@ import argparse
 import numpy as np
 import dsuite
 import gym
-from dsuite.dclaw.turn import DClawTurnImage, DClawTurnFixed
 from softlearning.environments.adapters.gym_adapter import GymAdapter
 import os
-import imageio
 import pickle
+import skimage
 
 cur_dir = os.path.dirname(os.path.realpath(__file__))
 # directory = cur_dir + "/free_screw_180_regular_box_32"
-directory = cur_dir + "/test"
+directory = cur_dir + "/free_screw_180"
 
 if not os.path.exists(directory):
     os.makedirs(directory)
 
 def main():
     num_positives = 0
-    NUM_TOTAL_EXAMPLES, ROLLOUT_LENGTH, STEPS_PER_SAMPLE = 200, 25, 4
+    NUM_TOTAL_EXAMPLES, ROLLOUT_LENGTH, STEPS_PER_SAMPLE = 250, 25, 4
     goal_angle = np.pi
     observations = []
     images = True
@@ -32,21 +31,37 @@ def main():
                 'height': image_shape[1],
                 'camera_id': -1,
             },
-            'camera_ids': (-1, 0),
         },
+        # 'camera_settings': {
+        #     'distance': 0.5,
+        #     'elevation': -60
+        # },
         'camera_settings': {
             'azimuth': 180,
-            'distance': 0.26,
-            'elevation': -40,
-            'lookat': (0, 0, 0.06),
-        }
-        'init_angle_range': (goal_angle - 0.05, goal_angle + 0.05),
-        'target_angle_range': (goal_angle, goal_angle),
-        'observation_keys': ('pixels', 'claw_qpos', 'last_action'),
+            'distance': 0.35,
+            'elevation': -55,
+            'lookat': np.array([0, 0, 0.03]),
+        },
+        'init_qpos_range': (
+            (0, 0, 0, 0, 0, goal_angle - 0.05),
+            (0, 0, 0, 0, 0, goal_angle + 0.05)
+        ),
+        'target_qpos_range': (
+            (0, 0, 0, 0, 0, goal_angle),
+            (0, 0, 0, 0, 0, goal_angle)
+        ),
+        'observation_keys': (
+            'pixels',
+            'claw_qpos',
+            'last_action',
+            'object_xy_position',
+            'object_z_orientation_cos',
+            'object_z_orientation_sin'
+        ),
     }
     env = GymAdapter(
         domain='DClaw',
-        task='LiftDDFixed-v0',
+        task='TurnFreeValve3Fixed-v0',
         **env_kwargs
     )
 
@@ -76,13 +91,13 @@ def main():
                 print(observation)
                 if images:
                     img_obs = observation['pixels']
-                    img_0, img_1 = np.split(
-                        img_obs,
-                        indices_or_sections=2,
-                        axis=2
-                    )
-                    concat_obs = np.concatenate([img_0, img_1], axis=1)
-                    imageio.imwrite(directory + '/img%i.jpg' % num_positives, concat_obs)
+                    # img_0, img_1 = np.split(
+                    #     img_obs,
+                    #     indices_or_sections=2,
+                    #     axis=2
+                    # )
+                    # concat_obs = np.concatenate([img_0, img_1], axis=1)
+                    skimage.io.imsave(directory + f'/img_{num_positives}.png', img_obs)
                 num_positives += 1
             t += 1
 

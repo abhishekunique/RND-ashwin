@@ -9,16 +9,17 @@ import imageio
 import pickle
 
 cur_dir = os.path.dirname(os.path.realpath(__file__))
-directory = cur_dir + "/fixed_screw_180_no_normalization"
+directory = cur_dir + "/fixed_screw_180"
 if not os.path.exists(directory):
     os.makedirs(directory)
 
+
 def main():
     num_positives = 0
-    NUM_TOTAL_EXAMPLES, ROLLOUT_LENGTH, STEPS_PER_SAMPLE = 200, 25, 4
+    NUM_TOTAL_EXAMPLES, ROLLOUT_LENGTH, STEPS_PER_SAMPLE = 250, 25, 4
     goal_angle = np.pi
     observations = []
-    images = False
+    images = True
     image_shape = (32, 32, 3)
 
     env_kwargs = {
@@ -37,9 +38,16 @@ def main():
             'elevation': -38.17570837642188,
             'lookat': np.array([0.00046945, -0.00049496, 0.05389398]),
         },
-        'init_object_pos_range': (goal_angle - 0.05, goal_angle + 0.05),
+        'init_pos_range': (goal_angle - 0.05, goal_angle + 0.05),
         'target_pos_range': (goal_angle, goal_angle),
-        'observation_keys': ('pixels', 'claw_qpos', 'last_action'), 
+        'observation_keys': (
+            'pixels',
+            'claw_qpos',
+            'last_action',
+            'object_xy_position',
+            'object_z_orientation_cos',
+            'object_z_orientation_sin',
+        ),
     }
     env = GymAdapter(
         domain='DClaw',
@@ -63,7 +71,7 @@ def main():
             # env.render()  # render on display
             obs_dict = env.get_obs_dict()
 
-            circle_dist = obs_dict['object_to_target_angle_dist']
+            circle_dist = obs_dict['object_to_target_angle_distance']
             print(f"Circle dist: {circle_dist}")
 
             if goal_criteria(circle_dist):
@@ -74,7 +82,7 @@ def main():
                     img_obs = observation['pixels']
                     # image = img_obs[:np.prod(image_shape)].reshape(image_shape)
                     img_obs = 255 / 2 * (img_obs + 1)
-                    imageio.imwrite(directory + '/img%i.jpg' % num_positives, img_obs)
+                    imageio.imwrite(directory + '/img%i.png' % num_positives, img_obs)
                 num_positives += 1
             t += 1
 
