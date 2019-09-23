@@ -28,9 +28,9 @@ PUSH_TASKS = [
 ]
 
 GOAL_IMAGE_PATH_PER_ENVIRONMENT = {
-    'TurnFreeValve3ResetFree-v0': 'free_screw_180_less_tiny_box_48/',
+    'TurnFreeValve3ResetFree-v0': 'free_screw_180/',
     # 'TurnFreeValve3Fixed-v0': 'free_screw_180_regular_box_48/',
-    'TurnFreeValve3Fixed-v0': 'free_screw_180_less_tiny_box_old_camera/',
+    'TurnFreeValve3Fixed-v0': 'free_screw_180/',
     'TurnFixed-v0': 'fixed_screw_180_no_normalization/',
     'TurnMultiGoalResetFree-v0': 'fixed_screw_2_goals_mixed_pool_goal_index/',
     'LiftDDResetFree-v0': 'dodecahedron_lifting_flat_bowl_arena_red',
