@@ -31,7 +31,7 @@ class VICE(SACClassifier):
             for name in self._classifier.observation_keys
         })
         observation_log_p = self._classifier(classifier_inputs)
-        self._reward_t = self._ext_reward = observation_log_p
+        self._reward_t = self._unscaled_ext_reward = observation_log_p
 
     def _get_classifier_feed_dict(self):
         negatives = self.sampler.random_batch(
@@ -149,9 +149,9 @@ class VICE(SACClassifier):
         # Sample goal actions uniformly in action space
         # action_space_dim = sample_actions.shape[1]
         # goal_actions = np.random.uniform(
-        #     low=-1, high=1, size=(num_sample_observations, action_space_dim)) 
+        #     low=-1, high=1, size=(num_sample_observations, action_space_dim))
         # goal_validation_actions = np.random.uniform(
-        #     low=-1, high=1, size=(num_sample_observations, action_space_dim)) 
+        #     low=-1, high=1, size=(num_sample_observations, action_space_dim))
         goal_index_validation = np.random.randint(
             self._goal_examples_validation[
                 next(iter(self._goal_examples_validation))].shape[0],
@@ -190,7 +190,7 @@ class VICE(SACClassifier):
         #  log_pi,
         #  discriminator_output,
         #  classifier_loss) = self._session.run(
-        #     (self._reward_t, 
+        #     (self._reward_t,
         #      self._classifier_log_p_t,
         #      self._log_pi_t,
         #      self._discriminator_output_t,
@@ -210,7 +210,7 @@ class VICE(SACClassifier):
          # log_pi_negative,
          # discriminator_output_negative,
          negative_classifier_loss) = self._session.run(
-            (self._reward_t, 
+            (self._reward_t,
              # self._classifier_log_p_t,
              # self._log_pi_t,
              # self._discriminator_output_t,
@@ -225,13 +225,13 @@ class VICE(SACClassifier):
             }
         )
 
-        (reward_goal_observations_training, 
-         # classifier_output_goal_training, 
-         # discriminator_output_goal_training, 
+        (reward_goal_observations_training,
+         # classifier_output_goal_training,
+         # discriminator_output_goal_training,
          goal_classifier_training_loss) = self._session.run(
-            (self._reward_t, 
-             # self._classifier_log_p_t, 
-             # self._discriminator_output_t, 
+            (self._reward_t,
+             # self._classifier_log_p_t,
+             # self._discriminator_output_t,
              self._classifier_loss_t),
             feed_dict={
                 **{
@@ -246,7 +246,7 @@ class VICE(SACClassifier):
          # classifier_output_goal_validation,
          # discriminator_output_goal_validation,
          goal_classifier_validation_loss) = self._session.run(
-            (self._reward_t, 
+            (self._reward_t,
              # self._classifier_log_p_t,
              # self._discriminator_output_t,
              self._classifier_loss_t),
@@ -257,15 +257,15 @@ class VICE(SACClassifier):
                 },
                 self._placeholders['labels']: goal_validation_labels
             }
-        ) 
+        )
 
         diagnostics.update({
             # classifier loss averaged across the actual training batches
             'reward_learning/classifier_training_loss': np.mean(
-                self._training_loss), 
+                self._training_loss),
             # classifier loss sampling from the goal image pool
             'reward_learning/classifier_loss_sample_goal_obs_training': np.mean(
-                goal_classifier_training_loss), 
+                goal_classifier_training_loss),
             'reward_learning/classifier_loss_sample_goal_obs_validation': np.mean(
                 goal_classifier_validation_loss),
             'reward_learning/classifier_loss_sample_negative_obs': np.mean(

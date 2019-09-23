@@ -61,7 +61,7 @@ class SACClassifier(SAC):
             raise NotImplementedError(
                 f"Unknown reward type: {self._reward_type}")
 
-        self._ext_reward = self._reward_t
+        self._unscaled_ext_reward = self._reward_t
 
     def _get_classifier_training_op(self):
         if self._classifier_optim_name == 'adam':
@@ -135,7 +135,7 @@ class SACClassifier(SAC):
         _, loss = self._session.run((
             self._classifier_training_op, self._classifier_loss_t
         ), feed_dict)
-        self._training_loss = loss 
+        self._training_loss = loss
         return loss
 
     """
