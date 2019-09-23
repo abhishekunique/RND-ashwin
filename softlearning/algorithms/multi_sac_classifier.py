@@ -198,7 +198,7 @@ class MultiSACClassifier(MultiSAC):
                         feed_dict = self._get_classifier_feed_dict(i)
                         losses_per_classifier[i].append(
                             self._train_classifier_step(i, feed_dict))
-        self._training_losses_per_classifier = [np.concatenate(loss, axis=-1) for loss in losses_per_classifier]
+        self._training_losses_per_classifier = [np.concatenate(loss, axis=-1) if loss else np.array([]) for loss in losses_per_classifier]
 
     def _train_classifier_step(self, i, feed_dict):
         # Train classifier i on feed_dict
