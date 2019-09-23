@@ -194,8 +194,9 @@ class MultiSACClassifier(MultiSAC):
         if self._epoch == 0: # Why epoch == 0?
             for i in range(self._n_classifier_train_steps):
                 classifier_index = i % self._num_goals
-                feed_dict = self._get_classifier_feed_dict(classifier_index)
-                losses_per_classifier[classifier_index].append(self._train_classifier_step(classifier_index, feed_dict))
+                if self._ext_reward_coeffs[i]: # Don't train unused classifiers
+                    feed_dict = self._get_classifier_feed_dict(classifier_index)
+                    losses_per_classifier[classifier_index].append(self._train_classifier_step(classifier_index, feed_dict))
         self._training_losses_per_classifier = [np.concatenate(loss, axis=-1) for loss in losses_per_classifier]
 
     def _train_classifier_step(self, i, feed_dict):
@@ -214,70 +215,71 @@ class MultiSACClassifier(MultiSAC):
             iteration, batches, training_paths_per_policy, evaluation_paths_per_policy)
 
         for goal_index in range(self._num_goals):
-            sample_obs = batches[goal_index]['observations']
-            n_sample_obs = sample_obs[next(iter(sample_obs))].shape[0]
+            if self._ext_reward_coeffs[goal_index]: # only generate diagnostic if classifier is used
+                sample_obs = batches[goal_index]['observations']
+                n_sample_obs = sample_obs[next(iter(sample_obs))].shape[0]
 
-            training_goals = self._goal_example_pools[goal_index]
-            validation_goals = self._goal_example_validation_pools[goal_index]
-            rand_indices = np.random.randint(
-                training_goals[next(iter(training_goals))].shape[0],
-                size=n_sample_obs)
-            rand_training_goals = {
-                key: training_goals[key][rand_indices]
-                for key in training_goals.keys()
-            }
-            rand_indices = np.random.randint(
-                validation_goals[next(iter(validation_goals))].shape[0],
-                size=n_sample_obs)
-            rand_validation_goals = {
-                key: validation_goals[key][rand_indices]
-                for key in validation_goals.keys()
-            }
-
-            rewards, classifier_loss = self._session.run(
-                (self._unscaled_ext_rewards[goal_index], self._classifier_losses_t[goal_index]),
-                feed_dict={
-                    **{
-                        self._placeholders[
-                            'observations'][key]: np.concatenate((
-                                sample_obs[key],
-                                rand_training_goals[key],
-                                rand_validation_goals[key]
-                            ), axis=0)
-                        for key in self._classifiers[goal_index].observation_keys
-                    },
-                    self._placeholders['labels']: np.concatenate([
-                        np.zeros((n_sample_obs, 1)),
-                        np.ones((n_sample_obs, 1)),
-                        np.ones((n_sample_obs, 1)),
-                    ])
+                training_goals = self._goal_example_pools[goal_index]
+                validation_goals = self._goal_example_validation_pools[goal_index]
+                rand_indices = np.random.randint(
+                    training_goals[next(iter(training_goals))].shape[0],
+                    size=n_sample_obs)
+                rand_training_goals = {
+                    key: training_goals[key][rand_indices]
+                    for key in training_goals.keys()
                 }
-            )
+                rand_indices = np.random.randint(
+                    validation_goals[next(iter(validation_goals))].shape[0],
+                    size=n_sample_obs)
+                rand_validation_goals = {
+                    key: validation_goals[key][rand_indices]
+                    for key in validation_goals.keys()
+                }
 
-            (sample_rewards,
-             goal_rewards,
-             goal_rewards_validation) = np.split(
-                 rewards,
-                (n_sample_obs, n_sample_obs + n_sample_obs),
-                axis=0)
+                rewards, classifier_loss = self._session.run(
+                    (self._unscaled_ext_rewards[goal_index], self._classifier_losses_t[goal_index]),
+                    feed_dict={
+                        **{
+                            self._placeholders[
+                                'observations'][key]: np.concatenate((
+                                    sample_obs[key],
+                                    rand_training_goals[key],
+                                    rand_validation_goals[key]
+                                ), axis=0)
+                            for key in self._classifiers[goal_index].observation_keys
+                        },
+                        self._placeholders['labels']: np.concatenate([
+                            np.zeros((n_sample_obs, 1)),
+                            np.ones((n_sample_obs, 1)),
+                            np.ones((n_sample_obs, 1)),
+                        ])
+                    }
+                )
 
-            diagnostics.update({
-                f'reward_learning/classifier_training_loss_{goal_index}':
-                self._training_losses_per_classifier[goal]
-                for goal in range(self._num_goals)
-            })
-            diagnostics.update({
-                f'reward_learning/sample_reward_mean_{goal_index}':
-                np.mean(sample_rewards)
-            })
-            diagnostics.update({
-                f'reward_learning/goal_reward_mean_{goal_index}':
-                np.mean(goal_rewards)
-            })
-            diagnostics.update({
-                f'reward_learning/reward_goal_obs_validation_mean_{goal_index}':
-                np.mean(goal_rewards_validation)
-            })
+                (sample_rewards,
+                 goal_rewards,
+                 goal_rewards_validation) = np.split(
+                     rewards,
+                    (n_sample_obs, n_sample_obs + n_sample_obs),
+                    axis=0)
+
+                diagnostics.update({
+                    f'reward_learning/classifier_training_loss_{goal_index}':
+                    self._training_losses_per_classifier[goal]
+                    for goal in range(self._num_goals)
+                })
+                diagnostics.update({
+                    f'reward_learning/sample_reward_mean_{goal_index}':
+                    np.mean(sample_rewards)
+                })
+                diagnostics.update({
+                    f'reward_learning/goal_reward_mean_{goal_index}':
+                    np.mean(goal_rewards)
+                })
+                diagnostics.update({
+                    f'reward_learning/reward_goal_obs_validation_mean_{goal_index}':
+                    np.mean(goal_rewards_validation)
+                })
 
         return diagnostics
 
