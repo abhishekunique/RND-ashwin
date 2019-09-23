@@ -75,7 +75,6 @@ def rollout(env,
             min_pool_size=None,
             batch_size=None)
 
-
     sampler.initialize(env, policy, pool)
 
     render_mode = (render_kwargs or {}).get('mode', None)

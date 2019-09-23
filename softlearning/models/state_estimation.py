@@ -33,7 +33,6 @@ def state_estimator_model(input_shape,
                           output_size=4, # (x, y, z_cos, z_sin)
                           preprocessor_params=None,
                           preprocessor=None,
-                          kernel_regularizer=None,
                           name='state_estimator_preprocessor'):
     # TODO: Make this take in observation keys instead of this hardcoded output size.
     obs_preprocessor_params = (
@@ -85,8 +84,8 @@ def get_seed_data(seed_path):
             obs = pool['observations']
             training_images.append(obs['pixels'])
             pos = obs['object_position'][:, :2]
-            pos = normalize(pos, -0.1, 0.1, -1, 1) 
-            num_samples = pos.shape[0] 
+            pos = normalize(pos, -0.1, 0.1, -1, 1)
+            num_samples = pos.shape[0]
             ground_truth_state = np.concatenate([
                 pos,
                 obs['object_orientation_cos'][:, 2].reshape((num_samples, 1)),
@@ -96,7 +95,7 @@ def get_seed_data(seed_path):
 
     return np.concatenate(training_images), np.concatenate(ground_truth_states)
 
-def get_training_data(exp_path, limit=None): 
+def get_training_data(exp_path, limit=None):
     for exp in sorted(glob.iglob(os.path.join(exp_path, '*'))):
         training_images = None # np.array([])
         ground_truth_states = None # np.array([])
@@ -119,8 +118,8 @@ def get_training_data(exp_path, limit=None):
                 obs = pool['observations']
                 training_images.append(obs['pixels'])
                 pos = obs['object_position'][:, :2]
-                pos = normalize(pos, -0.1, 0.1, -1, 1) 
-                num_samples = pos.shape[0] 
+                pos = normalize(pos, -0.1, 0.1, -1, 1)
+                num_samples = pos.shape[0]
                 ground_truth_state = np.concatenate([
                     pos,
                     obs['object_orientation_cos'][:, 2].reshape((num_samples, 1)),
@@ -131,8 +130,8 @@ def get_training_data(exp_path, limit=None):
             i += 1
             if limit is not None and i == limit:
                 break
-            
-    training_images = np.concatenate(training_images, axis=0) 
+
+    training_images = np.concatenate(training_images, axis=0)
     ground_truth_states = np.concatenate(ground_truth_states, axis=0)
     return training_images, ground_truth_states
 
@@ -168,7 +167,7 @@ def train(model, obs_keys_to_estimate, save_path, n_epochs=50):
     )
 
     model.save_weights(save_path)
-    
+
     # Plot training & validation loss values
     plt.plot(history.history['loss'])
     plt.plot(history.history['val_loss'])
@@ -182,7 +181,7 @@ def train(model, obs_keys_to_estimate, save_path, n_epochs=50):
     random_indices = np.random.choice(pixels.shape[0], size=50, replace=False)
     tests, labels = pixels[random_indices], states[random_indices]
     preds = model.predict(tests)
-    
+
     pos_errors = []
     angle_errors = []
     import imageio
@@ -199,7 +198,7 @@ def train(model, obs_keys_to_estimate, save_path, n_epochs=50):
 
         pos_errors.append(pos_error)
         angle_errors.append(angle_error)
-        
+
         print('\n========== IMAGE #', i, '=========')
         print('POS ERROR (cm):', pos_error, 'true xy: {}'.format(label[:2]), 'pred xy: {}'.format(pred[:2]))
         print('ANGLE ERROR (degrees):', angle_error, 'true angle: {}'.format(true_angle), 'pred angle: {}'.format(pred_angle))
@@ -219,9 +218,9 @@ if __name__ == '__main__':
     model = state_estimator_model(
         domain='DClaw',
         task='TurnFreeValve3ResetFreeSwapGoal-v0',
-        obs_keys_to_estimate=obs_keys, 
+        obs_keys_to_estimate=obs_keys,
         input_shape=image_shape)
-    
+
     model.summary()
     model.compile(
         optimizer=tf.keras.optimizers.Adam(learning_rate=3e-4),
@@ -230,7 +229,7 @@ if __name__ == '__main__':
     load_weights = False
     if load_weights:
         # training_pools_base_path = '/home/justinvyu/ray_results/gym/DClaw/TurnFreeValve3ResetFreeSwapGoal-v0/2019-08-07T14-57-41-state_gtr_2_goals_with_resets_regular_box_saving_pixels_fixed_env'
-        training_pools_base_path = '/root/softlearning-vice/goal_classifier/free_screw_state_estimator_data/all_data.pkl' 
+        training_pools_base_path = '/root/softlearning-vice/goal_classifier/free_screw_state_estimator_data/all_data.pkl'
         weights_path = './state_estimator_random_data.h5'
         model.load_weights(weights_path)
         images, labels = get_dumped_pkl_data(training_pools_base_path)
@@ -255,7 +254,7 @@ if __name__ == '__main__':
 
             pos_errors.append(pos_error)
             angle_errors.append(angle_error)
-            
+
             print('\n========== IMAGE #', i, '=========')
             print('POS ERROR (cm):', pos_error, 'true xy: {}'.format(label[:2]), 'pred xy: {}'.format(pred[:2]))
             print('ANGLE ERROR (degrees):', angle_error, 'true angle: {}'.format(true_angle), 'pred angle: {}'.format(pred_angle))
@@ -270,6 +269,6 @@ if __name__ == '__main__':
         mean_angle_error = np.mean(angle_errors)
         print('MEAN POS ERROR (CM):', mean_pos_error)
         print('MEAN ANGLE ERROR (degrees):', mean_angle_error)
-    
+
     else:
         train(model, obs_keys, './state_estimator_invisible_claw.h5')

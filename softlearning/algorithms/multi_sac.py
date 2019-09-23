@@ -221,9 +221,14 @@ class MultiSAC(SAC):
             else:
                 self._unscaled_int_rewards.append(0)
             self._int_rewards.append(self._rnd_int_rew_coeffs[i] * self._unscaled_int_rewards[i])
-            self._normalized_ext_rewards.append(
-                self._unscaled_ext_rewards[i] / self._placeholders['reward'][f'running_ext_rew_std_{i}'])
+
+            if self._ext_reward_coeffs[i]:
+                self._normalized_ext_rewards.append(
+                    self._unscaled_ext_rewards[i] / self._placeholders['reward'][f'running_ext_rew_std_{i}'])
+            else:
+                self._normalized_ext_rewards.append(0)
             self._ext_rewards.append(self._ext_reward_coeffs[i] * self._normalized_ext_rewards[i])
+
             self._total_rewards.append(self._ext_rewards[i] + self._int_rewards[i])
 
             Q_target = td_target(
@@ -421,9 +426,10 @@ class MultiSAC(SAC):
                 diagnosables_per_goal[i][f'rnd_reward_{i}'] = self._int_rewards[i]
                 diagnosables_per_goal[i][f'rnd_error_{i}'] = self._rnd_errors[i]
                 diagnosables_per_goal[i][f'running_rnd_reward_std_{i}'] = self._placeholders['reward'][f'running_int_rew_std_{i}']
-            diagnosables_per_goal[i][f'ext_reward_{i}'] = self._ext_rewards[i]
-            diagnosables_per_goal[i][f'normalized_ext_reward_{i}'] = self._normalized_ext_rewards[i]
-            diagnosables_per_goal[i][f'unnormalized_ext_reward_{i}'] = self._unscaled_ext_rewards[i]
+            if self._ext_reward_coeffs[i]:
+                diagnosables_per_goal[i][f'ext_reward_{i}'] = self._ext_rewards[i]
+                diagnosables_per_goal[i][f'normalized_ext_reward_{i}'] = self._normalized_ext_rewards[i]
+                diagnosables_per_goal[i][f'unnormalized_ext_reward_{i}'] = self._unscaled_ext_rewards[i]
 
             diagnosables_per_goal[i][f'running_ext_reward_std_{i}'] = self._placeholders['reward'][f'running_ext_rew_std_{i}']
             diagnosables_per_goal[i][f'total_reward_{i}'] = self._total_rewards[i]
@@ -474,7 +480,7 @@ class MultiSAC(SAC):
             self._running_int_rew_stds[
                 self._goal_index] = self._running_int_rew_stds[self._goal_index] * self._rnd_gamma + int_rew_std * (1-self._rnd_gamma)
 
-        if self._normalize_ext_reward_gamma != 1:
+        if self._normalize_ext_reward_gamma != 1 and self._ext_reward_coeffs[self._goal_index]:
             ext_rew_std = np.maximum(np.std(self._session.run(
                 self._normalized_ext_rewards[self._goal_index], feed_dict)), 1e-3)
             self._running_ext_rew_stds[
@@ -730,7 +736,7 @@ class MultiSAC(SAC):
                     evaluation_paths_per_policy, evaluation_environment)
                 gt.stamp('evaluation_metrics')
             else:
-                evaluation_metrics_per_policy = {}
+                evaluation_metrics_per_policy = [{} for _ in range(self._num_goals)]
 
             self._epoch_after_hook(training_paths_per_policy)
             gt.stamp('epoch_after_hook')

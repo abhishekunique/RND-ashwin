@@ -57,9 +57,9 @@ class SAC(RLAlgorithm):
             goal_classifier_params_directory=None,
             save_full_state=False,
             save_eval_paths=False,
-            normalize_ext_reward_gamma=1,
             per_alpha=1,
-
+            normalize_ext_reward_gamma=1,
+            ext_reward_coeff=1,
             state_estimator=None,
             state_estimator_iters=None,
             train_state_estimator_online=False,
@@ -149,6 +149,7 @@ class SAC(RLAlgorithm):
         self._preprocessed_Q_inputs = self._Qs[0].preprocessed_inputs_fn
 
         self._normalize_ext_reward_gamma = normalize_ext_reward_gamma
+        self._ext_reward_coeff = ext_reward_coeff
         self._running_ext_rew_std = 1
         self._rnd_int_rew_coeff = 0
 
@@ -201,7 +202,7 @@ class SAC(RLAlgorithm):
         return goal_probs
 
     def _init_external_reward(self):
-        self._ext_reward = self._placeholders['rewards']
+        self._unscaled_ext_reward = self._placeholders['rewards']
 
     def _get_Q_target(self):
         policy_inputs = flatten_input_structure({
@@ -232,8 +233,9 @@ class SAC(RLAlgorithm):
             self._int_reward = self._rnd_int_rew_coeff * self._unscaled_int_reward
         else:
             self._int_reward = 0
-        self._normalized_ext_reward = self._ext_reward / self._placeholders['reward']['running_ext_rew_std']
-        self._total_reward = self._normalized_ext_reward + self._int_reward
+        self._normalized_ext_reward = self._unscaled_ext_reward / self._placeholders['reward']['running_ext_rew_std']
+        self._ext_reward = self._normalized_ext_reward * self._ext_reward_coeff
+        self._total_reward = self._ext_reward + self._int_reward
 
         Q_target = td_target(
             reward=self._reward_scale * self._total_reward,
@@ -294,7 +296,6 @@ class SAC(RLAlgorithm):
         See Section 4.2 in [1], for further information of the policy update,
         and Section 5 in [1] for further information of the entropy update.
         """
-
         policy_inputs = flatten_input_structure({
             name: self._placeholders['observations'][name]
             for name in self._policy.observation_keys
@@ -402,9 +403,11 @@ class SAC(RLAlgorithm):
         if self._rnd_int_rew_coeff:
             diagnosables['rnd_reward'] = self._int_reward
             diagnosables['rnd_error'] = self._rnd_errors
-            diagnosables['running_rnd_reward_std'] = self._placeholders['reward']['running_int_rew_std']
-        diagnosables['ext_reward'] = self._ext_reward
+            diagnosables['running_rnd_reward_std'] = self._placeholders[
+                'reward']['running_int_rew_std']
+
         diagnosables['normalized_ext_reward'] = self._normalized_ext_reward
+        diagnosables['ext_reward'] = self._ext_reward
 
         diagnosables['running_ext_reward_std'] = self._placeholders['reward']['running_ext_rew_std']
         diagnosables['total_reward'] = self._total_reward

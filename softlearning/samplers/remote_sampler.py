@@ -20,6 +20,7 @@ class RemoteSampler(BaseSampler):
         self._total_samples = 0
         self._last_path_return = 0
         self._max_path_return = -np.inf
+        self._save_training_video_frequency = 0
 
     def _create_remote_environment(self, env, policy):
         env_pkl = pickle.dumps(env)
@@ -33,6 +34,14 @@ class RemoteSampler(BaseSampler):
         # Block until the env and policy is ready
         initialized = ray.get(self._remote_environment.initialized.remote())
         assert initialized, initialized
+
+    def set_save_training_video_frequency(self, flag):
+        self._save_training_video_frequency = flag
+        self._remote_environment.set_render_kwargs.remote({
+            'mode': 'rgb_array',
+            'width': 256,
+            'height': 256
+        })
 
     def initialize(self, env, policy, pool):
         super(RemoteSampler, self).initialize(env, policy, pool)
@@ -111,12 +120,17 @@ class _RemoteEnv(object):
             self._env.initialize()
 
         self._initialized = True
+        self._render_kwargs = None
 
     def initialized(self):
         return self._initialized
 
+    def set_render_kwargs(self, render_kwargs):
+        self._render_kwargs = render_kwargs
+
     def rollout(self, policy_weights, path_length):
         self._policy.set_weights(policy_weights)
-        path = rollout(self._env, self._policy, path_length)
+        path = rollout(self._env, self._policy, path_length,
+                       render_kwargs=self._render_kwargs)
 
         return path

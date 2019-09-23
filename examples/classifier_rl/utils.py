@@ -236,7 +236,7 @@ def get_parser(allow_policy_list=False):
     parser.add_argument(
         '--save-training-video-frequency',
         type=int,
-        default=5,
+        default=None,
         help="Save frequency for training videos.")
 
     from softlearning.preprocessors.utils import PREPROCESSOR_FUNCTIONS

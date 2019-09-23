@@ -94,8 +94,8 @@ six==1.11.0
 smmap2==2.0.5
 tensorboard==1.14.0
 # tensorflow-gpu==1.14.0
-tf-nightly-gpu==1.14.1.dev20190622
-tf-estimator-nightly==1.14.0.dev2019042301
+tf-nightly-gpu==1.15.0.dev20190821
+tf-estimator-nightly==1.14.0.dev2019082101
 # tensorflow==1.14.0
 tensorflow-probability==0.7.0
 termcolor==1.1.0
