@@ -1139,8 +1139,8 @@ def get_variant_spec_base(universe, domain, task, task_eval,
     if from_vision and "device_path" not in env_kwargs.keys():
         env_obs_keys = env_kwargs['observation_keys']
 
-        # non_image_obs_keys = tuple(key for key in env_obs_keys if key != 'pixels')
-        # variant_spec['replay_pool_params']['kwargs']['obs_save_keys'] = non_image_obs_keys
+        non_image_obs_keys = tuple(key for key in env_obs_keys if key != 'pixels')
+        variant_spec['replay_pool_params']['kwargs']['obs_save_keys'] = non_image_obs_keys
 
         non_object_obs_keys = tuple(key for key in env_obs_keys if 'object' not in key)
         variant_spec['policy_params']['kwargs']['observation_keys'] = variant_spec[
