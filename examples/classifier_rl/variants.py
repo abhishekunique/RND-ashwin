@@ -179,7 +179,10 @@ ALGORITHM_PARAMS_ADDITIONAL = {
             'action_prior': 'uniform',
             'her_iters': tune.grid_search([0]),
             'rnd_int_rew_coeffs': tune.sample_from([[1, 1]]),
-            'ext_reward_coeffs': [1, 0], # 0 corresponds to reset policy
+            # === BELOW FOR RND RESET CONTROLLER ===
+            # 'ext_reward_coeffs': [1, 0], # 0 corresponds to reset policy
+            # === BELOW FOR 2 GOALS ===
+            'ext_reward_coeffs': [1, 1],
             'normalize_ext_reward_gamma': 0.99,
             'share_pool': False,
             'n_classifier_train_steps': 5,
@@ -368,6 +371,7 @@ CLASSIFIER_PARAMS_PER_UNIVERSE_DOMAIN_TASK = {
                 for key in (
                     'TurnResetFree-v0',
                     'TurnFreeValve3ResetFree-v0',
+                    'SlideBeadsResetFree-v0',
                 )
             },
             **{
@@ -506,36 +510,22 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_STATE = {
     },
 }
 
-BASE_VISION_KWARGS = {
-    # 'pixel_wrapper_kwargs': {
-    #     'pixels_only': False,
-    #     'normalize': False,
-    #     'render_kwargs': {
-    #        'width': 32,
-    #        'height': 32,
-    #        'camera_id': -1,
-    #     }
-    # },
-    # 'camera_settings': {
-    #     'azimuth': 180,
-    #     'distance': 0.35,
-    #     'elevation': -55,
-    #     'lookat': np.array([0, 0, 0.03]),
-    # },
+
+FREE_SCREW_VISION_KWARGS = {
     'pixel_wrapper_kwargs': {
         'pixels_only': False,
         'normalize': False,
         'render_kwargs': {
-           'width': 32, # 64
-           'height': 32, # 64
-           'camera_id': -1,
-        }
+            'width': 32,
+            'height': 32,
+            'camera_id': -1,
+        },
     },
     'camera_settings': {
         'azimuth': 180,
         'distance': 0.38,
         'elevation': -36,
-        'lookat': np.array([0.04, 0.008, 0.026]),
+        'lookat': (0.04, 0.008, 0.026),
     },
 }
 FIXED_SCREW_VISION_KWARGS = {
@@ -555,31 +545,38 @@ FIXED_SCREW_VISION_KWARGS = {
         'lookat': np.array([0.02, 0.004, 0.09]),
     },
 }
+SLIDE_BEADS_VISION_KWARGS = {
+    'pixel_wrapper_kwargs': {
+        'pixels_only': False,
+        'normalize': False,
+        'render_kwargs': {
+            'width': 32,
+            'height': 32,
+            'camera_id': -1,
+        },
+    },
+    'camera_settings': {
+        'azimuth': 90,
+        'distance': 0.37,
+        'elevation': -45,
+        'lookat': (0, 0.046, -0.016),
+    },
+}
 
 ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_VISION = {
     'gym': {
         'DClaw': {
+            # === FIXED SCREW RANDOM RESET EVAL TASK BELOW ===
             'TurnFixed-v0': {
                 **FIXED_SCREW_VISION_KWARGS,
-                # 'reward_keys_and_weights': {
-                #     'object_to_target_angle_distance_reward': 1,
-                # },
-                'target_pos_range': (np.pi, np.pi),
-                'init_pos_range': (-np.pi, np.pi),
-                # 'camera_settings': {
-                #     'azimuth': 0.,
-                #     'distance': 0.35,
-                #     'elevation': -38.17570837642188,
-                #     'lookat': np.array([0.00046945, -0.00049496, 0.05389398]),
-                # },
-                # 'pixel_wrapper_kwargs': {
-                #     'observation_key': 'pixels',
-                #     'pixels_only': False,
-                #     'render_kwargs': {
-                #         'width': 32,
-                #         'height': 32,
-                #     },
-                # },
+                'init_pos_range': (-np.pi, np.pi), # Random reset between -pi, pi
+                # === GOAL = -90 DEGREES ===
+                # Single goal + RND reset controller
+                # 'target_pos_range': [-np.pi / 2, -np.pi / 2],
+                # 2 goal + no RND reset controller
+                'target_pos_range': [-np.pi / 2, np.pi / 2],
+                # 1 goal + no RND reset controller
+                'target_pos_range': [-np.pi / 2],
                 'observation_keys': (
                     'pixels',
                     'claw_qpos',
@@ -588,6 +585,9 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_VISION = {
                     'object_angle_cos',
                     'object_angle_sin',
                 ),
+                # 'reward_keys_and_weights': {
+                #     'object_to_target_angle_distance_reward': 1,
+                # },
             },
             # === FIXED SCREW RESET FREE TASK BELOW ===
             'TurnResetFree-v0': {
@@ -598,6 +598,12 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_VISION = {
                 },
                 'reset_fingers': True,
                 'init_pos_range': (0, 0),
+                # Single goal + RND reset controller
+                # 'target_pos_range': [-np.pi / 2, -np.pi / 2]
+                # 2 goal + no RND reset controller
+                # 'target_pos_range': [-np.pi / 2, np.pi / 2],
+                # 1 goal + no RND reset controller
+                'target_pos_range': [-np.pi / 2],
                 'observation_keys': (
                     'claw_qpos',
                     'pixels',
@@ -609,16 +615,16 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_VISION = {
             },
             # Random evaluation environment for free screw 
             'TurnFreeValve3Fixed-v0': {
-                **BASE_VISION_KWARGS,
+                **FREE_SCREW_VISION_KWARGS,
+                # Single goal + RND reset controller
                 'init_qpos_range': (
-                    # (-0.075, -0.075, 0, 0, 0, -np.pi),
-                    # (0.075, 0.075, 0, 0, 0, np.pi)
                     (-0.08, -0.08, 0, 0, 0, -np.pi),
                     (0.08, 0.08, 0, 0, 0, np.pi)
                 ),
+                # 2 goal, no RND reset controller
                 'target_qpos_range': [
                     (0, 0, 0, 0, 0, -np.pi / 2),
-                    (0, 0, 0, 0, 0, -np.pi / 2), # Second goal is arbitrary
+                    (0, 0, 0, 0, 0, np.pi / 2),
                 ],
                 'observation_keys': (
                     'pixels',
@@ -631,12 +637,18 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_VISION = {
                 ),
             },
             'TurnFreeValve3ResetFree-v0': {
-                **BASE_VISION_KWARGS,
+                **FREE_SCREW_VISION_KWARGS,
                 'init_qpos_range': [(0, 0, 0, 0, 0, 0)],
                 # Below needs to be 2 for a MultiVICEGAN run, since the goals switch
+                # Single goal + RND reset controller
+                # 'target_qpos_range': [
+                #     (0, 0, 0, 0, 0, -np.pi / 2),
+                #     (0, 0, 0, 0, 0, -np.pi / 2), # Second goal is arbitrary
+                # ],
+                # 2 goal, no RND reset controller
                 'target_qpos_range': [
                     (0, 0, 0, 0, 0, -np.pi / 2),
-                    (0, 0, 0, 0, 0, -np.pi / 2), # Second goal is arbitrary
+                    (0, 0, 0, 0, 0, np.pi / 2), # Second goal is arbitrary
                 ],
                 'swap_goal_upon_completion': False,
                 'observation_keys': (
@@ -650,7 +662,7 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_VISION = {
                 ),
             },
             'TurnFreeValve3ResetFreeSwapGoal-v0': {
-                **BASE_VISION_KWARGS,
+                **FREE_SCREW_VISION_KWARGS,
                 'reset_fingers': True,
                 'reset_frequency': 0,
                 'goals': [
@@ -672,7 +684,7 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_VISION = {
                 ),
             },
             'TurnFreeValve3ResetFreeSwapGoalEval-v0': {
-                **BASE_VISION_KWARGS,
+                **FREE_SCREW_VISION_KWARGS,
                 'goals': [
                     (0, 0, 0, 0, 0, np.pi / 2),
                     (0, 0, 0, 0, 0, -np.pi / 2),
@@ -760,6 +772,7 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_VISION = {
             },
             # Sliding Tasks
             'SlideBeadsFixed-v0': {
+                **SLIDE_BEADS_VISION_KWARGS,
                 'reward_keys_and_weights': {
                     'objects_to_targets_mean_distance_reward': 1,
                 },
@@ -773,15 +786,6 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_VISION = {
                     (-0.0475, -0.0475, 0.0475, 0.0475),
                     (-0.0475, -0.0475, 0.0475, 0.0475),
                 ],
-                'pixel_wrapper_kwargs': {
-                    'pixels_only': False,
-                    'normalize': False,
-                    'render_kwargs': {
-                        'width': 32,
-                        'height': 32,
-                        'camera_id': -1,
-                    },
-                },
                 'observation_keys': (
                     'claw_qpos',
                     'last_action',
@@ -790,21 +794,9 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_VISION = {
                     'objects_positions',
                     'objects_target_positions',
                 ),
-                # 'camera_settings': {
-                #     'azimuth': 90,
-                #     'lookat': (0, 0.04581637, -0.01614516),
-                #     'elevation': -45,
-                #     'distance': 0.37,
-                # },
-                # Try this for the VAE that's already trained
-                'camera_settings': {
-                    'azimuth': 30,
-                    'distance': 0.24,
-                    'elevation': -30,
-                    'lookat': np.array([-0.004, 0.012, 0.01]),
-                },
             },
             'SlideBeadsResetFree-v0': {
+                **SLIDE_BEADS_VISION_KWARGS,
                 'reward_keys_and_weights': {
                     'objects_to_targets_mean_distance_reward': 1,
                 },
@@ -817,15 +809,6 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_VISION = {
                     (0, 0, 0, 0),
                 ],
                 'cycle_goals': True,
-                'pixel_wrapper_kwargs': {
-                    'pixels_only': False,
-                    'normalize': False,
-                    'render_kwargs': {
-                        'width': 32,
-                        'height': 32,
-                        'camera_id': -1,
-                    },
-                },
                 'observation_keys': (
                     'pixels',
                     'claw_qpos',
@@ -834,24 +817,6 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_VISION = {
                     'objects_target_positions',
                     'objects_positions',
                 ),
-                'camera_settings': {
-                    'azimuth': 30,
-                    'distance': 0.24,
-                    'elevation': -30,
-                    'lookat': np.array([-0.004, 0.012, 0.01]),
-                },
-                # 'camera_settings': {
-                #     'azimuth': 23.234042553191497,
-                #     'distance': 0.2403358053524018,
-                #     'elevation': -29.68085106382978,
-                #     'lookat': (-0.00390331,  0.01236683,  0.01093447),
-                # }
-                # 'camera_settings': {
-                #     'azimuth': 90,
-                #     'lookat': (0,  0.04581637, -0.01614516),
-                #     'elevation': -45,
-                #     'distance': 0.37,
-                # },
             },
             'SlideBeadsResetFreeEval-v0': {
                 'reward_keys_and_weights': {
@@ -1031,21 +996,21 @@ PIXELS_PREPROCESSOR_PARAMS = {
             #                             'slide_beads_vae_16_dim',
             #                             'encoder_16_dim_1.0_beta_final.h5'),
             # Free screw
-            'image_shape': (32, 32, 3),
-            'latent_dim': 32,
-            'encoder_path': os.path.join(PROJECT_PATH,
-                                        'softlearning',
-                                        'models',
-                                        'free_screw_random_data_vae',
-                                        'encoder_32_dim_0.5_beta_final.h5'),
-            # Fixed screw
             # 'image_shape': (32, 32, 3),
-            # 'latent_dim': 16,
+            # 'latent_dim': 32,
             # 'encoder_path': os.path.join(PROJECT_PATH,
             #                             'softlearning',
             #                             'models',
-            #                             'fixed_screw_random_data_vae',
+            #                             'free_screw_vae_32_dim',
             #                             'encoder_32_dim_0.5_beta_final.h5'),
+            # Fixed screw
+            'image_shape': (32, 32, 3),
+            'latent_dim': 16,
+            'encoder_path': os.path.join(PROJECT_PATH,
+                                        'softlearning',
+                                        'models',
+                                        'fixed_screw_vae_16_dim',
+                                        'encoder_16_dim_5.0_beta_final.h5'),
 
         },
     },
