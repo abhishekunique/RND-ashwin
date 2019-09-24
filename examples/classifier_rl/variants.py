@@ -364,6 +364,13 @@ CLASSIFIER_PARAMS_PER_UNIVERSE_DOMAIN_TASK = {
     'gym': {
         'DClaw': {
             **{
+                key: {'observation_keys': ('pixels', )}
+                for key in (
+                    'TurnResetFree-v0',
+                    'TurnFreeValve3ResetFree-v0',
+                )
+            },
+            **{
                 key: {'observation_keys': ('pixels', 'goal_index')}
                 for key in (
                     'TurnMultiGoalResetFree-v0',
