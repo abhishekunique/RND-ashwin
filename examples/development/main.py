@@ -163,7 +163,7 @@ class ExperimentRunner(tune.Trainable):
             'pool': replay_pool,
             'sampler': sampler,
             'session': self._session,
-            'rnd_networks': rnd_networks,
+            'rnd_networks': self.rnd_networks,
             # 'vae': vae,
             # 'state_estimator': state_estimator,
         }
