@@ -8,7 +8,7 @@ tfk = tf.keras
 tfkl = tf.keras.layers
 
 
-tf.enable_eager_execution()
+# tf.enable_eager_execution()
 """
 Training methods
 """
@@ -140,8 +140,8 @@ class VAE(tfk.Model):
                              trainable=True,
                              kernel_regularizer=None,
                              extra_input_shape=None,
-                             padding='VALID', # CHANGE THIS BACK FOR OLD MODELS
-                             # padding='SAME', # CHANGE THIS BACK FOR OLD MODELS
+                             # padding='VALID', # CHANGE THIS BACK FOR OLD MODELS
+                             padding='SAME', # CHANGE THIS BACK FOR OLD MODELS
                              name='encoder'):
         if image_shape is None:
             image_shape = self.image_shape
@@ -183,7 +183,7 @@ class VAE(tfk.Model):
                 conv2d(filters=64, strides=2),
                 conv2d(filters=64, strides=2),
                 conv2d(filters=32, strides=2),
-                conv2d(filters=32, strides=2),
+                # conv2d(filters=32, strides=2),
                 tfkl.Flatten(),
                 tfkl.Dense(
                     latent_dim + latent_dim,
@@ -223,7 +223,7 @@ class VAE(tfk.Model):
             conv2d_transpose(filters=64, strides=2),
             conv2d_transpose(filters=64, strides=2),
             conv2d_transpose(filters=32, strides=2),
-            conv2d_transpose(filters=32, strides=2),
+            # conv2d_transpose(filters=32, strides=2),
             conv2d_transpose(filters=3, strides=1),
         ], name=name)
 

@@ -2,13 +2,31 @@ import numpy as np
 import os
 import pickle
 
-goal_directory = os.path.abspath(
-        os.path.join(os.path.dirname( __file__ ), '..', '..')) + '/goal_pools/'
+from softlearning.misc.utils import PROJECT_PATH
+goal_directory = os.path.join(PROJECT_PATH, 'goal_pools')
 
 # expects a list of paths for each of the goals
 # TODO: Split up by vision/state experiments
 GOAL_POOL_PATHS_PER_ENV_PER_NUM_GOALS = {
-    # Needs to be 180, 0, since the first goal is 180
+    'TurnFreeValve3ResetFree-v0': {
+        '2': (
+            f'free_screw_32x32/goal_{i}_{goal}'
+            for i, goal in enumerate([-90, 90])
+        ),
+    },
+    'TurnResetFree-v0': {
+        '2': (
+            f'fixed_screw/goal_{i}_{goal}'
+            for i, goal in enumerate([-90, 90])
+        ),
+    },
+    'SlideBeadsResetFree-v0': {
+        '2': (
+            f'4_beads/4_beads_{goal}'
+            for i, goal in enumerate([475, 0])
+        ),
+    },
+
     'TurnMultiGoalResetFree-v0': {
         '2': (
             f'fixed_screw_2_goals/goal_{i}_{goal}'
@@ -34,13 +52,13 @@ GOAL_POOL_PATHS_PER_ENV_PER_NUM_GOALS = {
     'LiftDDResetFree-v0': {
         '1': ('dodecahedron_lifting_bowl_arena/', ),
     },
-    'SlideBeadsResetFree-v0': {
-        # '2': ('2_beads_{goal}/' for goal in (np.array([0, 0]), np.array([-0.0875, 0.0875]))),
-        '2': (f'4_beads_{goal}/' for goal in (
-            np.array([0, 0, 0, 0]),
-            np.array([-0.0475, -0.0475, 0.0475, 0.0475]))
-        ),
-    },
+    # 'SlideBeadsResetFree-v0': {
+    #     # '2': ('2_beads_{goal}/' for goal in (np.array([0, 0]), np.array([-0.0875, 0.0875]))),
+    #     '2': (f'4_beads_{goal}/' for goal in (
+    #         np.array([0, 0, 0, 0]),
+    #         np.array([-0.0475, -0.0475, 0.0475, 0.0475]))
+    #     ),
+    # },
     # 'TurnMultiGoalResetFree-v0': (f'fixed_screw_multigoal_{goal}/' for goal in [180, 0]),
     # 'TurnMultiGoalResetFree-v0': (f'fixed_screw_multigoal_{goal}/' for goal in [120, 240, 0]),
     # 'TurnMultiGoalResetFree-v0': (f'fixed_screw_5_goals_{goal}/' for goal in [72, 144, 216, 288, 0]),
