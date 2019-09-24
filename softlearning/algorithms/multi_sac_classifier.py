@@ -237,7 +237,7 @@ class MultiSACClassifier(MultiSAC):
                     for key in validation_goals.keys()
                 }
 
-                rewards, classifier_loss = self._session.run(
+                rewards, classifier_losses = self._session.run(
                     (self._unscaled_ext_rewards[goal_index], self._classifier_losses_t[goal_index]),
                     feed_dict={
                         **{
@@ -266,8 +266,7 @@ class MultiSACClassifier(MultiSAC):
 
                 diagnostics.update({
                     f'reward_learning/classifier_training_loss_{goal_index}':
-                    self._training_losses_per_classifier[goal]
-                    for goal in range(self._num_goals)
+                    self._training_losses_per_classifier[goal_index]
                 })
                 diagnostics.update({
                     f'reward_learning/sample_reward_mean_{goal_index}':
@@ -278,7 +277,7 @@ class MultiSACClassifier(MultiSAC):
                     np.mean(goal_rewards)
                 })
                 diagnostics.update({
-                    f'reward_learning/reward_goal_obs_validation_mean_{goal_index}':
+                    f'reward_learning/goal_validation_reward_mean_{goal_index}':
                     np.mean(goal_rewards_validation)
                 })
 

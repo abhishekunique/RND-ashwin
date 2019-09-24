@@ -24,6 +24,7 @@ import numpy as np
 
 tf.compat.v1.disable_eager_execution()
 from softlearning.rnd.utils import get_rnd_networks_from_variant
+from pathlib import Path
 
 
 class ExperimentRunner(tune.Trainable):
@@ -461,7 +462,7 @@ class ExperimentRunner(tune.Trainable):
 
     def _restore_replay_pool(self, current_checkpoint_dir):
         # experiment_root = os.path.dirname(current_checkpoint_dir)
-        experiment_root = current_checkpoint_dir
+        experiment_root = Path(current_checkpoint_dir).parent
         experience_paths = [
             self._replay_pool_pickle_path(checkpoint_dir)
             for checkpoint_dir in sorted(glob.iglob(
@@ -472,7 +473,7 @@ class ExperimentRunner(tune.Trainable):
             self.replay_pool.load_experience(experience_path)
 
     def _restore_replay_pools(self, current_checkpoint_dir):
-        experiment_root = os.path.dirname(current_checkpoint_dir)
+        experiment_root = Path(current_checkpoint_dir).parent
 
         experience_paths_per_replay_pool = [
             self._replay_pools_pickle_paths(checkpoint_dir)
