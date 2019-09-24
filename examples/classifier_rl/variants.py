@@ -364,6 +364,13 @@ CLASSIFIER_PARAMS_PER_UNIVERSE_DOMAIN_TASK = {
     'gym': {
         'DClaw': {
             **{
+                key: {'observation_keys': ('pixels', )}
+                for key in (
+                    'TurnResetFree-v0',
+                    'TurnFreeValve3ResetFree-v0',
+                )    
+            },
+            **{
                 key: {'observation_keys': ('pixels', 'goal_index')}
                 for key in (
                     'TurnMultiGoalResetFree-v0',
@@ -519,8 +526,8 @@ BASE_VISION_KWARGS = {
         'pixels_only': False,
         'normalize': False,
         'render_kwargs': {
-           'width': 64,
-           'height': 64,
+           'width': 32, # 64
+           'height': 32, # 64
            'camera_id': -1,
         }
     },
@@ -757,80 +764,94 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_VISION = {
                     'objects_to_targets_mean_distance_reward': 1,
                 },
                 'num_objects': 4,
-                'init_qpos_range': [
+                'init_qpos_range': (
                     (-0.0475, -0.0475, -0.0475, -0.0475),
                     (0.0475, 0.0475, 0.0475, 0.0475),
-                ],
+                ),
+                # Goal we want to evaluate:
                 'target_qpos_range': [
                     (-0.0475, -0.0475, 0.0475, 0.0475),
                     (-0.0475, -0.0475, 0.0475, 0.0475),
                 ],
                 'pixel_wrapper_kwargs': {
-                    'observation_key': 'pixels',
                     'pixels_only': False,
+                    'normalize': False,
                     'render_kwargs': {
                         'width': 32,
                         'height': 32,
+                        'camera_id': -1,
                     },
                 },
                 'observation_keys': (
                     'claw_qpos',
-                    'objects_positions',
                     'last_action',
-                    'objects_target_positions',
                     'pixels',
+                    # === BELOW JUST FOR LOGGING ===
+                    'objects_positions',
+                    'objects_target_positions',
                 ),
-                'camera_settings': {
-                    'azimuth': 90,
-                    'lookat': (0,  0.04581637, -0.01614516),
-                    'elevation': -45,
-                    'distance': 0.37,
-                },
                 # 'camera_settings': {
-                #     'azimuth': 23.234042553191497,
-                #     'distance': 0.2403358053524018,
-                #     'elevation': -29.68085106382978,
-                #     'lookat': (-0.00390331,  0.01236683,  0.01093447),
-                # }
+                #     'azimuth': 90,
+                #     'lookat': (0, 0.04581637, -0.01614516),
+                #     'elevation': -45,
+                #     'distance': 0.37,
+                # },
+                # Try this for the VAE that's already trained
+                'camera_settings': {
+                    'azimuth': 30,
+                    'distance': 0.24,
+                    'elevation': -30,
+                    'lookat': np.array([-0.004, 0.012, 0.01]),
+                },
             },
             'SlideBeadsResetFree-v0': {
                 'reward_keys_and_weights': {
                     'objects_to_targets_mean_distance_reward': 1,
                 },
-                'init_qpos_range': [(0, 0)],
+                'init_qpos_range': [(0, 0, 0, 0)],
                 'num_objects': 4,
                 'target_qpos_range': [
-                    (0, 0, 0, 0),
                     (-0.0475, -0.0475, 0.0475, 0.0475),
+                    # (-0.0475, -0.0475, 0.0475, 0.0475),
+                    # This second one is arbitrary for training env
+                    (0, 0, 0, 0),
                 ],
                 'cycle_goals': True,
                 'pixel_wrapper_kwargs': {
-                    'observation_key': 'pixels',
                     'pixels_only': False,
+                    'normalize': False,
                     'render_kwargs': {
                         'width': 32,
                         'height': 32,
+                        'camera_id': -1,
                     },
                 },
                 'observation_keys': (
-                    'claw_qpos',
-                    'objects_positions',
-                    'last_action',
-                    'objects_target_positions',
                     'pixels',
+                    'claw_qpos',
+                    'last_action',
+                    # === BELOW JUST FOR LOGGING ===
+                    'objects_target_positions',
+                    'objects_positions',
                 ),
+                'camera_settings': {
+                    'azimuth': 30,
+                    'distance': 0.24,
+                    'elevation': -30,
+                    'lookat': np.array([-0.004, 0.012, 0.01]),
+                },
                 # 'camera_settings': {
                 #     'azimuth': 23.234042553191497,
                 #     'distance': 0.2403358053524018,
                 #     'elevation': -29.68085106382978,
                 #     'lookat': (-0.00390331,  0.01236683,  0.01093447),
                 # }
-                'camera_settings': {
-                    'azimuth': 90,
-                    'lookat': (0,  0.04581637, -0.01614516),
-                    'elevation': -45,
-                    'distance': 0.37,
-                },
+                # 'camera_settings': {
+                #     'azimuth': 90,
+                #     'lookat': (0,  0.04581637, -0.01614516),
+                #     'elevation': -45,
+                #     'distance': 0.37,
+                # },
             },
             'SlideBeadsResetFreeEval-v0': {
                 'reward_keys_and_weights': {
@@ -1000,17 +1021,32 @@ PIXELS_PREPROCESSOR_PARAMS = {
     'VAEPreprocessor': {
         'type': 'VAEPreprocessor',
         'kwargs': {
+            'trainable': False,
+            # SlideBeads 
             # 'image_shape': (32, 32, 3),
             # 'latent_dim': 16,
-            # 'encoder_path': '/nfs/kun1/users/justinvyu/pretrained_models/vae_16_dim_beta_3_invisible_claw_l2_reg/encoder_16_dim_3.0_beta.h5',
-            # 'decoder_path': '/nfs/kun1/users/justinvyu/pretrained_models/vae_16_dim_beta_3_invisible_claw_l2_reg/decoder_16_dim_3.0_beta.h5',
-            'image_shape': (64, 64, 3),
-            'latent_dim': 64,
-            'encoder_path': os.path.join(NFS_PATH,
-                                        'pretrained_models',
-                                        'vae_64_dim_beta_5_visible_claw_diff_angle',
-                                        'encoder_64_dim_5.0_beta.h5'),
-            'trainable': False,
+            # 'encoder_path': os.path.join(PROJECT_PATH,
+            #                             'softlearning',
+            #                             'models',
+            #                             'slide_beads_vae_16_dim',
+            #                             'encoder_16_dim_1.0_beta_final.h5'),
+            # Free screw
+            'image_shape': (32, 32, 3),
+            'latent_dim': 32,
+            'encoder_path': os.path.join(PROJECT_PATH,
+                                        'softlearning',
+                                        'models',
+                                        'free_screw_random_data_vae',
+                                        'encoder_32_dim_0.5_beta_final.h5'),
+            # Fixed screw
+            # 'image_shape': (32, 32, 3),
+            # 'latent_dim': 16,
+            # 'encoder_path': os.path.join(PROJECT_PATH,
+            #                             'softlearning',
+            #                             'models',
+            #                             'fixed_screw_random_data_vae',
+            #                             'encoder_32_dim_0.5_beta_final.h5'),
+
         },
     },
     'ConvnetPreprocessor': tune.grid_search([
