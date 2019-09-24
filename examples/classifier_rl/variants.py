@@ -368,7 +368,7 @@ CLASSIFIER_PARAMS_PER_UNIVERSE_DOMAIN_TASK = {
                 for key in (
                     'TurnResetFree-v0',
                     'TurnFreeValve3ResetFree-v0',
-                )    
+                )
             },
             **{
                 key: {'observation_keys': ('pixels', 'goal_index')}
