@@ -147,6 +147,7 @@ class SAC(RLAlgorithm):
         # VAE
         self._vae = vae
         self._preprocessed_Q_inputs = self._Qs[0].preprocessed_inputs_fn
+        self._n_vae_train_steps_per_epoch = 25
 
         self._normalize_ext_reward_gamma = normalize_ext_reward_gamma
         self._ext_reward_coeff = ext_reward_coeff
@@ -176,6 +177,7 @@ class SAC(RLAlgorithm):
             self._init_rnd_update()
         self._init_actor_update()
         self._init_critic_update()
+        self._init_vae_update()
         self._init_diagnostics_ops()
 
     def _load_goal_classifier(self, goal_classifier_params_directory):
@@ -242,6 +244,106 @@ class SAC(RLAlgorithm):
             discount=self._discount,
             next_value=(1 - terminals) * next_values)
         return tf.stop_gradient(Q_target)
+
+    @property
+    def _uses_vae(self):
+        return (
+            'pixels' in self._policy.preprocessors
+            and self._policy.preprocessors['pixels'].__class__.__name__ == 'OnlineVAEPreprocessor')
+
+    def _init_vae_update(self):
+        """
+        Initializes VAE optimization update
+        Creates a `tf.optimizer.minimize` operation, appends to
+        `self._training_ops`.
+        """
+        if self._uses_vae:
+            vae_log_dir = os.path.join(os.getcwd(), 'vae_logs')
+            if not os.path.exists(vae_log_dir):
+                os.makedirs(vae_log_dir)
+
+            # self._vae_file_writer = tf.contrib.summary.create_file_writer(vae_log_dir)
+
+            from softlearning.models.vae import log_normal_pdf
+            self._vae_reconstruction_losses = {}
+            self._vae_kl_losses = {}
+            self._vae_losses = {}
+            self._initial_vae_train_ops = []
+
+            policy_vae_preprocessor = self._policy.preprocessors['pixels']
+            Q_vae_preprocessor = self._Qs[0].observations_preprocessors['pixels']
+            assert Q_vae_preprocessor is self._Qs[1].observations_preprocessors['pixels'], (
+                'Preprocessors on the Qs must be the same object.'
+            )
+
+            preprocessors = (('policy', policy_vae_preprocessor),
+                             ('Q', Q_vae_preprocessor))
+            for (name, preprocessor) in preprocessors:
+                vae = preprocessor.vae
+
+                images = self._placeholders['observations']['pixels']
+                reconstructions = vae(images)
+
+                # image_shape = tf.keras.backend.int_shape(images)[1:]
+                cross_ent = tf.nn.sigmoid_cross_entropy_with_logits(
+                    logits=reconstructions,
+                    labels=tf.image.convert_image_dtype(images, tf.float32)
+                )
+                logpx_z = -tf.reduce_sum(cross_ent, axis=[1, 2, 3])
+
+                # reconstruction_loss = tf.keras.losses.binary_crossentropy(
+                #     images, reconstructions)
+                # reconstruction_loss = tf.reshape(reconstruction_loss, (-1,))
+                # reconstruction_loss *= np.prod(image_shape)
+                # reconstruction_loss = self._vae_reconstruction_losses[name] = (
+                #     tf.reduce_mean(reconstruction_loss))
+
+                # reconstruction_loss = tf.keras.losses.binary_crossentropy(
+                #     tf.reshape(tf.image.convert_image_dtype(images, tf.float32), [-1]),
+                #     tf.reshape(reconstructions, [-1])
+                # )
+                # reconstruction_loss = self._vae_reconstruction_losses[name] = (
+                #     tf.reduce_mean(reconstruction_loss)
+                # )
+
+                z_mean, z_log_var, z = vae.encoder(images)
+                logpz = log_normal_pdf(z, 0., 0.)
+                logqz_x = log_normal_pdf(z, z_mean, z_log_var)
+
+                reconstruction_loss = logpx_z
+                kl_divergence = logpz - logqz_x
+                loss = reconstruction_loss + vae.beta * kl_divergence
+                self._vae_reconstruction_losses[name] = -tf.reduce_mean(reconstruction_loss)
+                self._vae_kl_losses[name] = tf.reduce_mean(kl_divergence)
+
+                vae_loss = -tf.reduce_mean(loss)
+                self._vae_losses[name] = -tf.reduce_mean(loss)
+
+                # kl_loss = 1 + z_log_var - tf.square(z_mean) - tf.exp(z_log_var)
+                # kl_loss = 1.5 * tf.reduce_sum(kl_loss, axis=-1)
+                # kl_loss = self._vae_kl_losses[name] = tf.reduce_mean(kl_loss)
+
+                # vae_loss = self._vae_losses[name] = (
+                #     reconstruction_loss + vae.beta * kl_loss)
+
+                vae_optimizer = tf.train.AdamOptimizer(
+                    learning_rate=self._policy_lr,
+                    name=f'{name}_vae_optimizer')
+
+                initial_vae_train_op = tf.contrib.layers.optimize_loss(
+                    loss=vae_loss,
+                    global_step=self.global_step,
+                    learning_rate=self._policy_lr,
+                    optimizer=vae_optimizer,
+                    variables=vae.trainable_variables,
+                    increment_global_step=False,
+                )
+                vae_train_op = vae_optimizer.minimize(
+                    loss=vae_loss,
+                    var_list=vae.trainable_variables
+                )
+                self._initial_vae_train_ops.append(initial_vae_train_op)
+                # self._training_ops.update({f'{name}_vae_train_op': vae_train_op})
 
     def _init_critic_update(self):
         """Create minimization operation for critic Q-function.
@@ -425,6 +527,22 @@ class SAC(RLAlgorithm):
             for metric_name, metric_fn in diagnostic_metrics.items()
         ])
 
+        if self._uses_vae:
+            self._diagnostics_ops.update({
+                **{
+                    f"vae/{key}-reconstruction_loss": value
+                    for key, value in self._vae_reconstruction_losses.items()
+                },
+                **{
+                    f"vae/{key}-kl_loss": value
+                    for key, value in self._vae_kl_losses.items()
+                },
+                **{
+                    f"vae/{key}-loss": value
+                    for key, value in self._vae_losses.items()
+                },
+            })
+
     def _init_training(self):
         self._update_target(tau=1.0)
 
@@ -442,30 +560,22 @@ class SAC(RLAlgorithm):
     def _do_training(self, iteration, batch):
         """Runs the operations for updating training and target ops."""
         feed_dict = self._get_feed_dict(iteration, batch)
-        # intermediate = self._Qs[0].preprocessed_inputs_fn
-        # inputs = (
-        #     feed_dict[self._placeholders['actions']],
-        #     feed_dict[self._placeholders['observations']['claw_qpos']],
-        #     feed_dict[self._placeholders['observations']['last_action']],
-        #     feed_dict[self._placeholders['observations']['pixels']],
-        #     feed_dict[self._placeholders['observations']['target_xy_position']],
-        #     feed_dict[self._placeholders['observations']['target_z_orientation_cos']],
-        #     feed_dict[self._placeholders['observations']['target_z_orientation_sin']],
-        # )
-        # feed_dict_interm = {
-        #     input_ph: input_np
-        #     for input_ph, input_np in zip(intermediate.inputs, inputs)
-        # }
 
         self._session.run(self._training_ops, feed_dict)
+
         if self._rnd_int_rew_coeff:
-            int_rew_std = np.maximum(np.std(self._session.run(self._unscaled_int_reward, feed_dict)), 1e-3)
-            self._running_int_rew_std = self._running_int_rew_std * self._rnd_gamma + int_rew_std * (1-self._rnd_gamma)
+            int_rew_std = np.maximum(
+                np.std(self._session.run(self._unscaled_int_reward, feed_dict)), 1e-3)
+            self._running_int_rew_std = (
+                self._running_int_rew_std * self._rnd_gamma
+                + int_rew_std * (1 - self._rnd_gamma))
 
         if self._normalize_ext_reward_gamma != 1:
-            ext_rew_std = np.maximum(np.std(self._session.run(self._normalized_ext_reward, feed_dict)), 1e-3)
-            self._running_ext_rew_std = self._running_ext_rew_std * self._normalize_ext_reward_gamma + \
-                ext_rew_std * (1-self._normalize_ext_reward_gamma)
+            ext_rew_std = np.maximum(
+                np.std(self._session.run(self._normalized_ext_reward, feed_dict)), 1e-3)
+            self._running_ext_rew_std = (
+                self._running_ext_rew_std * self._normalize_ext_reward_gamma
+                + ext_rew_std * (1 - self._normalize_ext_reward_gamma))
 
         if self._her_iters:
             # Q: Is it better to build a large batch and take one grad step, or
@@ -489,6 +599,16 @@ class SAC(RLAlgorithm):
         ## Question: why the min over the Q's?
         return self._session.run(self._bellman_errors, feed_dict)
 
+    def _epoch_before_hook(self, *args, **kwargs):
+        super()._epoch_before_hook(*args, **kwargs)
+        # vae_dataset = self._training_batch(10000)
+        # feed_dict = self._get_feed_dict(0, vae_dataset)
+        # for i in range(self._n_vae_train_steps_per_epoch):
+        #     for training_op in self._initial_vae_train_ops:
+        #         self._session.run(
+        #             training_op,
+        #             feed_dict=feed_dict)
+
     def _get_feed_dict(self, iteration, batch):
         """Construct a TensorFlow feed dictionary from a sample batch."""
 
@@ -501,7 +621,7 @@ class SAC(RLAlgorithm):
             random_idx = np.random.randint(
                 batch['observations']['pixels'].shape[0])
             image = batch['observations']['pixels'][random_idx].copy()
-            if image.shape[-1] == 6:
+            if image.shape[-1] == 6: # If the pixel observations are 2 images concatenated
                 img_0, img_1 = np.split(
                     image, 2, axis=2)
                 image = np.concatenate([img_0, img_1], axis=1)
@@ -538,6 +658,49 @@ class SAC(RLAlgorithm):
 
         return feed_dict
 
+    # TODO: Use the below in `get_diagnostics`
+    def _vae_diagnostics(self,
+                         iteration,
+                         batch,
+                         training_paths,
+                         evaluation_paths):
+        assert self._Qs[0]._preprocessor is self._Qs[1]._preprocessor
+        preprocessors = (
+            ('policy', self._policy.preprocessors['pixels']),
+            ('Q', self._Qs[0].observations_preprocessors['pixels']),
+        )
+
+        from scipy.special import expit
+        image_dir = os.path.join(os.getcwd(), 'vae')
+        if not os.path.exists(image_dir):
+            os.makedirs(image_dir)
+
+        for (preprocessor_name, preprocessor) in preprocessors:
+            vae = preprocessor.vae
+            encoder = vae.encoder
+            decoder = vae.decoder
+
+            num_images = 4
+            # Generate never-before-seen images.
+            z = np.random.normal(
+                size=(num_images, vae.latent_dim))
+            # Need to pass through sigmoid, since outputs are logits 
+            xtilde = expit(decoder.predict(z))
+
+            # Examine reconstruction of random images from pool.
+            x = self._pool.random_batch(
+                num_images)['observations']['pixels']
+            xhat = expit(vae.predict(x))
+
+            # concat = np.concatenate([
+            #     x, xhat, xtilde
+            # ], axis=)
+
+            skimage.io.imsave(
+                os.path.join(
+                    image_dir, f'{iteration}-{preprocessor_name}.png'),
+                unnormalized_x)
+
     def get_diagnostics(self,
                         iteration,
                         batch,
@@ -560,6 +723,50 @@ class SAC(RLAlgorithm):
                 for name in self._policy.observation_keys
             })).items()
         ]))
+
+        # VAE diagnostics
+        if self._uses_vae:
+            num_to_eval = 3
+            random_idxs = np.random.choice(
+                feed_dict[self._placeholders['observations']['pixels']].shape[0],
+                size=num_to_eval)
+            eval_pixels = (
+                feed_dict[self._placeholders['observations']['pixels']][random_idxs])
+            policy_vae = self._policy.preprocessors['pixels'].vae
+
+            # Visualize reconstructions and samples
+            reconstructions = self._session.run(
+                tf.math.sigmoid(policy_vae.output),
+                feed_dict={policy_vae.input: eval_pixels}
+            )
+
+            import ipdb; ipdb.set_trace()
+            # from scipy.special import expit
+            # reconstructions = policy_vae.predict(eval_pixels)
+            # reconstructions = expit(reconstructions)
+
+            concat = np.concatenate([
+                eval_pixels,
+                skimage.util.img_as_ubyte(reconstructions)
+            ], axis=2)
+            sampled_z = np.random.normal(
+                size=(num_to_eval, policy_vae.latent_dim))
+            # decoded_samples = policy_vae.decoder.predict(sampled_z)
+            # decoded_samples = expit(policy_vae)
+            decoded_samples = self._session.run(
+                tf.math.sigmoid(policy_vae.decoder.output),
+                feed_dict={policy_vae.decoder.input: sampled_z}
+            )
+
+            for i, (recon, samp) in enumerate(zip(concat, decoded_samples)):
+                skimage.io.imsave(f'/tmp/test_obs/reconstruction_{iteration}_{i}.png', recon)
+                skimage.io.imsave(f'/tmp/test_obs/sample_{iteration}_{i}.png', samp)
+
+            # with self._vae_file_writer.as_default(),
+            #       tf.contrib.summary.always_record_summaries():
+            #     tf.contrib.summary.image(f'vae/reconstructions', concat, step=iteration)
+            #     tf.contrib.summary.image(f'vae/samples', decoded_samples, step=iteration)
+
         # if self._vae:
         #     eval_pixels = feed_dict[self._placeholders['observations']['pixels']]
         #     inputs = (
@@ -621,6 +828,7 @@ class SAC(RLAlgorithm):
             #     os.path.join(image_save_dir, f'worst_reconstruction_{iteration}.png'),
             #     reconstruction_cmp)
 
+        # State estimator diagnostics
         if 'pixels' in self._policy.preprocessors and \
                 self._state_estimator is not None and \
                 self._state_estimator.name == 'state_estimator_preprocessor':
