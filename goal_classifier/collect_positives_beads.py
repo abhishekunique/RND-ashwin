@@ -13,13 +13,14 @@ directory = cur_dir + "/4_beads_"
 
 def main():
     # goals = [np.array((0, 0)), np.array((-0.0875, 0.0875))]
+    # Goal 0 = sides, Goal 1 = middle
     goals = [
         np.array([-0.0475, -0.0475, 0.0475, 0.0475]),
         np.array([0, 0, 0, 0])
     ]
     for goal_index, goal in enumerate(goals):
         num_positives = 0
-        NUM_TOTAL_EXAMPLES, ROLLOUT_LENGTH, STEPS_PER_SAMPLE = 200, 25, 4
+        NUM_TOTAL_EXAMPLES, ROLLOUT_LENGTH, STEPS_PER_SAMPLE = 500, 25, 4
         POSITION_THRESHOLD = 0.015
         observations = []
         images = True
@@ -27,10 +28,12 @@ def main():
 
         goal_keys = (
             'pixels',
+            'goal_index',
+            'claw_qpos',
+            'last_action',
             # 'object_position',
             # 'object_orientation_sin',
             # 'object_orientation_cos',
-            # 'goal_index',
         )
 
         env_kwargs = {
@@ -49,11 +52,12 @@ def main():
             #     'elevation': -29.68085106382978,
             #     'lookat': (-0.00390331,  0.01236683,  0.01093447),
             # },
+            # Updated camera settings
             'camera_settings': {
                 'azimuth': 90,
-                'lookat': (0,  0.04581637, -0.01614516),
-                'elevation': -45,
                 'distance': 0.37,
+                'elevation': -45,
+                'lookat': (0, 0.046, -0.016),
             },
             'target_qpos_range': [goal],
             'observation_keys': goal_keys,

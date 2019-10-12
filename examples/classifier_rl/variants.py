@@ -257,7 +257,6 @@ ALGORITHM_PARAMS_ADDITIONAL = {
                 'output_size': 512,
             },
         },
-
     },
     'VICEGAN': {
         'type': 'VICEGAN',
@@ -271,11 +270,11 @@ ALGORITHM_PARAMS_ADDITIONAL = {
             'classifier_lr': 1e-4,
             'classifier_batch_size': 128,
             'n_initial_exploration_steps': int(1e3),
-            'n_classifier_train_steps': 10,
+            'n_classifier_train_steps': 5,
             'classifier_optim_name': 'adam',
             'n_epochs': 200,
             'mixup_alpha': 1.0,
-        }
+        },
     },
     'VICERAQ': {
         'type': 'VICERAQ',
@@ -576,7 +575,7 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_VISION = {
                 # 2 goal + no RND reset controller
                 'target_pos_range': [-np.pi / 2, np.pi / 2],
                 # 1 goal + no RND reset controller
-                'target_pos_range': [-np.pi / 2],
+                # 'target_pos_range': [-np.pi / 2],
                 'observation_keys': (
                     'pixels',
                     'claw_qpos',
@@ -601,9 +600,9 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_VISION = {
                 # Single goal + RND reset controller
                 # 'target_pos_range': [-np.pi / 2, -np.pi / 2]
                 # 2 goal + no RND reset controller
-                # 'target_pos_range': [-np.pi / 2, np.pi / 2],
+                'target_pos_range': [-np.pi / 2, np.pi / 2],
                 # 1 goal + no RND reset controller
-                'target_pos_range': [-np.pi / 2],
+                # 'target_pos_range': [-np.pi / 2],
                 'observation_keys': (
                     'claw_qpos',
                     'pixels',
@@ -784,7 +783,9 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_VISION = {
                 # Goal we want to evaluate:
                 'target_qpos_range': [
                     (-0.0475, -0.0475, 0.0475, 0.0475),
-                    (-0.0475, -0.0475, 0.0475, 0.0475),
+                    # (-0.0475, -0.0475, 0.0475, 0.0475),
+                    # Remove below for 1 goal reset free
+                    # (0, 0, 0, 0)
                 ],
                 'observation_keys': (
                     'claw_qpos',
@@ -806,9 +807,9 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_VISION = {
                     (-0.0475, -0.0475, 0.0475, 0.0475),
                     # (-0.0475, -0.0475, 0.0475, 0.0475),
                     # This second one is arbitrary for training env
-                    (0, 0, 0, 0),
+                    # (0, 0, 0, 0),
                 ],
-                'cycle_goals': True,
+                # 'cycle_goals': True,
                 'observation_keys': (
                     'pixels',
                     'claw_qpos',
@@ -988,13 +989,13 @@ PIXELS_PREPROCESSOR_PARAMS = {
         'kwargs': {
             'trainable': False,
             # SlideBeads 
-            # 'image_shape': (32, 32, 3),
-            # 'latent_dim': 16,
-            # 'encoder_path': os.path.join(PROJECT_PATH,
-            #                             'softlearning',
-            #                             'models',
-            #                             'slide_beads_vae_16_dim',
-            #                             'encoder_16_dim_1.0_beta_final.h5'),
+            'image_shape': (32, 32, 3),
+            'latent_dim': 16,
+            'encoder_path': os.path.join(PROJECT_PATH,
+                                        'softlearning',
+                                        'models',
+                                        'slide_beads_vae_16_230iters',
+                                        'encoder_16_dim_1_beta.h5'),
             # Free screw
             # 'image_shape': (32, 32, 3),
             # 'latent_dim': 32,
@@ -1004,14 +1005,13 @@ PIXELS_PREPROCESSOR_PARAMS = {
             #                             'free_screw_vae_32_dim',
             #                             'encoder_32_dim_0.5_beta_final.h5'),
             # Fixed screw
-            'image_shape': (32, 32, 3),
-            'latent_dim': 16,
-            'encoder_path': os.path.join(PROJECT_PATH,
-                                        'softlearning',
-                                        'models',
-                                        'fixed_screw_vae_16_dim',
-                                        'encoder_16_dim_5.0_beta_final.h5'),
-
+            # 'image_shape': (32, 32, 3),
+            # 'latent_dim': 16,
+            # 'encoder_path': os.path.join(PROJECT_PATH,
+            #                             'softlearning',
+            #                             'models',
+            #                             'fixed_screw_vae_16_dim',
+            #                             'encoder_16_dim_5.0_beta_final.h5'),
         },
     },
     'ConvnetPreprocessor': tune.grid_search([

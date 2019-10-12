@@ -80,10 +80,6 @@ def get_environment_params(task, image_shape):
                 # 'objects_target_positions',
             ),
             'camera_settings': {
-                # 'azimuth': ,
-                # 'distance': ,
-                # 'elevation': ,
-                # 'lookat': ,
                 # 'azimuth': 30,
                 # 'distance': 0.24,
                 # 'elevation': -30,

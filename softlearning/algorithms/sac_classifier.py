@@ -124,7 +124,7 @@ class SACClassifier(SAC):
             **{
                 self._placeholders['observations'][key]:
                 observations_batch[key]
-                for key in self._classifier.observation_keys()
+                for key in self._classifier.observation_keys
             },
             self._placeholders['labels']: labels_batch
         }
@@ -177,6 +177,9 @@ class SACClassifier(SAC):
             iteration, batch, training_paths, evaluation_paths)
 
         sample_observations = batch['observations']
+        num_sample_observations = sample_observations[
+            next(iter(sample_observations))].shape[0]
+
         goal_index = np.random.randint(
             self._goal_examples[next(iter(self._goal_examples))].shape[0],
             size=sample_observations[next(iter(sample_observations))].shape[0])
@@ -184,13 +187,20 @@ class SACClassifier(SAC):
             key: self._goal_examples[key][goal_index]
             for key in self._goal_examples.keys()
         }
+        num_goal_observations = goal_observations[
+            next(iter(goal_observations))].shape[0]
 
         goal_index_validation = np.random.randint(
             self._goal_examples_validation[
                 next(iter(self._goal_examples))].shape[0],
             size=sample_observations[next(iter(sample_observations))].shape[0])
-        goal_observations_validation = (
-            self._goal_examples_validation[goal_index_validation])
+        goal_observations_validation = {
+            key: values[goal_index_validation]
+            for key, values in self._goal_examples_validation.items()
+            if key in self._policy.observation_keys
+        }
+        num_validation_goal_observations = goal_observations_validation[
+            next(iter(goal_observations))].shape[0]
 
         reward_sample_goal_observations, classifier_loss = self._session.run(
             (self._reward_t, self._classifier_loss_t),
@@ -204,9 +214,9 @@ class SACClassifier(SAC):
                     for key in self._classifier.observation_keys
                 },
                 self._placeholders['labels']: np.concatenate([
-                    np.zeros((sample_observations.shape[0], 1)),
-                    np.ones((goal_observations.shape[0], 1)),
-                    np.ones((goal_observations_validation.shape[0], 1)),
+                    np.zeros((num_sample_observations, 1)),
+                    np.ones((num_goal_observations, 1)),
+                    np.ones((num_validation_goal_observations, 1)),
                 ])
             }
         )
@@ -218,8 +228,8 @@ class SACClassifier(SAC):
          reward_goal_observations_validation) = np.split(
              reward_sample_goal_observations,
              (
-                 sample_observations.shape[0],
-                 sample_observations.shape[0] + goal_observations.shape[0]
+                 num_sample_observations,
+                 num_sample_observations + num_goal_observations
              ),
              axis=0)
 
@@ -238,11 +248,11 @@ class SACClassifier(SAC):
             'reward_learning/classifier_training_loss': np.mean(
                 self._training_loss),
             'reward_learning/classifier_loss': classifier_loss,
-            'reward_learning/reward_sample_obs_mean': np.mean(
+            'reward_learning/reward_sample_mean': np.mean(
                 reward_sample_observations),
-            'reward_learning/reward_goal_obs_mean': np.mean(
+            'reward_learning/reward_goal_mean': np.mean(
                 reward_goal_observations),
-            'reward_learning/reward_goal_obs_validation_mean': np.mean(
+            'reward_learning/reward_goal_validation_mean': np.mean(
                 reward_goal_observations_validation),
         })
 
