@@ -693,116 +693,104 @@ class SAC(RLAlgorithm):
                         f'{name}_sample_{iteration}.png'),
                     samples_concat)
 
-                # for i, (recon, samp) in enumerate(zip(concat, decoded_samples)):
-                #     skimage.io.imsave(
-                #         os.path.join(
-                #             save_path,
-                #             f'{name}_reconstruction_{iteration}_{i}.png'),
-                #         recon)
-                #     skimage.io.imsave(
-                #         os.path.join(
-                #             save_path,
-                #             f'{name}_sample_{iteration}_{i}.png'),
-                #         samp)
+        # # State estimator diagnostics
+        # if 'pixels' in self._policy.preprocessors and \
+        #         self._state_estimator is not none and \
+        #         self._state_estimator.name == 'state_estimator_preprocessor':
+        #     # train the state estimator on the diagnostic batch
+        #     if self._train_state_estimator_online:
+        #         self._state_estimator.trainable = true
+        #         self._state_estimator.compile(optimizer=self._state_estimator_optimizer, loss='mse')
+        #         train_obs = batch['observations']
+        #         # obs_keys_to_estimate = (
+        #         #     'object_position',
+        #         #     'object_orientation_cos',
+        #         #     'object_orientation_sin',
+        #         # )
+        #         pos = train_obs['object_position'][:, :2]
+        #         pos = normalize(pos, -0.1, 0.1, -1, 1)
+        #         num_samples = pos.shape[0]
+        #         ground_truth_state = np.concatenate([
+        #             pos,
+        #             train_obs['object_orientation_cos'][:, 2].reshape((num_samples, 1)),
+        #             train_obs['object_orientation_sin'][:, 2].reshape((num_samples, 1))
+        #         ], axis=1)
 
-        # State estimator diagnostics
-        if 'pixels' in self._policy.preprocessors and \
-                self._state_estimator is not None and \
-                self._state_estimator.name == 'state_estimator_preprocessor':
-            # Train the state estimator on the diagnostic batch
-            if self._train_state_estimator_online:
-                self._state_estimator.trainable = True
-                self._state_estimator.compile(optimizer=self._state_estimator_optimizer, loss='mse')
-                train_obs = batch['observations']
-                # obs_keys_to_estimate = (
-                #     'object_position',
-                #     'object_orientation_cos',
-                #     'object_orientation_sin',
-                # )
-                pos = train_obs['object_position'][:, :2]
-                pos = normalize(pos, -0.1, 0.1, -1, 1)
-                num_samples = pos.shape[0]
-                ground_truth_state = np.concatenate([
-                    pos,
-                    train_obs['object_orientation_cos'][:, 2].reshape((num_samples, 1)),
-                    train_obs['object_orientation_sin'][:, 2].reshape((num_samples, 1))
-                ], axis=1)
+        #         pixels = train_obs['pixels']
+        #         # ground_truth_state = np.concatenate(
+        #         #     [train_obs[key] for key in obs_keys_to_estimate], axis=1)
 
-                pixels = train_obs['pixels']
-                # ground_truth_state = np.concatenate(
-                #     [train_obs[key] for key in obs_keys_to_estimate], axis=1)
+        #         self._state_estimator.fit(
+        #             x=pixels,
+        #             y=ground_truth_state,
+        #             batch_size=32,
+        #             epochs=self._state_estimator_iters or 1
+        #         )
+        #         self._state_estimator.trainable = false
 
-                self._state_estimator.fit(
-                    x=pixels,
-                    y=ground_truth_state,
-                    batch_size=32,
-                    epochs=self._state_estimator_iters or 1
-                )
-                self._state_estimator.trainable = False
+        #         self._state_estimator.compile(optimizer=self._state_estimator_optimizer, loss='mse')
+        #         # copy over weights to the other state estimators
+        #         for q, q_target in zip(self._qs, self._q_targets):
+        #             q.get_layer('state_estimator_preprocessor').set_weights(
+        #                     self._state_estimator.get_weights())
+        #             q_target.get_layer('state_estimator_preprocessor').set_weights(
+        #                     self._state_estimator.get_weights())
 
-                self._state_estimator.compile(optimizer=self._state_estimator_optimizer, loss='mse')
-                # Copy over weights to the other state estimators
-                for Q, Q_target in zip(self._Qs, self._Q_targets):
-                    Q.get_layer('state_estimator_preprocessor').set_weights(
-                            self._state_estimator.get_weights())
-                    Q_target.get_layer('state_estimator_preprocessor').set_weights(
-                            self._state_estimator.get_weights())
+        #     # evaluate on the current diagnostic batch
+        #     state_estimators = [
+        #         self._state_estimator,
+        #         self._qs[0].get_layer('state_estimator_preprocessor'),
+        #         self._qs[1].get_layer('state_estimator_preprocessor')
+        #     ]
+        #     state_estimator_descriptors = ('policy', 'q0', 'q1')
+        #     # state_estimator = self._state_estimator
+        #     eval_obs = batch['observations']
+        #     # obs_keys_to_estimate = (
+        #     #     'object_position',
+        #     #     'object_orientation_cos',
+        #     #     'object_orientation_sin',
+        #     # )
+        #     pixels = eval_obs['pixels']
+        #     # ground_truth_state = np.concatenate(
+        #     #     [eval_obs[key] for key in obs_keys_to_estimate], axis=1)
 
-            # Evaluate on the current diagnostic batch
-            state_estimators = [
-                self._state_estimator,
-                self._Qs[0].get_layer('state_estimator_preprocessor'),
-                self._Qs[1].get_layer('state_estimator_preprocessor')
-            ]
-            state_estimator_descriptors = ('policy', 'Q0', 'Q1')
-            # state_estimator = self._state_estimator
-            eval_obs = batch['observations']
-            # obs_keys_to_estimate = (
-            #     'object_position',
-            #     'object_orientation_cos',
-            #     'object_orientation_sin',
-            # )
-            pixels = eval_obs['pixels']
-            # ground_truth_state = np.concatenate(
-            #     [eval_obs[key] for key in obs_keys_to_estimate], axis=1)
+        #     # pos = eval_obs['object_position'][:, :2]
 
-            # pos = eval_obs['object_position'][:, :2]
+        #     assert 'object_xy_position' in eval_obs
+        #     pos = eval_obs['object_xy_position']
+        #     from softlearning.models.state_estimation import normalize
+        #     pos = normalize(pos, -0.1, 0.1, -1, 1)
+        #     num_samples = pos.shape[0]
+        #     assert 'object_z_orientation_cos' in eval_obs and 'object_z_orientation_sin' in eval_obs
+        #     labels = np.concatenate([
+        #         pos,
+        #         eval_obs['object_z_orientation_cos'].reshape((num_samples, 1)),
+        #         eval_obs['object_z_orientation_sin'].reshape((num_samples, 1))
+        #         # eval_obs['object_orientation_cos'][:, 2].reshape((num_samples, 1)),
+        #         # eval_obs['object_orientation_sin'][:, 2].reshape((num_samples, 1)),
+        #     ], axis=1)
+        #     preds_per_state_estimator = [
+        #         state_estimator.predict(pixels)
+        #         for state_estimator in state_estimators
+        #     ]
 
-            assert 'object_xy_position' in eval_obs
-            pos = eval_obs['object_xy_position']
-            from softlearning.models.state_estimation import normalize
-            pos = normalize(pos, -0.1, 0.1, -1, 1)
-            num_samples = pos.shape[0]
-            assert 'object_z_orientation_cos' in eval_obs and 'object_z_orientation_sin' in eval_obs
-            labels = np.concatenate([
-                pos,
-                eval_obs['object_z_orientation_cos'].reshape((num_samples, 1)),
-                eval_obs['object_z_orientation_sin'].reshape((num_samples, 1))
-                # eval_obs['object_orientation_cos'][:, 2].reshape((num_samples, 1)),
-                # eval_obs['object_orientation_sin'][:, 2].reshape((num_samples, 1)),
-            ], axis=1)
-            preds_per_state_estimator = [
-                state_estimator.predict(pixels)
-                for state_estimator in state_estimators
-            ]
+        #     true_angles = np.arctan2(labels[:, 3], labels[:, 2]) * 180 / np.pi
+        #     for preds, desc in zip(preds_per_state_estimator, state_estimator_descriptors):
+        #         pos_errors_xy = np.abs(labels[:, :2] - preds[:, :2])
+        #         pos_errors = np.linalg.norm(pos_errors_xy, axis=1)
+        #         pos_errors = 15 * pos_errors
 
-            true_angles = np.arctan2(labels[:, 3], labels[:, 2]) * 180 / np.pi
-            for preds, desc in zip(preds_per_state_estimator, state_estimator_descriptors):
-                pos_errors_xy = np.abs(labels[:, :2] - preds[:, :2])
-                pos_errors = np.linalg.norm(pos_errors_xy, axis=1)
-                pos_errors = 15 * pos_errors
+        #         pred_angles = np.arctan2(preds[:, 3], preds[:, 2]) * 180 / np.pi
+        #         angle_errors = angle_distance(true_angles, pred_angles)
 
-                pred_angles = np.arctan2(preds[:, 3], preds[:, 2]) * 180 / np.pi
-                angle_errors = angle_distance(true_angles, pred_angles)
-
-                diagnostics.update({
-                    f'state_estimator/{desc}/xy_position_error_in_cm': np.mean(
-                        pos_errors
-                    ),
-                    f'state_estimator/{desc}/angle_error_in_degrees_policy': np.mean(
-                        angle_errors
-                    )
-                })
+        #         diagnostics.update({
+        #             f'state_estimator/{desc}/xy_position_error_in_cm': np.mean(
+        #                 pos_errors
+        #             ),
+        #             f'state_estimator/{desc}/angle_error_in_degrees_policy': np.mean(
+        #                 angle_errors
+        #             )
+        #         })
 
         if self._save_eval_paths:
             import pickle
@@ -820,8 +808,8 @@ class SAC(RLAlgorithm):
         saveables = {
             '_policy_optimizer': self._policy_optimizer,
             **{
-                f'Q_optimizer_{i}': optimizer
-                for i, optimizer in enumerate(self._Q_optimizers)
+                f'q_optimizer_{i}': optimizer
+                for i, optimizer in enumerate(self._q_optimizers)
             },
             '_log_alpha': self._log_alpha,
         }
