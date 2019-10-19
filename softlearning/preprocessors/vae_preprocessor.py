@@ -13,14 +13,6 @@ from softlearning.utils.keras import PicklableModel
 tfk = tf.keras
 tfkl = tf.keras.layers
 
-def sampling(inputs):
-    z_mean, z_log_var = inputs
-    batch_size = tf.shape(z_mean)[0]
-    dim = tf.keras.backend.int_shape(z_mean)[1]
-    # by default, random_normal has mean = 0 and std = 1.0
-    epsilon = tf.random_normal(shape=(batch_size, dim))
-    return z_mean + tf.exp(0.5 * z_log_var) * epsilon
-
 
 def create_encoder_model(image_shape,
                          latent_dim,
@@ -34,7 +26,7 @@ def create_encoder_model(image_shape,
         activation=tfkl.LeakyReLU(),
         trainable=trainable,
         kernel_regularizer=kernel_regularizer,
-        # padding='SAME',
+        padding='SAME',
     )
 
     def preprocess(x):
@@ -43,11 +35,11 @@ def create_encoder_model(image_shape,
     # Functional model, need to debug this
     x = tfkl.Input(shape=image_shape, name='pixel_input')
     preprocessed_x = tfkl.Lambda(preprocess)(x)
-    # TODO: Be able to specify convnet params
+    # TODO: Be able to specify convnet params, do this with `convnet.py`
     conv_output_0 = conv2d(filters=64, strides=2)(preprocessed_x)
     conv_output_1 = conv2d(filters=64, strides=2)(conv_output_0)
-    conv_output_2 = conv2d(filters=32, strides=1)(conv_output_1)
-    # conv_output_2 = conv2d(filters=32, strides=2)(conv_output_1)
+    # conv_output_2 = conv2d(filters=32, strides=1)(conv_output_1)
+    conv_output_2 = conv2d(filters=32, strides=2)(conv_output_1)
     output = tfkl.Flatten()(conv_output_2)
 
     if extra_input_shape:
@@ -68,23 +60,25 @@ def create_encoder_model(image_shape,
         )
     )(output)
 
-    def sampling(inputs):
+    # def sample(inputs):
+    #     z_mean, z_logvar = inputs
+    #     return tf.random.normal(shape=z_mean.shape, mean=z_mean, stddev=tf.exp(z_logvar * 0.5))
+    def sample(inputs):
         """Reparameterization that is batch_size and dimension agnostic."""
         z_mean, z_logvar = inputs
         batch_size = tf.shape(z_mean)[0]
         dim = tf.keras.backend.int_shape(z_mean)[1]
         eps = tf.random.normal(shape=(batch_size, dim))
-        return eps * tf.exp(z_logvar * 0.5) + z_mean
+        return eps * tf.exp(z_logvar * 0.5) + z_mean# , (batch_size, dim, eps)
 
     latents = tfkl.Lambda(
-        sampling, output_shape=(latent_dim, ), name='z'
+        sample, output_shape=(latent_dim, ), name='z'
     )([mean, logvar])
 
     if extra_input_shape:
         return tfk.Model([x, s], output, name=name)
     else:
         return tfk.Model(x, [mean, logvar, latents], name=name)
-
 
 def create_decoder_model(latent_dim,
                          trainable=True,
@@ -152,6 +146,7 @@ class OnlineVAEPreprocessor:
             latent_dim,
             **kwargs)
         # Take the mean, not the sampled latent, since gradients won't pass.
+        # Should I be doing a stop gradient here?
         self.preprocessor = PicklableModel(
             self.vae.input,
             tf.stop_gradient(self.vae.encoder.outputs[0]),

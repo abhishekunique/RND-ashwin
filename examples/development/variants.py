@@ -58,14 +58,14 @@ ALGORITHM_PARAMS_ADDITIONAL = {
             'lr': 3e-4,
             'target_update_interval': 1,
             'tau': 5e-3,
-            # 'n_initial_exploration_steps': int(5e3),
+            'n_initial_exploration_steps': int(5e3),
             'target_entropy': 'auto',
             'action_prior': 'uniform',
             'her_iters': tune.grid_search([0]),
             # === TO TRAIN ON RND REWARD ONLY ===
-            'ext_reward_coeff': 0,
+            'ext_reward_coeff': 1,
             # === DONT DO EVAL EPISODES FOR DATA COLLECTION ===
-            'eval_n_episodes': 0,
+            'eval_n_episodes': 3,
             'rnd_int_rew_coeff': tune.sample_from([1]), # 1
             'normalize_ext_reward_gamma': 0.99,
         },
@@ -837,103 +837,13 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_VISION = {
                 #     },
                 # },
             },
-            # 'TurnMultiGoalResetFree-v0': {
-            #     'goals': (
-            #         -np.pi / 2,
-            #         np.pi / 2
-            #     ),
-            #     'initial_goal_index': 0,
-            #     'swap_goals_upon_completion': False,
-            #     'use_concatenated_goal': False,
-            #     'one_hot_goal_index': True,
-            #     'pixel_wrapper_kwargs': {
-            #         'pixels_only': False,
-            #         'normalize': False,
-            #         'render_kwargs': {
-            #             'width': 32,
-            #             'height': 32,
-            #             'camera_id': -1,
-            #         }
-            #     },
-            #     'camera_settings': {
-            #         'azimuth': 180,
-            #         'distance': 0.3,
-            #         'elevation': -50,
-            #         'lookat': np.array([0.02, 0.004, 0.09])
-            #     },
-            #     'observation_keys': (
-            #         'pixels',
-            #         'claw_qpos',
-            #         'last_action',
-            #         'goal_index',
-            #         'one_hot_goal_index',
-            #         'object_angle_cos',
-            #         'object_angle_sin',
-            #     ),
-            #     'reward_keys_and_weights': {
-            #         'object_to_target_angle_dist_cost': 1,
-            #     },
-            # },
-            # 'TurnMultiGoal-v0': { #  eval environment
-            #     'goals': (
-            #         -np.pi / 2,
-            #         np.pi / 2
-            #     ),
-            #     'initial_goal_index': 0,
-            #     'swap_goals_upon_completion': False,
-            #     'use_concatenated_goal': False,
-            #     'one_hot_goal_index': True,
-            #     'pixel_wrapper_kwargs': {
-            #         'pixels_only': False,
-            #         'normalize': False,
-            #         'render_kwargs': {
-            #             'width': 32,
-            #             'height': 32,
-            #             'camera_id': -1,
-            #         }
-            #     },
-            #     'camera_settings': {
-            #         'azimuth': 180,
-            #         'distance': 0.3,
-            #         'elevation': -50,
-            #         'lookat': np.array([0.02, 0.004, 0.09])
-            #     },
-            #     'observation_keys': (
-            #         'pixels',
-            #         'claw_qpos',
-            #         'last_action',
-            #         'goal_index',
-            #         'one_hot_goal_index',
-            #         'object_angle_cos',
-            #         'object_angle_sin',
-            #     ),
-            #     'reward_keys_and_weights': {
-            #         'object_to_target_angle_dist_cost': 1,
-            #     },
-            # },
-            # 'TurnRandomResetSingleGoal-v0': {
-            #     'initial_object_pos_range': (-np.pi, np.pi),
-            #     'reward_keys': ('object_to_target_angle_dist_cost', ),
-            #     'device_path': '/dev/ttyUSB2',
-            #     'camera_config': {
-            #         # 'topic': '/kinect2_001144463747/hd/image_color',
-            #         'topic': '/front_2/image_raw',
-            #     },
-            #     'use_dict_obs': True,
-            #     'pixel_wrapper_kwargs': {
-            #         'observation_key': 'pixels',
-            #         'pixels_only': False,
-            #         'render_kwargs': {
-            #             'width': 32,
-            #             'height': 32,
-            #             'camera_id': 1,
-            #             # 'camera_name': 'track',
-            #         },
-            #     },
-            #     'observation_keys': ('claw_qpos', 'last_action', 'pixels'),
-            # },
+            # Free screw
             'TurnFreeValve3Fixed-v0': {
                 **FREE_SCREW_VISION_KWARGS,
+                'reward_keys_and_weights': {
+                    'object_to_target_position_distance_reward': 1,
+                    'object_to_target_orientation_distance_reward': 1,
+                },
                 'observation_keys': (
                     'pixels',
                     'claw_qpos',
@@ -947,26 +857,24 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_VISION = {
                     (-0.08, -0.08, 0, 0, 0, -np.pi),
                     (0.08, 0.08, 0, 0, 0, np.pi)
                 ),
-                # 'camera_settings': {
-                #     'distance': 0.5,
-                #     'elevation': -60
-                # },
-                # 'reward_keys_and_weights': {
-                #     'object_to_target_position_distance_reward': tune.grid_search([2]),
-                #     'object_to_target_orientation_distance_reward': 1,
-                # },
+                'target_qpos_range': [
+                    (0, 0, 0, 0, 0, -np.pi / 2)
+                ],
             },
             # === Reset-free environment below ===
             'TurnFreeValve3ResetFree-v0': {
                 **FREE_SCREW_VISION_KWARGS,
-                'reward_keys_and_weights': {
-                    'object_to_target_position_distance_reward': 0,
-                    'object_to_target_orientation_distance_reward': 0,
-                },
+                # 'reward_keys_and_weights': {
+                #     'object_to_target_position_distance_reward': 0,
+                #     'object_to_target_orientation_distance_reward': 0,
+                # },
                 'reset_fingers': True,
                 'reset_frequency': 0,
                 'reset_policy_checkpoint_path': '',
                 'init_qpos_range': [(0, 0, 0, 0, 0, 0)],
+                'target_qpos_range': [
+                    (0, 0, 0, 0, 0, -np.pi / 2)
+                ],
                 'observation_keys': (
                     'pixels',
                     'claw_qpos',
@@ -1311,11 +1219,11 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_VISION = {
                 ),
                 'target_qpos_range': [
                     (-0.0475, -0.0475, 0.0475, 0.0475),
-                    (-0.0475, -0.0475, 0.0475, 0.0475),
+                    # (-0.0475, -0.0475, 0.0475, 0.0475),
                 ],
-                'init_qpos_range': [(0, 0, 0, 0)], # TODO: Random init
-                'target_qpos_range': [
-                    (-0.0825, 0.0825)],
+                # 'init_qpos_range': [(0, 0, 0, 0)], # TODO: Random init
+                # 'target_qpos_range': [
+                #     (-0.0825, 0.0825)],
                 'observation_keys': (
                     'claw_qpos',
                     'last_action',
@@ -1324,12 +1232,6 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_VISION = {
                     'objects_target_positions',
                     'objects_positions',
                 ),
-                # 'camera_settings': {
-                #     'azimuth': 23.234042553191497,
-                #     'distance': 0.2403358053524018,
-                #     'elevation': -29.68085106382978,
-                #     'lookat': (-0.00390331,  0.01236683,  0.01093447),
-                # }
             },
             'SlideBeadsResetFree-v0': {
                 **SLIDE_BEADS_VISION_KWARGS,
@@ -1643,8 +1545,8 @@ def get_variant_spec_base(universe, domain, task, task_eval, policy, algorithm, 
        "device_path" not in env_kwargs.keys():
         env_obs_keys = env_kwargs['observation_keys']
         # === UNCOMMENT BELOW IF YOU DONT WANT TO SAVE PIXELS INTO POOL ===
-        # non_image_obs_keys = tuple(key for key in env_obs_keys if key != 'pixels')
-        # variant_spec['replay_pool_params']['kwargs']['obs_save_keys'] = non_image_obs_keys
+        non_image_obs_keys = tuple(key for key in env_obs_keys if key != 'pixels')
+        variant_spec['replay_pool_params']['kwargs']['obs_save_keys'] = non_image_obs_keys
 
         non_object_obs_keys = tuple(key for key in env_obs_keys if 'object' not in key)
         variant_spec['policy_params']['kwargs']['observation_keys'] = variant_spec[
@@ -1715,8 +1617,7 @@ STATE_PREPROCESSOR_PARAMS = {
 }
 
 
-from softlearning.misc.utils import NFS_PATH
-# TODO: Create a helper function to retrieve models from relative path
+from softlearning.misc.utils import PROJECT_PATH, NFS_PATH
 PIXELS_PREPROCESSOR_PARAMS = {
     'StateEstimatorPreprocessor': {
         'type': 'StateEstimatorPreprocessor',
@@ -1759,14 +1660,18 @@ PIXELS_PREPROCESSOR_PARAMS = {
         'kwargs': {
             'image_shape': (32, 32, 3),
             'latent_dim': 16,
-            'encoder_path': os.path.join(NFS_PATH,
-                                         'pretrained_models',
-                                         'vae_16_dim_beta_3_invisible_claw_l2_reg',
-                                         'encoder_16_dim_3.0_beta.h5'),
-            'decoder_path': os.path.join(NFS_PATH,
-                                         'pretrained_models',
-                                         'vae_16_dim_beta_3_invisible_claw_l2_reg',
-                                         'decoder_16_dim_3.0_beta.h5'),
+            # 'latent_dim': 32,
+            # Optionally specify a pretrained model to start finetuning
+            # 'encoder_path': os.path.join(PROJECT_PATH,
+            #                              'softlearning',
+            #                              'models',
+            #                              'free_screw_vae_32_dim',
+            #                              'encoder_32_dim_0.5_beta_final.h5'),
+            # 'decoder_path': os.path.join(PROJECT_PATH,
+            #                              'softlearning',
+            #                              'models',
+            #                              'free_screw_vae_32_dim',
+            #                              'decoder_32_dim_0.5_beta_final.h5'),
         }
     },
     'ConvnetPreprocessor': tune.grid_search([
