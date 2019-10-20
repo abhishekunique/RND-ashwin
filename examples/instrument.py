@@ -209,16 +209,16 @@ def run_example_dry(example_module_name, example_argv):
     total_number_of_trials = experiments_info["total_number_of_trials"]
 
     experiments_info_text = f"""
-Dry run.
+        Dry run.
 
-Experiment specs:
-{pformat(experiment_kwargs, indent=2)}
+        Experiment specs:
+        {pformat(experiment_kwargs, indent=2)}
 
-Number of trials:
-{pformat(number_of_trials, indent=2)}
+        Number of trials:
+        {pformat(number_of_trials, indent=2)}
 
-Number of total trials (including samples/seeds): {total_number_of_trials}
-"""
+        Number of total trials (including samples/seeds): {total_number_of_trials}
+    """
 
     print(experiments_info_text)
 

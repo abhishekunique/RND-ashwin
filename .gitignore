@@ -116,7 +116,6 @@ src/plotly
 ray_playground
 MUJOCO_LOG.TXT
 
-
 .mujoco/
 .vscode/
 # notebooks/
