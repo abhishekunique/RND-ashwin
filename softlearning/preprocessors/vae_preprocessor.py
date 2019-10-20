@@ -110,11 +110,11 @@ def create_decoder_model(latent_dim,
 
 
 def create_vae(image_shape,
-                latent_dim,
-                *args,
-                beta=1.0,
-                name='beta_vae',
-                **kwargs):
+               latent_dim,
+               *args,
+               beta=1.0,
+               name='beta_vae',
+               **kwargs):
     encoder = create_encoder_model(
         image_shape=image_shape,
         latent_dim=latent_dim,

@@ -488,7 +488,7 @@ class SAC(RLAlgorithm):
                     for key, value in self._vae_kl_losses.items()
                 },
                 **{
-                    f"vae/{key}-loss": value
+                    f"vae/{key}-elbo": value
                     for key, value in self._vae_losses.items()
                 },
             })
@@ -809,7 +809,7 @@ class SAC(RLAlgorithm):
             '_policy_optimizer': self._policy_optimizer,
             **{
                 f'q_optimizer_{i}': optimizer
-                for i, optimizer in enumerate(self._q_optimizers)
+                for i, optimizer in enumerate(self._Q_optimizers)
             },
             '_log_alpha': self._log_alpha,
         }
