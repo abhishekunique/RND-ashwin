@@ -292,6 +292,7 @@ class ExperimentRunner(tune.Trainable):
 
     @property
     def picklables(self):
+        # TODO: Save the VAE preprocessor weights, load them back in on restoration
         if self._multi_build:
             return {
                 'variant': self._variant,

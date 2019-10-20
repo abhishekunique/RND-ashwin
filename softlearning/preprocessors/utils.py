@@ -6,6 +6,19 @@ def get_convnet_preprocessor(name='convnet_preprocessor',
     preprocessor = convnet_model(name=name, **kwargs)
     return preprocessor
 
+def get_online_vae_preprocessor(image_shape,
+                                encoder_path=None,
+                                decoder_path=None,
+                                name='online_vae_preprocessor',
+                                **kwargs):
+    from softlearning.preprocessors.vae_preprocessor import OnlineVAEPreprocessor
+    vae_preprocessor = OnlineVAEPreprocessor(image_shape, **kwargs)
+    # If the VAE is going to be finetuned from a pretrained model
+    if encoder_path and decoder_path:
+        vae_preprocessor.vae.encoder.load_weights(encoder_path)
+        vae_preprocessor.vae.decoder.load_weights(decoder_path)
+    return vae_preprocessor
+
 def get_vae_preprocessor(name='vae_preprocessor',
                          encoder_path=None,
                          decoder_path=None,
@@ -13,14 +26,13 @@ def get_vae_preprocessor(name='vae_preprocessor',
                          include_decoder=False,
                          **kwargs):
     from softlearning.models.vae import VAE
-    # assert encoder_path is not None and decoder_path is not None, (
-    #     "Must specify paths for the encoder/decoder models.")
     vae = VAE(**kwargs)
-    if encoder_path and decoder_path:
+    if encoder_path:
         vae.encoder.load_weights(encoder_path)
+    if decoder_path:
         vae.decoder.load_weights(decoder_path)
+
     if include_decoder:
-        # preprocessor = vae.get_encoder_decoder(trainable=trainable, name=name)
         preprocessor = vae
     else:
         preprocessor = vae.get_encoder(trainable=trainable, name=name)
@@ -28,9 +40,10 @@ def get_vae_preprocessor(name='vae_preprocessor',
 
 def get_state_estimator_preprocessor(
         name='state_estimator_preprocessor',
-        state_estimator_path='/home/justinvyu/dev/softlearning-vice/softlearning/models/state_estimator_model_random_data_50_epochs.h5',
+        state_estimator_path=None,
         **kwargs
     ):
+    assert state_estimator_path, 'Need to specify a model path'
     from softlearning.models.state_estimation import state_estimator_model
     preprocessor = state_estimator_model(**kwargs)
 
@@ -75,6 +88,7 @@ PREPROCESSOR_FUNCTIONS = {
     'FeedforwardPreprocessor': get_feedforward_preprocessor,
     'StateEstimatorPreprocessor': get_state_estimator_preprocessor,
     'VAEPreprocessor': get_vae_preprocessor,
+    'OnlineVAEPreprocessor': get_online_vae_preprocessor,
     'ReplicationPreprocessor': get_replication_preprocessor,
     'RandomNNPreprocessor': get_random_nn_preprocessor,
     'RandomMatrixPreprocessor': get_random_matrix_preprocessor,

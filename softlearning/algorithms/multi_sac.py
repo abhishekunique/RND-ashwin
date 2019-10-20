@@ -5,14 +5,17 @@ from numbers import Number
 import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
+import skimage
 
 from softlearning.models.utils import flatten_input_structure
 from .sac import SAC
 from softlearning.samplers import rollouts
 import math
 from softlearning.misc.utils import save_video
-tfd = tfp.distributions
 from flatten_dict import flatten
+
+tfd = tfp.distributions
+
 
 def td_target(reward, discount, next_value):
     return reward + discount * next_value
@@ -52,7 +55,6 @@ class MultiSAC(SAC):
             action_prior='uniform',
             reparameterize=False,
             her_iters=0,
-            goal_classifier_params_directory=None,
             save_full_state=False,
             save_eval_paths=False,
             per_alpha=1,
@@ -137,7 +139,6 @@ class MultiSAC(SAC):
 
         self._save_full_state = save_full_state
         self._save_eval_paths = save_eval_paths
-        self._goal_classifier_params_directory = goal_classifier_params_directory
 
         self._n_episodes_elapsed = 0
         self._num_grad_steps_taken_per_policy = [0 for _ in range(self._num_goals)]
@@ -163,23 +164,23 @@ class MultiSAC(SAC):
             # self._rnd_gamma = 1
             # self._running_int_rew_std = 1
 
+        if self._uses_vae:
+            self._n_vae_evals_per_epoch = 3
+
         self._build()
 
     def _build(self):
         super(SAC, self)._build()
-        if self._goal_classifier_params_directory:
-            self._load_goal_classifier(self._goal_classifier_params_directory)
-        else:
-            self._goal_classifier = None
-
         self._init_external_rewards()
         self._init_rnd_updates()
         self._init_actor_updates()
         self._init_critic_updates()
+        self._init_vae_updates()
         self._init_diagnostics_ops()
 
     def _init_external_rewards(self):
-        self._unscaled_ext_rewards = [self._placeholders['rewards'] for _ in range(self._num_goals)]
+        self._unscaled_ext_rewards = [
+            self._placeholders['rewards'] for _ in range(self._num_goals)]
 
     def _get_Q_targets(self):
         Q_targets = []
@@ -190,7 +191,11 @@ class MultiSAC(SAC):
             for i in range(self._num_goals)
         })
 
-        self._unscaled_int_rewards, self._int_rewards, self._normalized_ext_rewards, self._ext_rewards, self._total_rewards = [], [], [], [], []
+        (self._unscaled_int_rewards,
+         self._int_rewards,
+         self._normalized_ext_rewards,
+         self._ext_rewards,
+         self._total_rewards) = [], [], [], [], []
 
         for i, policy in enumerate(self._policies):
             policy_inputs = flatten_input_structure({
@@ -238,6 +243,93 @@ class MultiSAC(SAC):
             Q_targets.append(tf.stop_gradient(Q_target))
 
         return Q_targets
+
+    @property
+    def _uses_vae(self):
+        if self._policies and 'pixels' in self._policies[0].preprocessors:
+            preprocessor = self._policies[0].preprocessors['pixels']
+            return preprocessor.__class__.__name__ == 'OnlineVAEPreprocessor'
+        return False
+
+    def _init_vae_updates(self):
+        """
+        Initializes VAE optimization update
+        Creates a `tf.optimizer.minimize` operation, appends to `self._training_ops`.
+        """
+        # Need to loop through all the VAEs for Qs (2 per policy), and the VAEs for
+        # the policies
+        if not self._uses_vae:
+            return
+
+        from softlearning.models.vae import log_normal_pdf
+        vae_log_dir = os.path.join(os.getcwd(), 'vae')
+        if not os.path.exists(vae_log_dir):
+            os.makedirs(vae_log_dir)
+
+        self._vae_optimizers_per_policy = []
+        # The metrics will be used in `get_diagnostics` below
+        self._vae_metrics_per_policy = []
+        self._preprocessors_per_policy = []
+
+        for i in range(self._num_goals):
+            vae_metrics = {
+                'elbo': {},
+                'reconstruction_loss': {},
+                'kl_divergence': {},
+            }
+            if self._ext_reward_coeffs[i] != 0:
+                # Only add update operations attached to preprocessors that are used
+                # w.r.t the extrinsic reward
+                policy_preprocessor = self._policies[i].preprocessors['pixels']
+                Qs = self._Qs_per_policy[i]
+                Q_preprocessor = Qs[0].observations_preprocessors['pixels']
+                assert Q_preprocessor is Qs[1].observations_preprocessors['pixels'], (
+                    'Preprocessors on the critics must be the same object.'
+                )
+                preprocessors = (
+                    (f'policy_{i}', policy_preprocessor),
+                    (f'Q_{i}', Q_preprocessor),
+                )
+                self._preprocessors_per_policy.append(preprocessors)
+
+                for (name, preprocessor) in preprocessors:
+                    vae = preprocessor.vae
+
+                    images = self._placeholders['observations']['pixels']
+                    reconstructions = vae(images)
+
+                    cross_ent = tf.nn.sigmoid_cross_entropy_with_logits(
+                        logits=reconstructions,
+                        labels=tf.image.convert_image_dtype(images, tf.float32)
+                    )
+                    z_mean, z_log_var, z = vae.encoder(images)
+                    logpz = log_normal_pdf(z, 0., 0.)
+                    logqz_x = log_normal_pdf(z, z_mean, z_log_var)
+
+                    reconstruction_loss = tf.reduce_sum(cross_ent, axis=[1, 2, 3])
+                    kl_divergence = logqz_x - logpz
+
+                    # ELBO = E(p(x|z)) - D_kl(q(z|x) || p(z)) * beta
+                    elbo = -reconstruction_loss - vae.beta * kl_divergence
+                    vae_metrics['elbo'][name] = tf.reduce_mean(elbo)
+                    vae_metrics['reconstruction_loss'][name] = tf.reduce_mean(
+                        reconstruction_loss)
+                    vae_metrics['kl_divergence'][name] = tf.reduce_mean(kl_divergence)
+
+                    vae_loss = -tf.reduce_mean(elbo)
+
+                    vae_optimizer = tf.train.AdamOptimizer(
+                        learning_rate=self._policy_lr,
+                        name=f'{name}_vae_optimizer')
+
+                    vae_train_op = vae_optimizer.minimize(
+                        loss=vae_loss,
+                        var_list=vae.trainable_variables
+                    )
+                    self._training_ops_per_policy[i].update({
+                        f'{name}_vae_train_op': vae_train_op})
+            # Add the metrics computed above
+            self._vae_metrics_per_policy.append(vae_metrics)
 
     def _init_critic_updates(self):
         """Create minimization operation for critics' Q-functions.
@@ -383,7 +475,10 @@ class MultiSAC(SAC):
             self._training_ops_per_policy[i].update({f'policy_train_op_{i}': policy_train_op})
 
     def _init_rnd_updates(self):
-        self._rnd_errors, self._rnd_losses, self._rnd_error_stds, self._rnd_optimizers = [], [], [], []
+        (self._rnd_errors,
+         self._rnd_losses,
+         self._rnd_error_stds,
+         self._rnd_optimizers) = [], [], [], []
         for i in range(self._num_goals):
             self._placeholders['reward'].update({
                 f'running_int_rew_std_{i}': tf.compat.v1.placeholder(
@@ -422,17 +517,32 @@ class MultiSAC(SAC):
         ]
 
         for i in range(self._num_goals):
+            # Only record the intrinsic/extrinsic reward diagnostics if
+            # the reward is actually used (i.e. the reward coeff is not 0)
             if self._rnd_int_rew_coeffs[i]:
                 diagnosables_per_goal[i][f'rnd_reward_{i}'] = self._int_rewards[i]
                 diagnosables_per_goal[i][f'rnd_error_{i}'] = self._rnd_errors[i]
-                diagnosables_per_goal[i][f'running_rnd_reward_std_{i}'] = self._placeholders['reward'][f'running_int_rew_std_{i}']
+                diagnosables_per_goal[i][f'running_rnd_reward_std_{i}'] = (
+                    self._placeholders['reward'][f'running_int_rew_std_{i}'])
+
             if self._ext_reward_coeffs[i]:
                 diagnosables_per_goal[i][f'ext_reward_{i}'] = self._ext_rewards[i]
-                diagnosables_per_goal[i][f'normalized_ext_reward_{i}'] = self._normalized_ext_rewards[i]
-                diagnosables_per_goal[i][f'unnormalized_ext_reward_{i}'] = self._unscaled_ext_rewards[i]
+                diagnosables_per_goal[i][f'normalized_ext_reward_{i}'] = (
+                    self._normalized_ext_rewards[i])
+                diagnosables_per_goal[i][f'unnormalized_ext_reward_{i}'] = (
+                    self._unscaled_ext_rewards[i])
 
-            diagnosables_per_goal[i][f'running_ext_reward_std_{i}'] = self._placeholders['reward'][f'running_ext_rew_std_{i}']
+            diagnosables_per_goal[i][f'running_ext_reward_std_{i}'] = (
+                self._placeholders['reward'][f'running_ext_rew_std_{i}'])
             diagnosables_per_goal[i][f'total_reward_{i}'] = self._total_rewards[i]
+
+        if self._uses_vae:
+            for i in range(self._num_goals):
+                vae_metrics = self._vae_metrics_per_policy[i]
+                for metric, logs in vae_metrics.items():
+                    for name, log in logs.items():
+                        diagnostic_key = f'vae/{name}/{metric}'
+                        diagnosables_per_goal[i][diagnostic_key] = log
 
         diagnostic_metrics = OrderedDict((
             ('mean', tf.reduce_mean),
@@ -552,8 +662,47 @@ class MultiSAC(SAC):
             ]))
         self._goal_index = goal_index
 
-        if self._goal_classifier:
-            diagnostics.update({'goal_classifier/avg_reward': np.mean(feed_dict[self._rewards_ph])})
+        if self._uses_vae:
+            random_idxs = np.random.choice(
+                feed_dict[self._placeholders['observations']['pixels']].shape[0],
+                size=self._n_vae_evals_per_epoch)
+            eval_pixels = (
+                feed_dict[self._placeholders['observations']['pixels']][random_idxs])
+
+            for i, preprocessors in enumerate(self._preprocessors_per_policy):
+                if self._ext_reward_coeffs[i] == 0:
+                    continue
+
+                for name, preprocessor in preprocessors:
+                    vae = preprocessor.vae
+
+                    reconstructions = self._session.run(
+                        tf.math.sigmoid(vae(eval_pixels)))
+                    concat = np.concatenate([
+                        eval_pixels,
+                        skimage.util.img_as_ubyte(reconstructions)
+                    ], axis=2)
+
+                    sampled_z = np.random.normal(
+                        size=(self._n_vae_evals_per_epoch, vae.latent_dim))
+                    decoded_samples = self._session.run(
+                        tf.math.sigmoid(vae.decoder.output),
+                        feed_dict={vae.decoder.input: sampled_z}
+                    )
+
+                    save_path = os.path.join(os.getcwd(), 'vae')
+                    recon_concat = np.vstack(concat)
+                    skimage.io.imsave(
+                        os.path.join(
+                            save_path,
+                            f'{name}_reconstruction_{iteration}.png'),
+                        recon_concat)
+                    samples_concat = np.vstack(decoded_samples)
+                    skimage.io.imsave(
+                        os.path.join(
+                            save_path,
+                            f'{name}_sample_{iteration}.png'),
+                        samples_concat)
 
         if self._save_eval_paths:
             import pickle
@@ -579,9 +728,13 @@ class MultiSAC(SAC):
             },
         }
 
-        Q_optimizer_saveables = [{f'Q_optimizer_{i}_{j}': Q_optimizer
-                                  for j, Q_optimizer in enumerate(Q_optimizers)}
-                                 for i, Q_optimizers in enumerate(self._Q_optimizers_per_policy)]
+        Q_optimizer_saveables = [
+            {
+                f'Q_optimizer_{i}_{j}': Q_optimizer
+                for j, Q_optimizer in enumerate(Q_optimizers)
+            }
+            for i, Q_optimizers in enumerate(self._Q_optimizers_per_policy)
+        ]
 
         for Q_opt_dict in Q_optimizer_saveables:
             saveables.update(Q_opt_dict)
@@ -593,7 +746,8 @@ class MultiSAC(SAC):
 
     def _initial_exploration_hook(self, env, initial_exploration_policy, goal_index):
         print("start random exploration")
-        if self._n_initial_exploration_steps < 1: return
+        if self._n_initial_exploration_steps < 1:
+            return
 
         if not initial_exploration_policy:
             raise ValueError(
@@ -682,8 +836,7 @@ class MultiSAC(SAC):
                 samples_now = sum([self._samplers[i]._total_samples for i in range(self._num_goals)])
                 self._timestep = samples_now - start_samples
 
-                if (samples_now >= start_samples + self._epoch_length
-                    and self.ready_to_train):
+                if samples_now >= start_samples + self._epoch_length and self.ready_to_train:
                     break
 
                 t0 = time.time()
@@ -827,7 +980,8 @@ class MultiSAC(SAC):
         return paths_per_policy
 
     def _evaluation_paths(self):
-        if self._eval_n_episodes < 1: return ()
+        if self._eval_n_episodes < 1:
+            return ()
 
         should_save_video = (
             self._video_save_frequency > 0

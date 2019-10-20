@@ -10,6 +10,8 @@ import numpy as np
 PROJECT_PATH = os.path.dirname(
     os.path.realpath(os.path.join(__file__, '..', '..')))
 
+import getpass
+NFS_PATH = os.path.join('/nfs/kun1/users', getpass.getuser())
 
 DEFAULT_SNAPSHOT_MODE = 'none'
 DEFAULT_SNAPSHOT_GAP = 1000

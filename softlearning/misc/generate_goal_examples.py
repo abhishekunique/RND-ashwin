@@ -4,8 +4,8 @@ from softlearning.environments.utils import get_environment_from_params
 import pickle
 import os
 
-goal_directory = os.path.abspath(
-        os.path.join(os.path.dirname( __file__ ), '..', '..')) + '/goal_classifier/'
+from softlearning.misc.utils import PROJECT_PATH
+goal_directory = os.path.join(PROJECT_PATH, 'goal_classifier')
 print(goal_directory)
 
 PICK_TASKS = [
@@ -34,6 +34,7 @@ GOAL_IMAGE_PATH_PER_ENVIRONMENT = {
     'TurnFixed-v0': 'fixed_screw_180_no_normalization/',
     'TurnMultiGoalResetFree-v0': 'fixed_screw_2_goals_mixed_pool_goal_index/',
     'LiftDDResetFree-v0': 'dodecahedron_lifting_flat_bowl_arena_red',
+    'SlideBeadsResetFree-v0': '4_beads_475',
 }
 
 

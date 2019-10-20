@@ -198,7 +198,8 @@ class MultiSACClassifier(MultiSAC):
                         feed_dict = self._get_classifier_feed_dict(i)
                         losses_per_classifier[i].append(
                             self._train_classifier_step(i, feed_dict))
-        self._training_losses_per_classifier = [np.concatenate(loss, axis=-1) if loss else np.array([]) for loss in losses_per_classifier]
+        self._training_losses_per_classifier = [
+            np.concatenate(loss, axis=-1) if loss else np.array([]) for loss in losses_per_classifier]
 
     def _train_classifier_step(self, i, feed_dict):
         # Train classifier i on feed_dict
@@ -216,7 +217,7 @@ class MultiSACClassifier(MultiSAC):
             iteration, batches, training_paths_per_policy, evaluation_paths_per_policy)
 
         for goal_index in range(self._num_goals):
-            if self._ext_reward_coeffs[goal_index]: # only generate diagnostic if classifier is used
+            if self._ext_reward_coeffs[goal_index]:
                 sample_obs = batches[goal_index]['observations']
                 n_sample_obs = sample_obs[next(iter(sample_obs))].shape[0]
 
@@ -238,7 +239,8 @@ class MultiSACClassifier(MultiSAC):
                 }
 
                 rewards, classifier_losses = self._session.run(
-                    (self._unscaled_ext_rewards[goal_index], self._classifier_losses_t[goal_index]),
+                    (self._unscaled_ext_rewards[goal_index],
+                     self._classifier_losses_t[goal_index]),
                     feed_dict={
                         **{
                             self._placeholders[

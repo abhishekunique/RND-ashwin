@@ -31,6 +31,7 @@ def state_estimator_model(input_shape,
                           num_hidden_units=256,
                           num_hidden_layers=2,
                           output_size=4, # (x, y, z_cos, z_sin)
+                          kernel_regularizer=None,
                           preprocessor_params=None,
                           preprocessor=None,
                           name='state_estimator_preprocessor'):
