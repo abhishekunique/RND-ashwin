@@ -32,7 +32,7 @@ GAUSSIAN_POLICY_PARAMS_BASE = {
 
 ALGORITHM_PARAMS_BASE = {
     'kwargs': {
-        'epoch_length': 1000, #50,
+        'epoch_length': 1000,
         'train_every_n_steps': 1,
         'n_train_repeat': 1, #tune.grid_search([1, 2, 5, 10]),
         'eval_n_episodes': 3, # num of eval rollouts
@@ -65,9 +65,10 @@ ALGORITHM_PARAMS_ADDITIONAL = {
             # === TO TRAIN ON RND REWARD ONLY ===
             'ext_reward_coeff': 1,
             # === DONT DO EVAL EPISODES FOR DATA COLLECTION ===
-            'eval_n_episodes': 3,
+            'eval_n_episodes': 10,
             'rnd_int_rew_coeff': tune.sample_from([1]), # 1
             'normalize_ext_reward_gamma': 0.99,
+            'online_vae': True, # False --> train at the end of each epoch
         },
         'rnd_params': {
             'convnet_params': {
@@ -1578,6 +1579,8 @@ PIXELS_PREPROCESSOR_PARAMS = {
             'trainable': False,
         },
     },
+    # TODO: Merge OnlineVAEPreprocessor and VAEPreprocessor, just don't update
+    # in SAC if not online
     'OnlineVAEPreprocessor': {
         'type': 'OnlineVAEPreprocessor',
         'kwargs': {
@@ -1585,6 +1588,7 @@ PIXELS_PREPROCESSOR_PARAMS = {
             'latent_dim': 16,
             # 'latent_dim': 32,
             'beta': 0.5,
+            # 'beta': 1e-5,
             # Optionally specify a pretrained model to start finetuning
             # 'encoder_path': os.path.join(PROJECT_PATH,
             #                              'softlearning',
@@ -1596,6 +1600,13 @@ PIXELS_PREPROCESSOR_PARAMS = {
             #                              'models',
             #                              'free_screw_vae_32_dim',
             #                              'decoder_32_dim_0.5_beta_final.h5'),
+        }
+    },
+    'RAEPreprocessor': {
+        'type': 'RAEPreprocessor',
+        'kwargs': {
+            'image_shape': (32, 32, 3),
+            'latent_dim': 32,
         }
     },
     'ConvnetPreprocessor': tune.grid_search([

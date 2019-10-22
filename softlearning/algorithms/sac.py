@@ -13,8 +13,6 @@ from .rl_algorithm import RLAlgorithm
 from softlearning.replay_pools.prioritized_experience_replay_pool import (
     PrioritizedExperienceReplayPool
 )
-from softlearning.misc.utils import angle_distance
-from softlearning.models.state_estimation import normalize
 
 tfd = tfp.distributions
 
@@ -68,6 +66,10 @@ class SAC(RLAlgorithm):
             rnd_lr=1e-4,
             rnd_int_rew_coeff=0,
             rnd_gamma=0.99,
+
+            online_vae=True,
+            n_vae_train_steps=50,
+
             **kwargs,
     ):
         """
@@ -144,8 +146,8 @@ class SAC(RLAlgorithm):
         # VAE
         self._preprocessed_Q_inputs = self._Qs[0].preprocessed_inputs_fn
         self._n_vae_evals_per_epoch = 3
-        # self._n_vae_train_steps_per_epoch = 50
-        # self._online_vae = False
+        self._n_vae_train_steps_per_epoch = n_vae_train_steps
+        self._online_vae = online_vae
 
         self._normalize_ext_reward_gamma = normalize_ext_reward_gamma
         self._ext_reward_coeff = ext_reward_coeff
@@ -170,7 +172,10 @@ class SAC(RLAlgorithm):
             self._init_rnd_update()
         self._init_actor_update()
         self._init_critic_update()
-        self._init_vae_update()
+        if self._uses_vae:
+            self._init_vae_update()
+        elif self._uses_rae:
+            self._init_rae_update()
         self._init_diagnostics_ops()
 
     def _init_external_reward(self):
@@ -218,81 +223,144 @@ class SAC(RLAlgorithm):
 
     @property
     def _uses_vae(self):
+        # Variational Autoencoder (VAE)
         return (
             'pixels' in self._policy.preprocessors and
             self._policy.preprocessors['pixels'].__class__.__name__ == 'OnlineVAEPreprocessor')
+
+    @property
+    def _uses_rae(self):
+        # Regularized Autoencoder (RAE)
+        return (
+            'pixels' in self._policy.preprocessors and
+            self._policy.preprocessors['pixels'].__class__.__name__ == 'RAEPreprocessor')
 
     def _init_vae_update(self):
         """
         Initializes VAE optimization update
         Creates a `tf.optimizer.minimize` operation, appends to `self._training_ops`.
         """
-        if self._uses_vae:
-            vae_log_dir = os.path.join(os.getcwd(), 'vae')
-            if not os.path.exists(vae_log_dir):
-                os.makedirs(vae_log_dir)
+        vae_log_dir = os.path.join(os.getcwd(), 'vae')
+        if not os.path.exists(vae_log_dir):
+            os.makedirs(vae_log_dir)
 
-            from softlearning.models.vae import log_normal_pdf
-            self._vae_reconstruction_losses = {}
-            self._vae_kl_losses = {}
-            self._vae_losses = {}
-            self._initial_vae_train_ops = []
+        self._vae_reconstruction_losses = {}
+        self._vae_kl_losses = {}
+        self._vae_elbos = {}
+        self._vae_latent_l2 = {}
+        self._vae_latent_mean = {}
+        self._vae_latent_logvar = {}
+        self._initial_vae_train_ops = []
 
-            policy_vae_preprocessor = self._policy.preprocessors['pixels']
-            Q_vae_preprocessor = self._Qs[0].observations_preprocessors['pixels']
-            assert Q_vae_preprocessor is self._Qs[1].observations_preprocessors['pixels'], (
-                'Preprocessors on the Qs must be the same object.'
+        policy_vae_preprocessor = self._policy.preprocessors['pixels']
+        Q_vae_preprocessor = self._Qs[0].observations_preprocessors['pixels']
+        assert Q_vae_preprocessor is self._Qs[1].observations_preprocessors['pixels'], (
+            'Preprocessors on the Qs must be the same object.'
+        )
+
+        preprocessors = (('policy', policy_vae_preprocessor),
+                         ('Q', Q_vae_preprocessor))
+        for (name, preprocessor) in preprocessors:
+            vae = preprocessor.vae
+
+            images = self._placeholders['observations']['pixels']
+            reconstructions = vae(images)
+
+            cross_ent = tf.nn.sigmoid_cross_entropy_with_logits(
+                logits=reconstructions,
+                labels=tf.image.convert_image_dtype(images, tf.float32)
             )
+            z_mean, z_log_var, z = vae.encoder(images)
 
-            preprocessors = (('policy', policy_vae_preprocessor),
-                             ('Q', Q_vae_preprocessor))
-            for (name, preprocessor) in preprocessors:
-                vae = preprocessor.vae
+            reconstruction_loss = tf.reduce_sum(cross_ent, axis=[1, 2, 3])
+            kl_divergence = 1 + z_log_var - tf.square(z_mean) - tf.exp(z_log_var)
+            kl_divergence = -0.5 * tf.reduce_sum(kl_divergence, axis=-1)
 
-                images = self._placeholders['observations']['pixels']
-                reconstructions = vae(images)
+            # ELBO = E(p(x|z)) - D_kl(q(z|x) || p(z)) * beta
+            elbo = -reconstruction_loss - vae.beta * kl_divergence
+            vae_loss = -tf.reduce_mean(elbo)
 
-                cross_ent = tf.nn.sigmoid_cross_entropy_with_logits(
-                    logits=reconstructions,
-                    labels=tf.image.convert_image_dtype(images, tf.float32)
-                )
-                z_mean, z_log_var, z = vae.encoder(images)
-                logpz = log_normal_pdf(z, 0., 0.)
-                logqz_x = log_normal_pdf(z, z_mean, z_log_var)
+            # Log VAE metrics
+            self._vae_reconstruction_losses[name] = tf.reduce_mean(
+                reconstruction_loss)
+            self._vae_kl_losses[name] = tf.reduce_mean(kl_divergence)
+            self._vae_elbos[name] = tf.reduce_mean(elbo)
+            self._vae_latent_l2[name] = tf.reduce_mean(tf.norm(z, axis=-1))
+            self._vae_latent_mean[name] = tf.reduce_mean(z_mean)
+            self._vae_latent_logvar[name] = tf.reduce_mean(z_log_var)
 
-                reconstruction_loss = tf.reduce_sum(cross_ent, axis=[1, 2, 3])
-                # TODO: Calculate the KL analytically
-                kl_divergence = logqz_x - logpz
-                # kl_loss = 1 + z_log_var - tf.square(z_mean) - tf.exp(z_log_var)
-                # kl_loss = 1.5 * tf.reduce_sum(kl_loss, axis=-1)
-                # kl_loss = self._vae_kl_losses[name] = tf.reduce_mean(kl_loss)
+            vae_optimizer = tf.train.AdamOptimizer(
+                learning_rate=self._policy_lr,
+                name=f'{name}_vae_optimizer')
 
-                # ELBO = E(p(x|z)) - D_kl(q(z|x) || p(z)) * beta
-                elbo = -reconstruction_loss - vae.beta * kl_divergence
-                self._vae_reconstruction_losses[name] = tf.reduce_mean(
-                    reconstruction_loss)
-                self._vae_kl_losses[name] = tf.reduce_mean(kl_divergence)
-                vae_loss = -tf.reduce_mean(elbo)
-                self._vae_losses[name] = tf.reduce_mean(elbo)
-
-                vae_optimizer = tf.train.AdamOptimizer(
-                    learning_rate=self._policy_lr,
-                    name=f'{name}_vae_optimizer')
-
-                # initial_vae_train_op = tf.contrib.layers.optimize_loss(
-                #     loss=vae_loss,
-                #     global_step=self.global_step,
-                #     learning_rate=self._policy_lr,
-                #     optimizer=vae_optimizer,
-                #     variables=vae.trainable_variables,
-                #     increment_global_step=False,
-                # )
-                vae_train_op = vae_optimizer.minimize(
-                    loss=vae_loss,
-                    var_list=vae.trainable_variables
-                )
-                # self._initial_vae_train_ops.append(initial_vae_train_op)
+            initial_vae_train_op = tf.contrib.layers.optimize_loss(
+                loss=vae_loss,
+                global_step=self.global_step,
+                learning_rate=self._policy_lr,
+                optimizer=vae_optimizer,
+                variables=vae.trainable_variables,
+                increment_global_step=False,
+            )
+            vae_train_op = vae_optimizer.minimize(
+                loss=vae_loss,
+                var_list=vae.trainable_variables
+            )
+            if self._online_vae:
                 self._training_ops.update({f'{name}_vae_train_op': vae_train_op})
+            else:
+                self._initial_vae_train_ops.append(initial_vae_train_op)
+
+    def _init_rae_update(self):
+        """
+        Initializes RAE optimization update
+        Creates a `tf.optimizer.minimize` operation, appends to `self._training_ops`.
+        """
+        assert self._uses_rae
+        rae_log_dir = os.path.join(os.getcwd(), 'rae')
+        if not os.path.exists(rae_log_dir):
+            os.makedirs(rae_log_dir)
+
+        self._rae_reconstruction_losses = {}
+        self._rae_latent_l2 = {}
+
+        policy_preprocessor = self._policy.preprocessors['pixels']
+        # TODO: Do some check to see if the policy AE is the same as the Q
+        Q_preprocessor = self._Qs[0].observations_preprocessors['pixels']
+        assert Q_preprocessor is self._Qs[1].observations_preprocessors['pixels'], (
+            'Preprocessors on the Qs must be the same object.'
+        )
+
+        preprocessors = (('policy', policy_preprocessor),
+                         ('Q', Q_preprocessor))
+        for (name, preprocessor) in preprocessors:
+            rae = preprocessor.rae
+
+            images = self._placeholders['observations']['pixels']
+            z = rae.encoder(images)
+            reconstructions = rae.decoder(z)
+
+            # L_RAE = ||true - reconstructions||^2 + ||z||^2 + ||theta||^2
+            # Sum over individual pixel MSE over the entire image
+            reconstruction_loss = tf.reduce_mean(tf.reduce_sum(
+                tf.square(
+                    tf.image.convert_image_dtype(images, tf.float32) - reconstructions
+                ), axis=[1, 2, 3]))
+            latent_l2_norm_loss = tf.reduce_mean(tf.reduce_sum(tf.square(z), axis=-1))
+            # latent_l2_norm_loss = tf.reduce_mean(tf.norm(z, axis=-1))
+            rae_loss = reconstruction_loss + latent_l2_norm_loss
+
+            self._rae_reconstruction_losses[name] = reconstruction_loss
+            self._rae_latent_l2[name] = latent_l2_norm_loss
+
+            rae_optimizer = tf.train.AdamOptimizer(
+                learning_rate=self._policy_lr,  # TODO: Should this be its own parameter?
+                name=f'{name}_rae_optimizer')
+
+            rae_train_op = rae_optimizer.minimize(
+                loss=rae_loss,
+                var_list=rae.trainable_variables
+            )
+            self._training_ops.update({f'{name}_rae_train_op': rae_train_op})
 
     def _init_critic_update(self):
         """Create minimization operation for critic Q-function.
@@ -489,7 +557,30 @@ class SAC(RLAlgorithm):
                 },
                 **{
                     f"vae/{key}-elbo": value
-                    for key, value in self._vae_losses.items()
+                    for key, value in self._vae_elbos.items()
+                },
+                **{
+                    f"vae/{key}-latent_l2_norm": value
+                    for key, value in self._vae_latent_l2.items()
+                },
+                **{
+                    f"vae/{key}-latent_mean": value
+                    for key, value in self._vae_latent_mean.items()
+                },
+                **{
+                    f"vae/{key}-latent_logvar": value
+                    for key, value in self._vae_latent_logvar.items()
+                },
+            })
+        elif self._uses_rae:
+            self._diagnostics_ops.update({
+                **{
+                    f"rae/{key}-reconstruction_loss": value
+                    for key, value in self._rae_reconstruction_losses.items()
+                },
+                **{
+                    f"rae/{key}-latent_l2_norm": value
+                    for key, value in self._rae_latent_l2.items()
                 },
             })
 
@@ -571,14 +662,14 @@ class SAC(RLAlgorithm):
         super()._epoch_before_hook(*args, **kwargs)
         # TODO: Create an option for doing training before/after each
         # epoch rather than completely online.
-        # vae_dataset = self._training_batch(25000)
-        # feed_dict = self._get_feed_dict(0, vae_dataset)
-        # if not self._online_vae:
-        #     for i in range(self._n_vae_train_steps_per_epoch):
-        #         for training_op in self._initial_vae_train_ops:
-        #             self._session.run(
-        #                 training_op,
-        #                 feed_dict=feed_dict)
+        if not self._online_vae:
+            for i in range(self._n_vae_train_steps_per_epoch):
+                vae_dataset = self._training_batch(5000)
+                feed_dict = self._get_feed_dict(0, vae_dataset)
+                for training_op in self._initial_vae_train_ops:
+                    self._session.run(
+                        training_op,
+                        feed_dict=feed_dict)
 
     def _get_feed_dict(self, iteration, batch):
         """Construct a TensorFlow feed dictionary from a sample batch."""
@@ -656,15 +747,6 @@ class SAC(RLAlgorithm):
             eval_pixels = (
                 feed_dict[self._placeholders['observations']['pixels']][random_idxs])
             for name, vae in preprocessor_vaes.items():
-                # TODO: find out why this stuff doesn't work
-                # eval_encoded = self._session.run(
-                #     policy_vae.encoder.output,
-                #     feed_dict={policy_vae.encoder.input: eval_pixels}
-                # )
-                # reconstructions = self._session.run(
-                #     tf.math.sigmoid(policy_vae.decoder.output),
-                #     feed_dict={policy_vae.decoder.input: eval_encoded}
-                # )
                 reconstructions = self._session.run(
                     tf.math.sigmoid(vae(eval_pixels)))
 
@@ -692,6 +774,30 @@ class SAC(RLAlgorithm):
                         save_path,
                         f'{name}_sample_{iteration}.png'),
                     samples_concat)
+        elif self._uses_rae:
+            preprocessor_raes = {
+                'policy': self._policy.preprocessors['pixels'].rae,
+                'Q': self._Qs[0].observations_preprocessors['pixels'].rae
+            }
+            n_evals = 3
+            random_idxs = np.random.choice(
+                feed_dict[self._placeholders['observations']['pixels']].shape[0],
+                size=n_evals)
+            eval_pixels = (
+                feed_dict[self._placeholders['observations']['pixels']][random_idxs])
+            for name, rae in preprocessor_raes.items():
+                reconstructions = self._session.run(rae(eval_pixels))
+                concat = np.concatenate([
+                    eval_pixels,
+                    skimage.util.img_as_ubyte(reconstructions)
+                ], axis=2)
+                save_path = os.path.join(os.getcwd(), 'rae')
+                recon_concat = np.vstack(concat)
+                skimage.io.imsave(
+                    os.path.join(
+                        save_path,
+                        f'{name}_reconstruction_{iteration}.png'),
+                    recon_concat)
 
         # # State estimator diagnostics
         # if 'pixels' in self._policy.preprocessors and \

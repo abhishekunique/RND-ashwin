@@ -19,6 +19,18 @@ def get_online_vae_preprocessor(image_shape,
         vae_preprocessor.vae.decoder.load_weights(decoder_path)
     return vae_preprocessor
 
+def get_rae_preprocessor(image_shape,
+                         encoder_path=None,
+                         decoder_path=None,
+                         name='rae_preprocessor',
+                         **kwargs):
+    from softlearning.preprocessors.rae_preprocessor import RAEPreprocessor
+    vae_preprocessor = RAEPreprocessor(image_shape, **kwargs)
+    if encoder_path and decoder_path:
+        vae_preprocessor.vae.encoder.load_weights(encoder_path)
+        vae_preprocessor.vae.decoder.load_weights(decoder_path)
+    return vae_preprocessor
+
 def get_vae_preprocessor(name='vae_preprocessor',
                          encoder_path=None,
                          decoder_path=None,
@@ -89,6 +101,7 @@ PREPROCESSOR_FUNCTIONS = {
     'StateEstimatorPreprocessor': get_state_estimator_preprocessor,
     'VAEPreprocessor': get_vae_preprocessor,
     'OnlineVAEPreprocessor': get_online_vae_preprocessor,
+    'RAEPreprocessor': get_rae_preprocessor,
     'ReplicationPreprocessor': get_replication_preprocessor,
     'RandomNNPreprocessor': get_random_nn_preprocessor,
     'RandomMatrixPreprocessor': get_random_matrix_preprocessor,
