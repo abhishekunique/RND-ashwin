@@ -80,7 +80,7 @@ psutil==5.4.8
 ray[rllib,debug]==0.7.1
 redis==3.0.1
 requests==2.20.1
-robosuite==0.1.0
+# robosuite==0.1.0
 rsa==3.4.2
 ruamel-yaml==0.15.46
 s3transfer==0.2.0
@@ -93,10 +93,7 @@ setproctitle==1.1.10
 six==1.11.0
 smmap2==2.0.5
 tensorboard==1.14.0
-# tensorflow-gpu==1.14.0
-tf-nightly-gpu==1.15.0.dev20190821
-tf-estimator-nightly==1.14.0.dev2019082101
-# tensorflow==1.14.0
+tensorflow==1.15rc2
 tensorflow-probability==0.7.0
 termcolor==1.1.0
 toolz==0.9.0
