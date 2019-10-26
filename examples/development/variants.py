@@ -69,6 +69,7 @@ ALGORITHM_PARAMS_ADDITIONAL = {
             'rnd_int_rew_coeff': tune.sample_from([1]), # 1
             'normalize_ext_reward_gamma': 0.99,
             'online_vae': True, # False --> train at the end of each epoch
+            'verbose': True,
         },
         'rnd_params': {
             'convnet_params': {
@@ -1607,7 +1608,8 @@ PIXELS_PREPROCESSOR_PARAMS = {
         'kwargs': {
             'image_shape': (32, 32, 3),
             'latent_dim': 32,
-        }
+        },
+        'shared': True,
     },
     'ConvnetPreprocessor': tune.grid_search([
         {

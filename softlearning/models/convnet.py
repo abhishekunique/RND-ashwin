@@ -256,11 +256,14 @@ def convnet_transpose_model(
     model = PicklableSequential([
         tfkl.Dense(
             units=np.product(base_shape),
-            activation=(layers.Activation(activation)
-                        if isinstance(activation, str)
-                        else activation()),
+            # activation=(layers.Activation(activation)
+            #             if isinstance(activation, str)
+            #             else activation()),
             kernel_regularizer=kernel_regularizer
         ),
+        (layers.Activation(activation)
+         if isinstance(activation, str)
+         else activation()),
         tfkl.Reshape(target_shape=base_shape),
         *[
             conv_transpose_block(

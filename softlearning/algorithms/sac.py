@@ -329,15 +329,14 @@ class SAC(RLAlgorithm):
         assert Q_preprocessor is self._Qs[1].observations_preprocessors['pixels'], (
             'Preprocessors on the Qs must be the same object.'
         )
-
-        preprocessors = (('policy', policy_preprocessor),
-                         ('Q', Q_preprocessor))
-        for (name, preprocessor) in preprocessors:
-            rae = preprocessor.rae
-
+        preprocessors = self._preprocessors = (
+            {'policy': policy_preprocessor, 'Q': Q_preprocessor}
+            if policy_preprocessor is not Q_preprocessor
+            else {'shared': policy_preprocessor}
+        )
+        for name, rae in preprocessors.items():
             images = self._placeholders['observations']['pixels']
-            z = rae.encoder(images)
-            reconstructions = rae.decoder(z)
+            z, reconstructions = rae(images, include_reconstructions=True)
 
             # L_RAE = ||true - reconstructions||^2 + ||z||^2 + ||theta||^2
             # Sum over individual pixel MSE over the entire image
@@ -361,6 +360,9 @@ class SAC(RLAlgorithm):
                 var_list=rae.trainable_variables
             )
             self._training_ops.update({f'{name}_rae_train_op': rae_train_op})
+
+        # for name, preprocessor in preprocessors.items():
+        #     rae = preprocessor.rae
 
     def _init_critic_update(self):
         """Create minimization operation for critic Q-function.
@@ -662,7 +664,7 @@ class SAC(RLAlgorithm):
         super()._epoch_before_hook(*args, **kwargs)
         # TODO: Create an option for doing training before/after each
         # epoch rather than completely online.
-        if not self._online_vae:
+        if hasattr(self, '_online_vae') and not self._online_vae:
             for i in range(self._n_vae_train_steps_per_epoch):
                 vae_dataset = self._training_batch(5000)
                 feed_dict = self._get_feed_dict(0, vae_dataset)
@@ -737,9 +739,13 @@ class SAC(RLAlgorithm):
 
         # VAE diagnostics
         if self._uses_vae:
+            # preprocessor_vaes = {
+            #     'policy': self._policy.preprocessors['pixels'].vae,
+            #     'Q': self._Qs[0].observations_preprocessors['pixels'].vae
+            # }
             preprocessor_vaes = {
-                'policy': self._policy.preprocessors['pixels'].vae,
-                'Q': self._Qs[0].observations_preprocessors['pixels'].vae
+                name: preprocessor.vae
+                for name, preprocessor in self._preprocessors.items()
             }
             random_idxs = np.random.choice(
                 feed_dict[self._placeholders['observations']['pixels']].shape[0],
@@ -775,10 +781,11 @@ class SAC(RLAlgorithm):
                         f'{name}_sample_{iteration}.png'),
                     samples_concat)
         elif self._uses_rae:
-            preprocessor_raes = {
-                'policy': self._policy.preprocessors['pixels'].rae,
-                'Q': self._Qs[0].observations_preprocessors['pixels'].rae
-            }
+            # preprocessor_raes = {
+            #     name: preprocessor.rae
+            #     for name, preprocessor in self._preprocessors.items()
+            # }
+            preprocessor_raes = self._preprocessors
             n_evals = 3
             random_idxs = np.random.choice(
                 feed_dict[self._placeholders['observations']['pixels']].shape[0],
@@ -786,7 +793,8 @@ class SAC(RLAlgorithm):
             eval_pixels = (
                 feed_dict[self._placeholders['observations']['pixels']][random_idxs])
             for name, rae in preprocessor_raes.items():
-                reconstructions = self._session.run(rae(eval_pixels))
+                z, reconstructions = self._session.run(
+                    rae(eval_pixels, include_reconstructions=True))
                 concat = np.concatenate([
                     eval_pixels,
                     skimage.util.img_as_ubyte(reconstructions)

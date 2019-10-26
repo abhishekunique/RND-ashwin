@@ -25,11 +25,10 @@ def get_rae_preprocessor(image_shape,
                          name='rae_preprocessor',
                          **kwargs):
     from softlearning.preprocessors.rae_preprocessor import RAEPreprocessor
-    vae_preprocessor = RAEPreprocessor(image_shape, **kwargs)
-    if encoder_path and decoder_path:
-        vae_preprocessor.vae.encoder.load_weights(encoder_path)
-        vae_preprocessor.vae.decoder.load_weights(decoder_path)
-    return vae_preprocessor
+    rae_preprocessor = RAEPreprocessor(image_shape, **kwargs)
+    # from softlearning.preprocessors.rae_preprocessor import create_rae
+    # rae_preprocessor = create_rae(image_shape, **kwargs)
+    return rae_preprocessor
 
 def get_vae_preprocessor(name='vae_preprocessor',
                          encoder_path=None,
@@ -105,7 +104,7 @@ PREPROCESSOR_FUNCTIONS = {
     'ReplicationPreprocessor': get_replication_preprocessor,
     'RandomNNPreprocessor': get_random_nn_preprocessor,
     'RandomMatrixPreprocessor': get_random_matrix_preprocessor,
-    None: lambda *args, **kwargs: None
+    'None': lambda *args, **kwargs: None
 }
 
 def get_preprocessor_from_params(env, preprocessor_params, *args, **kwargs):

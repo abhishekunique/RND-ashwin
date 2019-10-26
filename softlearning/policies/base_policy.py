@@ -95,7 +95,11 @@ class BasePolicy(Serializable):
         preprocessors_state = state.pop('preprocessors_state')
         preprocessors = nest.map_structure(
             lambda config: (
-                PicklableSequential.from_config(config.config)
+                (
+                    PicklableSequential.from_config(config.config)
+                    if not isinstance(config.config, dict) and 'cls' not in config.config
+                    else config.config['cls'].from_config(config.config)
+                )
                 if config is not None
                 else None
             ),
