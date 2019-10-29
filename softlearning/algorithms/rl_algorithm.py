@@ -46,6 +46,7 @@ class RLAlgorithm(Checkpointable):
             session=None,
             n_training_videos_to_save=None,
             random_epoch_freq=0,
+            verbose=False,
     ):
         """
         Args:
@@ -74,6 +75,7 @@ class RLAlgorithm(Checkpointable):
         self._epoch_length = epoch_length
         self._n_initial_exploration_steps = n_initial_exploration_steps
         self._initial_exploration_policy = initial_exploration_policy
+        self._verbose = verbose
 
         # self._training_video_save_frequency = training_video_save_frequency
         # self._n_training_videos_to_save = n_training_videos_to_save
@@ -177,6 +179,9 @@ class RLAlgorithm(Checkpointable):
     def _initial_exploration_hook(self, env, initial_exploration_policy, pool):
         if self._n_initial_exploration_steps < 1: return
 
+        if self._verbose:
+            print('Starting initial exploration hook:',
+                  f'{self._n_initial_exploration_steps}')
         if not initial_exploration_policy:
             raise ValueError(
                 "Initial exploration policy must be provided when"
@@ -204,6 +209,8 @@ class RLAlgorithm(Checkpointable):
 
     def _epoch_before_hook(self):
         """Hook called at the beginning of each epoch."""
+        if self._verbose:
+            print(f'Epoch before hook: {self._epoch}')
         self._train_steps_this_epoch = 0
         if self._random_epoch_freq and self._epoch % self._random_epoch_freq == 0:
             self.sampler.initialize(
@@ -214,6 +221,8 @@ class RLAlgorithm(Checkpointable):
 
     def _epoch_after_hook(self, *args, **kwargs):
         """Hook called at the end of each epoch."""
+        if self._verbose:
+            print(f'Epoch after hook: {self._epoch}')
         if self._random_epoch_freq and self._epoch % self._random_epoch_freq == 0:
             self.sampler.initialize(
                 self._training_environment,

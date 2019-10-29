@@ -166,6 +166,7 @@ class MultiSAC(SAC):
 
         if self._uses_vae:
             self._n_vae_evals_per_epoch = 3
+            self._online_vae = True
 
         self._build()
 
@@ -175,7 +176,10 @@ class MultiSAC(SAC):
         self._init_rnd_updates()
         self._init_actor_updates()
         self._init_critic_updates()
-        self._init_vae_updates()
+        if self._uses_vae:
+            self._init_vae_updates()
+        elif self._uses_rae:
+            self._init_rae_updates()
         self._init_diagnostics_ops()
 
     def _init_external_rewards(self):
@@ -251,6 +255,13 @@ class MultiSAC(SAC):
             return preprocessor.__class__.__name__ == 'OnlineVAEPreprocessor'
         return False
 
+    @property
+    def _uses_rae(self):
+        if self._policies and 'pixels' in self._policies[0].preprocessors:
+            preprocessor = self._policies[0].preprocessors['pixels']
+            return preprocessor.__class__.__name__ == 'RAEPreprocessor'
+        return False
+
     def _init_vae_updates(self):
         """
         Initializes VAE optimization update
@@ -273,6 +284,8 @@ class MultiSAC(SAC):
 
         for i in range(self._num_goals):
             vae_metrics = {
+                'latent_mean': {},
+                'latent_logvar': {},
                 'elbo': {},
                 'reconstruction_loss': {},
                 'kl_divergence': {},
@@ -311,6 +324,8 @@ class MultiSAC(SAC):
 
                     # ELBO = E(p(x|z)) - D_kl(q(z|x) || p(z)) * beta
                     elbo = -reconstruction_loss - vae.beta * kl_divergence
+                    # vae_metrics['latent_mean'] = tf.reduce_mean(z_mean)
+                    # vae_metrics['latent_logvar'] = tf.reduce_mean(z_log_var)
                     vae_metrics['elbo'][name] = tf.reduce_mean(elbo)
                     vae_metrics['reconstruction_loss'][name] = tf.reduce_mean(
                         reconstruction_loss)
@@ -330,6 +345,77 @@ class MultiSAC(SAC):
                         f'{name}_vae_train_op': vae_train_op})
             # Add the metrics computed above
             self._vae_metrics_per_policy.append(vae_metrics)
+
+    # TODO: Clean up these two updates, lots of redundancy
+    def _init_rae_updates(self):
+        """
+        Initializes RAE optimization update
+        Creates a `tf.optimizer.minimize` operation, appends to `self._training_ops`.
+        """
+        if not self._uses_rae:
+            return
+
+        rae_log_dir = os.path.join(os.getcwd(), 'rae')
+        if not os.path.exists(rae_log_dir):
+            os.makedirs(rae_log_dir)
+
+        self._rae_optimizers_per_policy = []
+        # The metrics will be used in `get_diagnostics` below
+        self._rae_metrics_per_policy = []
+        self._preprocessors_per_policy = []
+
+        for i in range(self._num_goals):
+            rae_metrics = {
+                'reconstruction_loss': {},
+                'latent_l2_norm': {},
+            }
+            if self._ext_reward_coeffs[i] != 0:
+                # Only add update operations attached to preprocessors that are used
+                # w.r.t the extrinsic reward
+                policy_preprocessor = self._policies[i].preprocessors['pixels']
+                Qs = self._Qs_per_policy[i]
+                Q_preprocessor = Qs[0].observations_preprocessors['pixels']
+                assert Q_preprocessor is Qs[1].observations_preprocessors['pixels'], (
+                    'Preprocessors on the critics must be the same object.'
+                )
+                preprocessors = (
+                    (f'policy_{i}', policy_preprocessor),
+                    (f'Q_{i}', Q_preprocessor),
+                )
+                self._preprocessors_per_policy.append(preprocessors)
+
+                for (name, preprocessor) in preprocessors:
+                    rae = preprocessor.rae
+
+                    images = self._placeholders['observations']['pixels']
+                    z = rae.encoder(images)
+                    reconstructions = rae.decoder(z)
+
+                    # L_RAE = ||true - reconstructions||^2 + ||z||^2 + ||theta||^2
+                    # Sum over individual pixel MSE over the entire image
+                    reconstruction_loss = tf.reduce_mean(tf.reduce_sum(
+                        tf.square(
+                            tf.image.convert_image_dtype(images, tf.float32) - reconstructions
+                        ), axis=[1, 2, 3]))
+                    latent_l2_norm_loss = tf.reduce_mean(tf.reduce_sum(tf.square(z), axis=-1))
+                    # latent_l2_norm_loss = tf.reduce_mean(tf.norm(z, axis=-1))
+                    rae_loss = reconstruction_loss + latent_l2_norm_loss
+
+                    rae_metrics['reconstruction_loss'][name] = reconstruction_loss
+                    rae_metrics['latent_l2_norm'][name] = latent_l2_norm_loss
+
+                    rae_optimizer = tf.train.AdamOptimizer(
+                        learning_rate=self._policy_lr,
+                        name=f'{name}_rae_optimizer')
+
+                    rae_train_op = rae_optimizer.minimize(
+                        loss=rae_loss,
+                        var_list=rae.trainable_variables
+                    )
+                    self._training_ops_per_policy[i].update({
+                        f'{name}_rae_train_op': rae_train_op})
+            # Add the metrics computed above
+            self._rae_metrics_per_policy.append(rae_metrics)
 
     def _init_critic_updates(self):
         """Create minimization operation for critics' Q-functions.
@@ -543,6 +629,13 @@ class MultiSAC(SAC):
                     for name, log in logs.items():
                         diagnostic_key = f'vae/{name}/{metric}'
                         diagnosables_per_goal[i][diagnostic_key] = log
+        elif self._uses_rae:
+            for i in range(self._num_goals):
+                rae_metrics = self._rae_metrics_per_policy[i]
+                for metric, logs in rae_metrics.items():
+                    for name, log in logs.items():
+                        diagnostic_key = f'rae/{name}/{metric}'
+                        diagnosables_per_goal[i][diagnostic_key] = log
 
         diagnostic_metrics = OrderedDict((
             ('mean', tf.reduce_mean),
@@ -577,6 +670,9 @@ class MultiSAC(SAC):
                 tau * source + (1.0 - tau) * target
                 for source, target in zip(source_params, target_params)
             ])
+
+    def _epoch_before_hook(self, *args, **kwargs):
+        super(SAC, self)._epoch_before_hook(*args, **kwargs)
 
     def _do_training(self, iteration, batch):
         """Runs the operations for updating training and target ops."""
@@ -703,6 +799,30 @@ class MultiSAC(SAC):
                             save_path,
                             f'{name}_sample_{iteration}.png'),
                         samples_concat)
+        elif self._uses_rae:
+            random_idxs = np.random.choice(
+                feed_dict[self._placeholders['observations']['pixels']].shape[0],
+                size=3)
+            eval_pixels = (
+                feed_dict[self._placeholders['observations']['pixels']][random_idxs])
+            for i, preprocessors in enumerate(self._preprocessors_per_policy):
+                if self._ext_reward_coeffs[i] == 0:
+                    continue
+                for name, preprocessor in preprocessors:
+                    rae = preprocessor.rae
+                    reconstructions = self._session.run(rae(eval_pixels))
+                    concat = np.concatenate([
+                        eval_pixels,
+                        skimage.util.img_as_ubyte(reconstructions)
+                    ], axis=2)
+
+                    save_path = os.path.join(os.getcwd(), 'rae')
+                    recon_concat = np.vstack(concat)
+                    skimage.io.imsave(
+                        os.path.join(
+                            save_path,
+                            f'{name}_reconstruction_{iteration}.png'),
+                        recon_concat)
 
         if self._save_eval_paths:
             import pickle

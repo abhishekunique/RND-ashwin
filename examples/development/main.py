@@ -68,7 +68,16 @@ class ExperimentRunner(tune.Trainable):
         Q_targets = self.Q_targets = get_Q_function_from_variant(
             variant, training_environment)
 
+        # Set the preprocessors to be the same thing
         preprocessor_params = variant['Q_params']['kwargs']['observation_preprocessors_params']
+        for observation_name, params in preprocessor_params.items():
+            if params and params.get('shared', False):
+                print(f'Setting *{observation_name}* preprocessors to be the same across policy/Qs')
+                preprocessor = Qs[0].observations_preprocessors[observation_name]
+                policy.preprocessors[observation_name] = preprocessor
+                assert (
+                    policy.preprocessors[observation_name] is preprocessor and
+                    Qs[1].observations_preprocessors[observation_name] is preprocessor)
 
         # ==== LOADING IN CONVNET FROM WORKING RUN EXPERIMENT ====
         if ('pixels' in preprocessor_params
