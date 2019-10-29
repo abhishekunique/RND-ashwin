@@ -20,10 +20,10 @@ from matplotlib.colors import ListedColormap
 
 
 def replay_pool_pickle_path(checkpoint_dir):
-    return os.path.join(checkpoint_dir, 'replay_pool.pkl')
+    return os.path.join(checkpoint_dir, 'replay_pool_0.pkl')
 
 
-def plot_position_and_reward_heatmap(positions, rewards, xy_max, save_path, save_path_rew):
+def plot_position_heatmap(positions, xy_max, save_path):
     num_points = positions.shape[0]
 
     plt.style.use('default')
@@ -49,26 +49,26 @@ def plot_position_and_reward_heatmap(positions, rewards, xy_max, save_path, save
     plt.savefig(save_path)
     plt.close()
 
-    plt.style.use('dark_background')
+    # plt.style.use('dark_background')
 
-    plt.figure()
-    ax = plt.gca()
-    ax.grid(False)
-    reward_hexbins = plt.hexbin(x=positions[:, 0],
-                                y=positions[:, 1],
-                                C=rewards,
-                                linewidths=0.2,
-                                mincnt=0)
-    ax.set_xlim([-xy_max, xy_max])
-    ax.set_ylim([-xy_max, xy_max])
+    # plt.figure()
+    # ax = plt.gca()
+    # ax.grid(False)
+    # reward_hexbins = plt.hexbin(x=positions[:, 0],
+    #                             y=positions[:, 1],
+    #                             C=rewards,
+    #                             linewidths=0.2,
+    #                             mincnt=0)
+    # ax.set_xlim([-xy_max, xy_max])
+    # ax.set_ylim([-xy_max, xy_max])
 
-    plt.ticklabel_format(axis='both', style='sci')
-    plt.colorbar()
+    # plt.ticklabel_format(axis='both', style='sci')
+    # plt.colorbar()
 
-    plt.gca().set_aspect('equal', adjustable='box')
-    plt.title('Rewards by position binning')
-    plt.savefig(save_path_rew)
-    plt.close()
+    # plt.gca().set_aspect('equal', adjustable='box')
+    # plt.title('Rewards by position binning')
+    # plt.savefig(save_path_rew)
+    # plt.close()
 
     return support_metric, thresholds
 
@@ -119,12 +119,12 @@ for experiment_root in sorted(glob.iglob(
     ]
 
     position_heatmap_directory = experiment_root + '/object_position_heatmaps/'
-    reward_heatmap_directory = experiment_root + '/reward_position_heatmaps/'
+    # reward_heatmap_directory = experiment_root + '/reward_position_heatmaps/'
     orient_dist_directory = experiment_root + '/object_orientation_heatmaps/'
     if not os.path.exists(position_heatmap_directory):
         os.mkdir(position_heatmap_directory)
-    if not os.path.exists(reward_heatmap_directory):
-        os.mkdir(reward_heatmap_directory)
+    # if not os.path.exists(reward_heatmap_directory):
+    #     os.mkdir(reward_heatmap_directory)
     if not os.path.exists(orient_dist_directory):
         os.mkdir(orient_dist_directory)
 
@@ -149,13 +149,14 @@ for experiment_root in sorted(glob.iglob(
             screw_positions = obs['object_xy_position'][:, :2]
             screw_positions_total.append(screw_positions)
             object_angles = np.arctan2(
-                obs['object_orientation_sin'][:, 2],
-                obs['object_orientation_cos'][:, 2],
+                obs['object_z_orientation_sin'],
+                obs['object_z_orientation_cos'],
             )
             object_angles_total.append(object_angles)
-            rewards = pool['learned_rewards']
+
+            # rewards = pool['learned_rewards']
             # rewards = pool['rewards']
-            rewards_total.append(rewards)
+            # rewards_total.append(rewards)
             # two_set_angles.append(object_angles)
             # two_set_positions.append(screw_positions)
         # if i % 2 == 1:
@@ -168,11 +169,10 @@ for experiment_root in sorted(glob.iglob(
         #     thresholds.append(threshold)
         #     checkpoint_nums.append(int(checkpoint_num.split("checkpoint_")[1]))
 
-
         save_path = position_heatmap_directory + checkpoint_num + '.png'
-        save_path_rew = reward_heatmap_directory + checkpoint_num + '.png'
-        support_metric, threshold = plot_position_and_reward_heatmap(
-                screw_positions, rewards, xy_max, save_path, save_path_rew)
+        # save_path_rew = reward_heatmap_directory + checkpoint_num + '.png'
+        support_metric, threshold = plot_position_heatmap(
+                screw_positions, xy_max, save_path)
 
         save_path = orient_dist_directory + checkpoint_num + '.png'
         angular_support_metric, angular_threshold = plot_angle_distribution(object_angles, save_path)
@@ -183,13 +183,13 @@ for experiment_root in sorted(glob.iglob(
         i += 1
 
     screw_positions_total = np.concatenate(screw_positions_total, axis=0)
-    rewards_total = np.concatenate(rewards_total, axis=0)
+    # rewards_total = np.concatenate(rewards_total, axis=0)
     object_angles_total = np.concatenate(object_angles_total, axis=0)
 
     save_path = position_heatmap_directory + '/total.png'
-    save_path_rew = reward_heatmap_directory + '/total.png'
+    # save_path_rew = reward_heatmap_directory + '/total.png'
 
-    plot_position_and_reward_heatmap(screw_positions_total, rewards_total, xy_max, save_path, save_path_rew)
+    plot_position_heatmap(screw_positions_total, xy_max, save_path)
 
     save_path = orient_dist_directory + '/total.png'
     plot_angle_distribution(object_angles_total, save_path)
@@ -224,7 +224,6 @@ for experiment_root in sorted(glob.iglob(
     plt.ylim([0, 1.1])
     plt.savefig(orient_dist_directory + '/support_metric.png')
     plt.close()
-
 
 
     # nbins = 21
