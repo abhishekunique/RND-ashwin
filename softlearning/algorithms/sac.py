@@ -252,25 +252,30 @@ class SAC(RLAlgorithm):
         self._vae_latent_logvar = {}
         self._initial_vae_train_ops = []
 
-        policy_vae_preprocessor = self._policy.preprocessors['pixels']
-        Q_vae_preprocessor = self._Qs[0].observations_preprocessors['pixels']
-        assert Q_vae_preprocessor is self._Qs[1].observations_preprocessors['pixels'], (
+        policy_preprocessor = self._policy.preprocessors['pixels']
+        Q_preprocessor = self._Qs[0].observations_preprocessors['pixels']
+        assert Q_preprocessor is self._Qs[1].observations_preprocessors['pixels'], (
             'Preprocessors on the Qs must be the same object.'
         )
 
-        preprocessors = (('policy', policy_vae_preprocessor),
-                         ('Q', Q_vae_preprocessor))
-        for (name, preprocessor) in preprocessors:
-            vae = preprocessor.vae
-
+        preprocessors = self._preprocessors = (
+            {'policy': policy_preprocessor, 'Q': Q_preprocessor}
+            if policy_preprocessor is not Q_preprocessor
+            else {'shared': policy_preprocessor}
+        )
+        for name, vae in preprocessors.items():
+        # preprocessors = (('policy', policy_vae_preprocessor),
+        #                  ('Q', Q_vae_preprocessor))
+        # for (name, preprocessor) in preprocessors:
+        #     vae = preprocessor.vae
             images = self._placeholders['observations']['pixels']
-            reconstructions = vae(images)
+            z_mean, z_log_var, z, reconstructions = vae(images, include_reconstructions=True)
 
             cross_ent = tf.nn.sigmoid_cross_entropy_with_logits(
                 logits=reconstructions,
                 labels=tf.image.convert_image_dtype(images, tf.float32)
             )
-            z_mean, z_log_var, z = vae.encoder(images)
+            # z_mean, z_log_var, z = vae.encoder(images)
 
             reconstruction_loss = tf.reduce_sum(cross_ent, axis=[1, 2, 3])
             kl_divergence = 1 + z_log_var - tf.square(z_mean) - tf.exp(z_log_var)
@@ -360,9 +365,6 @@ class SAC(RLAlgorithm):
                 var_list=rae.trainable_variables
             )
             self._training_ops.update({f'{name}_rae_train_op': rae_train_op})
-
-        # for name, preprocessor in preprocessors.items():
-        #     rae = preprocessor.rae
 
     def _init_critic_update(self):
         """Create minimization operation for critic Q-function.
@@ -739,22 +741,18 @@ class SAC(RLAlgorithm):
 
         # VAE diagnostics
         if self._uses_vae:
-            # preprocessor_vaes = {
-            #     'policy': self._policy.preprocessors['pixels'].vae,
-            #     'Q': self._Qs[0].observations_preprocessors['pixels'].vae
-            # }
-            preprocessor_vaes = {
-                name: preprocessor.vae
-                for name, preprocessor in self._preprocessors.items()
-            }
             random_idxs = np.random.choice(
                 feed_dict[self._placeholders['observations']['pixels']].shape[0],
                 size=self._n_vae_evals_per_epoch)
             eval_pixels = (
                 feed_dict[self._placeholders['observations']['pixels']][random_idxs])
-            for name, vae in preprocessor_vaes.items():
+            for name, vae in self._preprocessors.items():
+                import ipdb; ipdb.set_trace()
+                z_mean, z_logvar, z = self._session.run(vae.encoder(eval_pixels))
                 reconstructions = self._session.run(
-                    tf.math.sigmoid(vae(eval_pixels)))
+                    tf.math.sigmoid(vae.decoder(z)))
+                # z_mean, z_logvar, z, reconstructions = self._session.run(
+                    # tf.math.sigmoid(vae(eval_pixels, include_reconstructions=True)))
 
                 concat = np.concatenate([
                     eval_pixels,
@@ -763,8 +761,7 @@ class SAC(RLAlgorithm):
                 sampled_z = np.random.normal(
                     size=(self._n_vae_evals_per_epoch, vae.latent_dim))
                 decoded_samples = self._session.run(
-                    tf.math.sigmoid(vae.decoder.output),
-                    feed_dict={vae.decoder.input: sampled_z}
+                    tf.math.sigmoid(vae.decoder(sampled_z))
                 )
 
                 save_path = os.path.join(os.getcwd(), 'vae')
@@ -781,18 +778,13 @@ class SAC(RLAlgorithm):
                         f'{name}_sample_{iteration}.png'),
                     samples_concat)
         elif self._uses_rae:
-            # preprocessor_raes = {
-            #     name: preprocessor.rae
-            #     for name, preprocessor in self._preprocessors.items()
-            # }
-            preprocessor_raes = self._preprocessors
             n_evals = 3
             random_idxs = np.random.choice(
                 feed_dict[self._placeholders['observations']['pixels']].shape[0],
                 size=n_evals)
             eval_pixels = (
                 feed_dict[self._placeholders['observations']['pixels']][random_idxs])
-            for name, rae in preprocessor_raes.items():
+            for name, rae in self._preprocessors.items():
                 z, reconstructions = self._session.run(
                     rae(eval_pixels, include_reconstructions=True))
                 concat = np.concatenate([

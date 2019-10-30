@@ -272,7 +272,6 @@ class MultiSAC(SAC):
         if not self._uses_vae:
             return
 
-        from softlearning.models.vae import log_normal_pdf
         vae_log_dir = os.path.join(os.getcwd(), 'vae')
         if not os.path.exists(vae_log_dir):
             os.makedirs(vae_log_dir)
@@ -299,33 +298,37 @@ class MultiSAC(SAC):
                 assert Q_preprocessor is Qs[1].observations_preprocessors['pixels'], (
                     'Preprocessors on the critics must be the same object.'
                 )
+                # preprocessors = (
+                #     (f'policy_{i}', policy_preprocessor),
+                #     (f'Q_{i}', Q_preprocessor),
+                # )
                 preprocessors = (
-                    (f'policy_{i}', policy_preprocessor),
-                    (f'Q_{i}', Q_preprocessor),
+                    {f'policy_{i}': policy_preprocessor, f'Q_{i}': Q_preprocessor}
+                    if policy_preprocessor is not Q_preprocessor
+                    else {f'shared_{i}': policy_preprocessor}
                 )
                 self._preprocessors_per_policy.append(preprocessors)
 
-                for (name, preprocessor) in preprocessors:
-                    vae = preprocessor.vae
-
+                for name, vae in preprocessors.items():
+                    # vae = preprocessor.vae
                     images = self._placeholders['observations']['pixels']
-                    reconstructions = vae(images)
+                    z_mean, z_log_var, z, reconstructions = vae(images,
+                        include_reconstructions=True)
 
                     cross_ent = tf.nn.sigmoid_cross_entropy_with_logits(
                         logits=reconstructions,
                         labels=tf.image.convert_image_dtype(images, tf.float32)
                     )
-                    z_mean, z_log_var, z = vae.encoder(images)
-                    logpz = log_normal_pdf(z, 0., 0.)
-                    logqz_x = log_normal_pdf(z, z_mean, z_log_var)
+                    # z_mean, z_log_var, z = vae.encoder(images)
 
                     reconstruction_loss = tf.reduce_sum(cross_ent, axis=[1, 2, 3])
-                    kl_divergence = logqz_x - logpz
+                    kl_divergence = 1 + z_log_var - tf.square(z_mean) - tf.exp(z_log_var)
+                    kl_divergence = -0.5 * tf.reduce_sum(kl_divergence, axis=-1)
 
                     # ELBO = E(p(x|z)) - D_kl(q(z|x) || p(z)) * beta
                     elbo = -reconstruction_loss - vae.beta * kl_divergence
-                    # vae_metrics['latent_mean'] = tf.reduce_mean(z_mean)
-                    # vae_metrics['latent_logvar'] = tf.reduce_mean(z_log_var)
+                    vae_metrics['latent_mean'][name] = tf.reduce_mean(z_mean)
+                    vae_metrics['latent_logvar'][name] = tf.reduce_mean(z_log_var)
                     vae_metrics['elbo'][name] = tf.reduce_mean(elbo)
                     vae_metrics['reconstruction_loss'][name] = tf.reduce_mean(
                         reconstruction_loss)
@@ -378,14 +381,19 @@ class MultiSAC(SAC):
                 assert Q_preprocessor is Qs[1].observations_preprocessors['pixels'], (
                     'Preprocessors on the critics must be the same object.'
                 )
+                # preprocessors = (
+                #     (f'policy_{i}', policy_preprocessor),
+                #     (f'Q_{i}', Q_preprocessor),
+                # )
                 preprocessors = (
-                    (f'policy_{i}', policy_preprocessor),
-                    (f'Q_{i}', Q_preprocessor),
+                    {f'policy_{i}': policy_preprocessor, f'Q_{i}': Q_preprocessor}
+                    if policy_preprocessor is not Q_preprocessor
+                    else {f'shared_{i}': policy_preprocessor}
                 )
                 self._preprocessors_per_policy.append(preprocessors)
 
-                for (name, preprocessor) in preprocessors:
-                    rae = preprocessor.rae
+                for name, rae in preprocessors.items():
+                    # rae = preprocessor.rae
 
                     images = self._placeholders['observations']['pixels']
                     z = rae.encoder(images)
@@ -769,11 +777,14 @@ class MultiSAC(SAC):
                 if self._ext_reward_coeffs[i] == 0:
                     continue
 
-                for name, preprocessor in preprocessors:
-                    vae = preprocessor.vae
+                for name, vae in preprocessors.items():
+                    # vae = preprocessor.vae
 
+                    # reconstructions = self._session.run(
+                    #     tf.math.sigmoid(vae(eval_pixels)))
+                    z_mean, z_logvar, z = self._session.run(vae.encoder(eval_pixels))
                     reconstructions = self._session.run(
-                        tf.math.sigmoid(vae(eval_pixels)))
+                        tf.math.sigmoid(vae.decoder(z)))
                     concat = np.concatenate([
                         eval_pixels,
                         skimage.util.img_as_ubyte(reconstructions)
@@ -808,9 +819,10 @@ class MultiSAC(SAC):
             for i, preprocessors in enumerate(self._preprocessors_per_policy):
                 if self._ext_reward_coeffs[i] == 0:
                     continue
-                for name, preprocessor in preprocessors:
-                    rae = preprocessor.rae
-                    reconstructions = self._session.run(rae(eval_pixels))
+                for name, rae in preprocessors.items():
+                    # rae = preprocessor.rae
+                    z, reconstructions = self._session.run(
+                        rae(eval_pixels, include_reconstructions=True))
                     concat = np.concatenate([
                         eval_pixels,
                         skimage.util.img_as_ubyte(reconstructions)

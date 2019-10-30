@@ -15,8 +15,8 @@ def get_online_vae_preprocessor(image_shape,
     vae_preprocessor = OnlineVAEPreprocessor(image_shape, **kwargs)
     # If the VAE is going to be finetuned from a pretrained model
     if encoder_path and decoder_path:
-        vae_preprocessor.vae.encoder.load_weights(encoder_path)
-        vae_preprocessor.vae.decoder.load_weights(decoder_path)
+        vae_preprocessor.encoder.load_weights(encoder_path)
+        vae_preprocessor.decoder.load_weights(decoder_path)
     return vae_preprocessor
 
 def get_rae_preprocessor(image_shape,

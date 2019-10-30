@@ -8,8 +8,12 @@ from softlearning.utils.keras import PicklableModel
 tfk = tf.keras
 tfkl = tf.keras.layers
 
-
 # tf.enable_eager_execution()
+# gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.33)
+# sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options))
+# tf.keras.backend.set_session(sess)
+
+
 """
 Training methods
 """
@@ -409,10 +413,6 @@ if __name__ == '__main__':
     import time
     import os
     import skimage
-    tf.enable_eager_execution()
-    gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.33)
-    sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options))
-    tf.keras.backend.set_session(sess)
 
     REGULARIZER_OPTIONS = {
         'l1': regularizers.l1,
@@ -484,9 +484,6 @@ if __name__ == '__main__':
 
     cur_dir = os.getcwd()
     save_path = os.path.join(cur_dir, path_name)
-    reconstruct_save_path = os.path.join(save_path, 'reconstructions')
-    if not os.path.exists(reconstruct_save_path):
-        os.makedirs(reconstruct_save_path)
 
     # Set up tensorboard
     logdir = os.path.join(save_path, 'logs')

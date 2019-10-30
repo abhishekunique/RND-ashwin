@@ -12,7 +12,7 @@ DEFAULT_KEY = "__DEFAULT_KEY__"
 # M = 256
 # N = 2
 M = 512
-N = 3
+N = 2
 
 REPARAMETERIZE = True
 
@@ -91,11 +91,13 @@ ALGORITHM_PARAMS_ADDITIONAL = {
             'lr': 3e-4,
             'target_update_interval': 1,
             'tau': 5e-3,
-            'target_entropy': 'auto', #tune.sample_from([-3, -5, -7]),#'auto',
+            'target_entropy': 'auto',
+            # 'n_initial_exploration_steps': int(1e4),
+            'n_initial_exploration_steps': int(5e3),
             'action_prior': 'uniform',
             'her_iters': tune.grid_search([0]),
-            'rnd_int_rew_coeffs': tune.sample_from([[1, 1]]),
-            'ext_reward_coeffs': [1, 0], # 0 corresponds to reset policy
+            'rnd_int_rew_coeffs': [0, 0], # [1, 1],
+            'ext_reward_coeffs': [1, 1], # 0 corresponds to reset policy
             'normalize_ext_reward_gamma': 0.99,
             'share_pool': False,
         },
@@ -173,7 +175,7 @@ MAX_PATH_LENGTH_PER_UNIVERSE_DOMAIN_TASK = {
             'TurnResetFreeRandomGoal-v0': 100,
             'TurnFreeValve3Fixed-v0': tune.grid_search([50]),
             # 'TurnFreeValve3RandomReset-v0': 50,
-            'TurnFreeValve3ResetFree-v0': tune.grid_search([50]),
+            'TurnFreeValve3ResetFree-v0': tune.grid_search([100]),
             'TurnFreeValve3ResetFreeSwapGoal-v0': tune.grid_search([50]),
             'TurnFreeValve3ResetFreeSwapGoalEval-v0': tune.grid_search([50]),
             'TurnFreeValve3ResetFreeComposedGoals-v0': tune.grid_search([150]),
@@ -357,69 +359,65 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_STATE = {
             },
             'TurnRandomDynamics-v0': {},
             'TurnFreeValve3Fixed-v0': {
+                'reward_keys_and_weights': {
+                    'object_to_target_position_distance_reward': tune.grid_search([2]),
+                    'object_to_target_orientation_distance_reward': 1,
+                },
                 'observation_keys': (
                     'claw_qpos',
                     'last_action',
                     'object_xy_position',
                     'object_z_orientation_cos',
                     'object_z_orientation_sin',
-                    'target_xy_position',
-                    'target_z_orientation_cos',
-                    'target_z_orientation_sin',
                 ),
-                'target_qpos_range': [(0, 0, 0, 0, 0, 0)],
-                'init_qpos_range': ((-0.08, -0.08, 0, 0, 0, -np.pi), (0.08, 0.08, 0, 0, 0, np.pi)),
-                'reward_keys_and_weights': {
-                    'object_to_target_position_distance_reward': tune.grid_search([2]),
-                    'object_to_target_orientation_distance_reward': 1,
-                },
+                # 'target_qpos_range': [(0, 0, 0, 0, 0, 0)],
+                'target_qpos_range': [
+                    (0.01, 0.01, 0, 0, 0, -np.pi / 2),
+                    (-0.01, -0.01, 0, 0, 0, np.pi / 2)
+                ],
+                'init_qpos_range': (
+                    (-0.08, -0.08, 0, 0, 0, -np.pi),
+                    (0.08, 0.08, 0, 0, 0, np.pi)
+                ),
             },
             'TurnFreeValve3ResetFree-v0': {
+                'observation_keys': (
+                    'claw_qpos',
+                    'last_action',
+                    'object_xy_position',
+                    'object_z_orientation_cos',
+                    'object_z_orientation_sin',
+                ),
                 'reward_keys_and_weights': {
-                    'object_to_target_position_distance_reward': 0, # tune.sample_from([10]),
-                    'object_to_target_orientation_distance_reward': 0, # 1,
+                    'object_to_target_position_distance_reward': 2,
+                    'object_to_target_orientation_distance_reward': 1,
                 },
                 'reset_fingers': True,
                 'reset_frequency': 0,
-                'reset_policy_checkpoint_path': '',
                 'target_qpos_range': [
-                    (0, 0, 0, 0, 0, 0), (0, 0, 0, 0, 0, 0)
+                    (0.01, 0.01, 0, 0, 0, -np.pi / 2),
+                    (-0.01, -0.01, 0, 0, 0, np.pi / 2)
                 ],
-                'init_qpos_range': [(0, 0, 0, 0, 0, 0)],
+                'init_qpos_range': [
+                    (0, 0, 0, 0, 0, 0)
+                ],
                 # === BELOW IS FOR SAVING INTO THE REPLAY POOL. ===
                 # MAKE SURE TO SET `no_pixel_information = True` below in order
                 # to remove the pixels from the policy inputs/Q inputs.
-                'pixel_wrapper_kwargs': {
-                    'observation_key': 'pixels',
-                    'pixels_only': False,
-                    'render_kwargs': {
-                        'width': 32,
-                        'height': 32,
-                    },
-                },
-                'camera_settings': {
-                    'azimuth': 180,
-                    'distance': 0.38,
-                    'elevation': -36,
-                    'lookat': (0.04, 0.008, 0.025),
-                },
+                # 'pixel_wrapper_kwargs': {
+                #     'observation_key': 'pixels',
+                #     'pixels_only': False,
+                #     'render_kwargs': {
+                #         'width': 32,
+                #         'height': 32,
+                #     },
+                # },
                 # 'camera_settings': {
                 #     'azimuth': 180,
-                #     'distance': 0.35,
-                #     'elevation': -55,
-                #     'lookat': (0, 0, 0.03),
+                #     'distance': 0.38,
+                #     'elevation': -36,
+                #     'lookat': (0.04, 0.008, 0.025),
                 # },
-                'observation_keys': (
-                    'claw_qpos',
-                    'object_xy_position',
-                    'object_orientation_cos',
-                    'object_orientation_sin',
-                    'last_action',
-                    'target_xy_position',
-                    'target_z_orientation_cos',
-                    'target_z_orientation_sin',
-                    'pixels',
-                ),
             },
             'TurnFreeValve3RandomReset-v0': {
                 'reward_keys': (
@@ -814,7 +812,7 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_VISION = {
             'TurnFreeValve3Fixed-v0': {
                 **FREE_SCREW_VISION_KWARGS,
                 'reward_keys_and_weights': {
-                    'object_to_target_position_distance_reward': 1,
+                    'object_to_target_position_distance_reward': 2,
                     'object_to_target_orientation_distance_reward': 1,
                 },
                 'observation_keys': (
@@ -830,28 +828,28 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_VISION = {
                     (-0.08, -0.08, 0, 0, 0, -np.pi),
                     (0.08, 0.08, 0, 0, 0, np.pi)
                 ),
-                'target_qpos_range': [
-                    (0, 0, 0, 0, 0, -np.pi / 2),
-                    (0, 0, 0, 0, 0, -np.pi / 2)
-                ],
                 # 'target_qpos_range': [
+                #     (0, 0, 0, 0, 0, -np.pi / 2),
                 #     (0, 0, 0, 0, 0, -np.pi / 2)
                 # ],
+                'target_qpos_range': [
+                    (0, 0, 0, 0, 0, -np.pi / 2)
+                ],
             },
             # === Reset-free environment below ===
             'TurnFreeValve3ResetFree-v0': {
                 **FREE_SCREW_VISION_KWARGS,
                 'reward_keys_and_weights': {
-                    'object_to_target_position_distance_reward': 1,
+                    'object_to_target_position_distance_reward': 2,
                     'object_to_target_orientation_distance_reward': 1,
                 },
                 'reset_fingers': True,
                 'reset_frequency': 0,
-                'reset_policy_checkpoint_path': '',
                 'init_qpos_range': [(0, 0, 0, 0, 0, 0)],
                 'target_qpos_range': [
                     (0, 0, 0, 0, 0, -np.pi / 2),
-                    (0, 0, 0, 0, 0, -np.pi / 2)
+                    # (0, 0, 0, 0, 0, -np.pi / 2)
+                    (0, 0, 0, 0, 0, np.pi / 2)
                 ],
                 'observation_keys': (
                     'pixels',
@@ -1601,7 +1599,8 @@ PIXELS_PREPROCESSOR_PARAMS = {
             #                              'models',
             #                              'free_screw_vae_32_dim',
             #                              'decoder_32_dim_0.5_beta_final.h5'),
-        }
+        },
+        'shared': True,
     },
     'RAEPreprocessor': {
         'type': 'RAEPreprocessor',
