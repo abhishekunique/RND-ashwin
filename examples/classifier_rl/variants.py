@@ -56,6 +56,7 @@ POLICY_PARAMS_FOR_DOMAIN.update({
 MAX_PATH_LENGTH_PER_DOMAIN = {
     DEFAULT_KEY: 100,
     'DClaw': 100,
+    # 'DClaw': 50,
     # 'DClaw': tune.grid_search([50, 100, 150]), # 100, # 50
 }
 
@@ -175,14 +176,14 @@ ALGORITHM_PARAMS_ADDITIONAL = {
             'lr': 3e-4,
             'target_update_interval': 1,
             'tau': 5e-3,
-            'target_entropy': 'auto', #tune.sample_from([-3, -5, -7]),#'auto',
+            'target_entropy': 'auto',
             'action_prior': 'uniform',
             'her_iters': tune.grid_search([0]),
             'rnd_int_rew_coeffs': tune.sample_from([[1, 1]]),
             # === BELOW FOR RND RESET CONTROLLER ===
-            # 'ext_reward_coeffs': [1, 0], # 0 corresponds to reset policy
+            'ext_reward_coeffs': [1, 0], # 0 corresponds to reset policy
             # === BELOW FOR 2 GOALS ===
-            'ext_reward_coeffs': [1, 1],
+            # 'ext_reward_coeffs': [1, 1],
             'normalize_ext_reward_gamma': 0.99,
             'share_pool': False,
             'n_classifier_train_steps': 5,
@@ -571,9 +572,9 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_VISION = {
                 'init_pos_range': (-np.pi, np.pi), # Random reset between -pi, pi
                 # === GOAL = -90 DEGREES ===
                 # Single goal + RND reset controller
-                # 'target_pos_range': [-np.pi / 2, -np.pi / 2],
+                'target_pos_range': [-np.pi / 2, -np.pi / 2],
                 # 2 goal + no RND reset controller
-                'target_pos_range': [-np.pi / 2, np.pi / 2],
+                # 'target_pos_range': [-np.pi / 2, np.pi / 2],
                 # 1 goal + no RND reset controller
                 # 'target_pos_range': [-np.pi / 2],
                 'observation_keys': (
@@ -598,9 +599,9 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_VISION = {
                 'reset_fingers': True,
                 'init_pos_range': (0, 0),
                 # Single goal + RND reset controller
-                # 'target_pos_range': [-np.pi / 2, -np.pi / 2]
+                'target_pos_range': [-np.pi / 2, -np.pi / 2],
                 # 2 goal + no RND reset controller
-                'target_pos_range': [-np.pi / 2, np.pi / 2],
+                # 'target_pos_range': [-np.pi / 2, np.pi / 2],
                 # 1 goal + no RND reset controller
                 # 'target_pos_range': [-np.pi / 2],
                 'observation_keys': (
@@ -620,11 +621,15 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_VISION = {
                     (-0.08, -0.08, 0, 0, 0, -np.pi),
                     (0.08, 0.08, 0, 0, 0, np.pi)
                 ),
-                # 2 goal, no RND reset controller
                 'target_qpos_range': [
                     (0, 0, 0, 0, 0, -np.pi / 2),
-                    (0, 0, 0, 0, 0, np.pi / 2),
+                    (0, 0, 0, 0, 0, -np.pi / 2),
                 ],
+                # 2 goal, no RND reset controller
+                # 'target_qpos_range': [
+                #     (0, 0, 0, 0, 0, -np.pi / 2),
+                #     (0, 0, 0, 0, 0, np.pi / 2),
+                # ],
                 'observation_keys': (
                     'pixels',
                     'claw_qpos',
@@ -640,15 +645,15 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_VISION = {
                 'init_qpos_range': [(0, 0, 0, 0, 0, 0)],
                 # Below needs to be 2 for a MultiVICEGAN run, since the goals switch
                 # Single goal + RND reset controller
-                # 'target_qpos_range': [
-                #     (0, 0, 0, 0, 0, -np.pi / 2),
-                #     (0, 0, 0, 0, 0, -np.pi / 2), # Second goal is arbitrary
-                # ],
-                # 2 goal, no RND reset controller
                 'target_qpos_range': [
                     (0, 0, 0, 0, 0, -np.pi / 2),
-                    (0, 0, 0, 0, 0, np.pi / 2), # Second goal is arbitrary
+                    (0, 0, 0, 0, 0, -np.pi / 2), # Second goal is arbitrary
                 ],
+                # 2 goal, no RND reset controller
+                # 'target_qpos_range': [
+                #     (0, 0, 0, 0, 0, -np.pi / 2),
+                #     (0, 0, 0, 0, 0, np.pi / 2), # Second goal is arbitrary
+                # ],
                 'swap_goal_upon_completion': False,
                 'observation_keys': (
                     'pixels',
@@ -989,20 +994,25 @@ PIXELS_PREPROCESSOR_PARAMS = {
         'kwargs': {
             'trainable': False,
             # SlideBeads 
-            'image_shape': (32, 32, 3),
-            'latent_dim': 16,
-            'encoder_path': os.path.join(PROJECT_PATH,
-                                        'softlearning',
-                                        'models',
-                                        'slide_beads_vae_16_230iters',
-                                        'encoder_16_dim_1_beta.h5'),
-            # Free screw
             # 'image_shape': (32, 32, 3),
-            # 'latent_dim': 32,
+            # 'latent_dim': 16,
             # 'encoder_path': os.path.join(PROJECT_PATH,
             #                             'softlearning',
             #                             'models',
-            #                             'free_screw_vae_32_dim',
+            #                             'slide_beads_vae_16_230iters',
+            #                             'encoder_16_dim_1_beta.h5'),
+            # Free screw
+            'image_shape': (32, 32, 3),
+            'latent_dim': 32,
+            'encoder_path': os.path.join(PROJECT_PATH,
+                                        'softlearning',
+                                        'models',
+                                        'free_screw_vae_32_dim',
+                                        'encoder_32_dim_0.5_beta_final.h5'),
+            # 'encoder_path': os.path.join(PROJECT_PATH,
+            #                             'softlearning',
+            #                             'models',
+            #                             'vae_32_dim_beta_half_free_screw_from_rnd_data',
             #                             'encoder_32_dim_0.5_beta_final.h5'),
             # Fixed screw
             # 'image_shape': (32, 32, 3),
@@ -1014,6 +1024,15 @@ PIXELS_PREPROCESSOR_PARAMS = {
             #                             'encoder_16_dim_5.0_beta_final.h5'),
         },
     },
+    'RAEPreprocessor': {
+        'type': 'RAEPreprocessor',
+        'kwargs': {
+            'trainable': True,
+            'image_shape': (32, 32, 3),
+            'latent_dim': 32,
+        },
+        'shared': True,
+    }
     'ConvnetPreprocessor': tune.grid_search([
         {
             'type': 'ConvnetPreprocessor',

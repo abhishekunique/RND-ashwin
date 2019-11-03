@@ -107,7 +107,8 @@ class RAEPreprocessor(PicklableModel):
             'image_shape': self.image_shape,
             'latent_dim': self.latent_dim,
             'encoder': self.encoder.get_config(),
-            'decoder': self.decoder.get_config()
+            'decoder': self.decoder.get_config(),
+            'weights': self.get_weights(),
         }
         return config
 
@@ -120,6 +121,7 @@ class RAEPreprocessor(PicklableModel):
             latent_dim=config['latent_dim'])
         rae_preprocessor.encoder = PicklableModel.from_config(config['encoder'])
         rae_preprocessor.decoder = PicklableModel.from_config(config['decoder'])
+        rae_preprocessor.set_weights(config['weights'])
         return rae_preprocessor
 
 # TODO: Create an abstract interface for preprocessors

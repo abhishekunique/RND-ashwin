@@ -330,6 +330,12 @@ class ExperimentRunner(tune.Trainable):
                         checkpoint_dir,
                         f'Qs_{i}_{j}')
                     Q.save_weights(checkpoint_path)
+                if 'pixels' in Q.observations_preprocessors:
+                    preprocessor_path = os.path.join(
+                        checkpoint_dir,
+                        f'Q_pixels_preprocessor_config_{i}.pkl')
+                    with open(preprocessor_path, 'wb') as f:
+                        pickle.dump(Q.observations_preprocessors['pixels'].get_config(), f)
         else:
             if isinstance(self.Qs, tf.keras.Model):
                 Qs = [self.Qs]
@@ -342,6 +348,13 @@ class ExperimentRunner(tune.Trainable):
                     checkpoint_dir,
                     f'Qs_{i}')
                 Q.save_weights(checkpoint_path)
+            if 'pixels' in Q.observations_preprocessors:
+                preprocessor_path = os.path.join(
+                    checkpoint_dir,
+                    f'Q_pixels_preprocessor_config.pkl')
+                with open(preprocessor_path, 'wb') as f:
+                    pickle.dump(Q.observations_preprocessors['pixels'].get_config(), f)
+
 
     def _restore_value_functions(self, checkpoint_dir):
         if self._multi_build:
