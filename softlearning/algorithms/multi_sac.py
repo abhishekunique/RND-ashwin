@@ -64,6 +64,7 @@ class MultiSAC(SAC):
             rnd_lr=1e-4,
             rnd_int_rew_coeffs=[],
             rnd_gamma=0.99,
+            save_reconstruction_frequency=1,
             **kwargs,
     ):
         """
@@ -164,9 +165,10 @@ class MultiSAC(SAC):
             # self._rnd_gamma = 1
             # self._running_int_rew_std = 1
 
-        if self._uses_vae:
-            self._n_vae_evals_per_epoch = 3
-            self._online_vae = True
+        self._n_preprocessor_evals_per_epoch = 3
+        self._online_vae = True
+        self._save_reconstruction_frequency = save_reconstruction_frequency
+        self._fixed_eval_pixels = None
 
         self._build()
 
@@ -312,8 +314,8 @@ class MultiSAC(SAC):
                 for name, vae in preprocessors.items():
                     # vae = preprocessor.vae
                     images = self._placeholders['observations']['pixels']
-                    z_mean, z_log_var, z, reconstructions = vae(images,
-                        include_reconstructions=True)
+                    z_mean, z_log_var, z, reconstructions = vae(
+                        images, include_reconstructions=True)
 
                     cross_ent = tf.nn.sigmoid_cross_entropy_with_logits(
                         logits=reconstructions,
@@ -711,18 +713,18 @@ class MultiSAC(SAC):
         batch_flat = flatten(batch)
         placeholders_flat = flatten(self._placeholders)
 
-        if np.random.rand() < 1e-4 and 'pixels' in batch['observations']:
-            import os
-            from skimage import io
-            random_idx = np.random.randint(
-                batch['observations']['pixels'].shape[0])
-            image_save_dir = os.path.join(os.getcwd(), 'pixels')
-            image_save_path = os.path.join(
-                image_save_dir, f'observation_{iteration}_batch.png')
-            if not os.path.exists(image_save_dir):
-                os.makedirs(image_save_dir)
-            io.imsave(image_save_path,
-                      batch['observations']['pixels'][random_idx].copy())
+        # if np.random.rand() < 1e-4 and 'pixels' in batch['observations']:
+        #     import os
+        #     from skimage import io
+        #     random_idx = np.random.randint(
+        #         batch['observations']['pixels'].shape[0])
+        #     image_save_dir = os.path.join(os.getcwd(), 'pixels')
+        #     image_save_path = os.path.join(
+        #         image_save_dir, f'observation_{iteration}_batch.png')
+        #     if not os.path.exists(image_save_dir):
+        #         os.makedirs(image_save_dir)
+        #     io.imsave(image_save_path,
+        #               batch['observations']['pixels'][random_idx].copy())
 
         feed_dict = {
             placeholders_flat[key]: batch_flat[key]
@@ -733,9 +735,11 @@ class MultiSAC(SAC):
         if iteration is not None:
             feed_dict[self._placeholders['iteration']] = iteration
 
-        feed_dict[self._placeholders['reward'][f'running_ext_rew_std_{self._goal_index}']] = self._running_ext_rew_stds[self._goal_index]
+        ext_rew_std_ph = self._placeholders['reward'][f'running_ext_rew_std_{self._goal_index}']
+        feed_dict[ext_rew_std_ph] = self._running_ext_rew_stds[self._goal_index]
         if self._rnd_int_rew_coeffs[self._goal_index]:
-            feed_dict[self._placeholders['reward'][f'running_int_rew_std_{self._goal_index}']] = self._running_int_rew_stds[self._goal_index]
+            int_rew_std_ph = self._placeholders['reward'][f'running_int_rew_std_{self._goal_index}']
+            feed_dict[int_rew_std_ph] = self._running_int_rew_stds[self._goal_index]
 
         return feed_dict
 
@@ -765,23 +769,21 @@ class MultiSAC(SAC):
                 ).items()
             ]))
         self._goal_index = goal_index
+        should_save = iteration % self._save_reconstruction_frequency == 0
 
-        if self._uses_vae:
-            random_idxs = np.random.choice(
-                feed_dict[self._placeholders['observations']['pixels']].shape[0],
-                size=self._n_vae_evals_per_epoch)
-            eval_pixels = (
-                feed_dict[self._placeholders['observations']['pixels']][random_idxs])
+        # Generate random pixels to evaluate the preprocessors
+        random_idxs = np.random.choice(
+            feed_dict[self._placeholders['observations']['pixels']].shape[0],
+            size=self._n_preprocessor_evals_per_epoch)
+        eval_pixels = (
+            feed_dict[self._placeholders['observations']['pixels']][random_idxs])
 
+        if self._uses_vae and should_save:
             for i, preprocessors in enumerate(self._preprocessors_per_policy):
                 if self._ext_reward_coeffs[i] == 0:
                     continue
 
                 for name, vae in preprocessors.items():
-                    # vae = preprocessor.vae
-
-                    # reconstructions = self._session.run(
-                    #     tf.math.sigmoid(vae(eval_pixels)))
                     z_mean, z_logvar, z = self._session.run(vae.encoder(eval_pixels))
                     reconstructions = self._session.run(
                         tf.math.sigmoid(vae.decoder(z)))
@@ -791,7 +793,7 @@ class MultiSAC(SAC):
                     ], axis=2)
 
                     sampled_z = np.random.normal(
-                        size=(self._n_vae_evals_per_epoch, vae.latent_dim))
+                        size=(eval_pixels.shape[0], vae.latent_dim))
                     decoded_samples = self._session.run(
                         tf.math.sigmoid(vae.decoder.output),
                         feed_dict={vae.decoder.input: sampled_z}
@@ -811,16 +813,10 @@ class MultiSAC(SAC):
                             f'{name}_sample_{iteration}.png'),
                         samples_concat)
         elif self._uses_rae:
-            random_idxs = np.random.choice(
-                feed_dict[self._placeholders['observations']['pixels']].shape[0],
-                size=3)
-            eval_pixels = (
-                feed_dict[self._placeholders['observations']['pixels']][random_idxs])
             for i, preprocessors in enumerate(self._preprocessors_per_policy):
                 if self._ext_reward_coeffs[i] == 0:
                     continue
                 for name, rae in preprocessors.items():
-                    # rae = preprocessor.rae
                     z, reconstructions = self._session.run(
                         rae(eval_pixels, include_reconstructions=True))
                     concat = np.concatenate([
@@ -828,13 +824,42 @@ class MultiSAC(SAC):
                         skimage.util.img_as_ubyte(reconstructions)
                     ], axis=2)
 
-                    save_path = os.path.join(os.getcwd(), 'rae')
-                    recon_concat = np.vstack(concat)
-                    skimage.io.imsave(
-                        os.path.join(
-                            save_path,
-                            f'{name}_reconstruction_{iteration}.png'),
-                        recon_concat)
+                    if should_save:
+                        save_path = os.path.join(os.getcwd(), 'rae')
+                        recon_concat = np.vstack(concat)
+                        skimage.io.imsave(
+                            os.path.join(
+                                save_path,
+                                f'{name}_reconstruction_{iteration}.png'),
+                            recon_concat)
+
+                    # Track latents
+                    if self._fixed_eval_pixels is None:
+                        self._fixed_eval_pixels = eval_pixels
+                        self._fixed_eval_latents = np.zeros(z.shape)
+
+                    z_fixed, reconstructions_fixed = self._session.run(
+                        rae(self._fixed_eval_pixels, include_reconstructions=True))
+
+                    if should_save:
+                        concat_fixed = np.concatenate([
+                            self._fixed_eval_pixels,
+                            skimage.util.img_as_ubyte(reconstructions_fixed)
+                        ], axis=2)
+                        recon_concat_fixed = np.vstack(concat_fixed)
+                        skimage.io.imsave(
+                            os.path.join(
+                                save_path,
+                                f'{name}_fixed_reconstruction_{iteration}.png'),
+                            recon_concat_fixed)
+
+                    z_diff = np.linalg.norm(z_fixed - self._fixed_eval_latents, axis=1)
+                    diagnostics.update({
+                        f'rae/{name}/tracked-latent-l2-difference-with-prev-mean': np.mean(z_diff),
+                        f'rae/{name}/tracked-latent-l2-difference-with-prev-std': np.std(z_diff),
+                    })
+                    # Save the previous latents to compare in the next epoch
+                    self._fixed_eval_latents = z_fixed
 
         if self._save_eval_paths:
             import pickle
@@ -1001,21 +1026,6 @@ class MultiSAC(SAC):
                 training_paths_per_policy, training_environment)
             gt.stamp('training_metrics')
 
-            #should_save_path = (
-            #    self._path_save_frequency > 0
-            #    and self._epoch % self._path_save_frequency == 0)
-            #if should_save_path:
-            #    import pickle
-            #    for i, path in enumerate(training_paths):
-            #        #path.pop('images')
-            #        path_file_name = f'training_path_{self._epoch}_{i}.pkl'
-            #        path_file_path = os.path.join(
-            #            os.getcwd(), 'paths', path_file_name)
-            #        if not os.path.exists(os.path.dirname(path_file_path)):
-            #            os.makedirs(os.path.dirname(path_file_path))
-            #        with open(path_file_path, 'wb' ) as f:
-            #            pickle.dump(path, f)
-
             if evaluation_paths_per_policy:
                 evaluation_metrics_per_policy = self._evaluate_rollouts(
                     evaluation_paths_per_policy, evaluation_environment)
@@ -1028,7 +1038,8 @@ class MultiSAC(SAC):
 
             t0 = time.time()
 
-            sampler_diagnostics_per_policy = [self._samplers[i].get_diagnostics() for i in range(self._num_goals)]
+            sampler_diagnostics_per_policy = [
+                self._samplers[i].get_diagnostics() for i in range(self._num_goals)]
 
             diagnostics = self.get_diagnostics(
                 iteration=self._total_timestep,
@@ -1053,8 +1064,10 @@ class MultiSAC(SAC):
             )))
 
             print("Other basic diagnostics: ", time.time() - t0)
-            for i, (evaluation_metrics, training_metrics, sampler_diagnostics) in enumerate(
-                    zip(evaluation_metrics_per_policy, training_metrics_per_policy, sampler_diagnostics_per_policy)):
+            for i, (evaluation_metrics, training_metrics, sampler_diagnostics) in (
+                enumerate(zip(evaluation_metrics_per_policy,
+                              training_metrics_per_policy,
+                              sampler_diagnostics_per_policy))):
                 diagnostics.update(OrderedDict((
                     *(
                         (f'evaluation_{i}/{key}', evaluation_metrics[key])
@@ -1090,9 +1103,11 @@ class MultiSAC(SAC):
 
     def _training_paths(self):
         """ Override to interleave training videos between policy rollouts. """
-        paths_per_policy = [self._samplers[i].get_last_n_paths(
-            math.ceil((self._epoch_length / self._num_goals) / self._samplers[self._goal_index]._max_path_length))
-                            for i in range(self._num_goals)
+        num_paths = math.ceil(
+            (self._epoch_length / self._num_goals) / self._samplers[self._goal_index]._max_path_length)
+        paths_per_policy = [
+            self._samplers[i].get_last_n_paths(num_paths)
+            for i in range(self._num_goals)
         ]
 
         if self._save_training_video_frequency:

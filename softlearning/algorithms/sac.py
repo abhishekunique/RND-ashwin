@@ -69,6 +69,8 @@ class SAC(RLAlgorithm):
 
             online_vae=True,
             n_vae_train_steps=50,
+            save_reconstruction_frequency=1,
+            save_observations=False,
 
             **kwargs,
     ):
@@ -145,9 +147,14 @@ class SAC(RLAlgorithm):
 
         # VAE
         self._preprocessed_Q_inputs = self._Qs[0].preprocessed_inputs_fn
-        self._n_vae_evals_per_epoch = 3
+        self._n_preprocessor_evals_per_epoch = 3
         self._n_vae_train_steps_per_epoch = n_vae_train_steps
         self._online_vae = online_vae
+
+        # Track a few eval pixels to evaluate autoencoders at the same data point
+        self._fixed_eval_pixels = None
+        self._save_reconstruction_frequency = save_reconstruction_frequency
+        self._save_observations = save_observations
 
         self._normalize_ext_reward_gamma = normalize_ext_reward_gamma
         self._ext_reward_coeff = ext_reward_coeff
@@ -681,9 +688,9 @@ class SAC(RLAlgorithm):
         batch_flat = flatten(batch)
         placeholders_flat = flatten(self._placeholders)
 
-        if np.random.rand() < 1e-4 and 'pixels' in batch['observations']:
-            import os
-            from skimage import io
+        if (self._save_observations and
+            np.random.rand() < 1e-4 and
+            'pixels' in batch['observations']):
             random_idx = np.random.randint(
                 batch['observations']['pixels'].shape[0])
             image = batch['observations']['pixels'][random_idx].copy()
@@ -696,7 +703,7 @@ class SAC(RLAlgorithm):
                 image_save_dir, f'observation_{iteration}_batch.png')
             if not os.path.exists(image_save_dir):
                 os.makedirs(image_save_dir)
-            io.imsave(image_save_path, image)
+            skimage.io.imsave(image_save_path, image)
 
         feed_dict = {
             placeholders_flat[key]: batch_flat[key]
@@ -740,26 +747,24 @@ class SAC(RLAlgorithm):
         ]))
 
         # VAE diagnostics
-        if self._uses_vae:
-            random_idxs = np.random.choice(
-                feed_dict[self._placeholders['observations']['pixels']].shape[0],
-                size=self._n_vae_evals_per_epoch)
-            eval_pixels = (
-                feed_dict[self._placeholders['observations']['pixels']][random_idxs])
+        random_idxs = np.random.choice(
+            feed_dict[self._placeholders['observations']['pixels']].shape[0],
+            size=self._n_preprocessor_evals_per_epoch)
+        eval_pixels = (
+            feed_dict[self._placeholders['observations']['pixels']][random_idxs])
+
+        should_save = self._save_reconstruction_frequency == 0
+        if self._uses_vae and should_save:
             for name, vae in self._preprocessors.items():
-                import ipdb; ipdb.set_trace()
                 z_mean, z_logvar, z = self._session.run(vae.encoder(eval_pixels))
                 reconstructions = self._session.run(
                     tf.math.sigmoid(vae.decoder(z)))
-                # z_mean, z_logvar, z, reconstructions = self._session.run(
-                    # tf.math.sigmoid(vae(eval_pixels, include_reconstructions=True)))
-
                 concat = np.concatenate([
                     eval_pixels,
                     skimage.util.img_as_ubyte(reconstructions)
                 ], axis=2)
                 sampled_z = np.random.normal(
-                    size=(self._n_vae_evals_per_epoch, vae.latent_dim))
+                    size=(self._n_preprocessor_evals_per_epoch, vae.latent_dim))
                 decoded_samples = self._session.run(
                     tf.math.sigmoid(vae.decoder(sampled_z))
                 )
@@ -778,26 +783,50 @@ class SAC(RLAlgorithm):
                         f'{name}_sample_{iteration}.png'),
                     samples_concat)
         elif self._uses_rae:
-            n_evals = 3
-            random_idxs = np.random.choice(
-                feed_dict[self._placeholders['observations']['pixels']].shape[0],
-                size=n_evals)
-            eval_pixels = (
-                feed_dict[self._placeholders['observations']['pixels']][random_idxs])
             for name, rae in self._preprocessors.items():
                 z, reconstructions = self._session.run(
                     rae(eval_pixels, include_reconstructions=True))
-                concat = np.concatenate([
-                    eval_pixels,
-                    skimage.util.img_as_ubyte(reconstructions)
-                ], axis=2)
-                save_path = os.path.join(os.getcwd(), 'rae')
-                recon_concat = np.vstack(concat)
-                skimage.io.imsave(
-                    os.path.join(
-                        save_path,
-                        f'{name}_reconstruction_{iteration}.png'),
-                    recon_concat)
+
+                # Keep a set of pixels to track the latents
+                if self._fixed_eval_pixels is None:
+                    self._fixed_eval_pixels = eval_pixels
+                    self._fixed_eval_latents = np.zeros(z.shape)
+
+                if should_save:
+                    concat = np.concatenate([
+                        eval_pixels,
+                        skimage.util.img_as_ubyte(reconstructions)
+                    ], axis=2)
+                    save_path = os.path.join(os.getcwd(), 'rae')
+                    recon_concat = np.vstack(concat)
+                    skimage.io.imsave(
+                        os.path.join(
+                            save_path,
+                            f'{name}_reconstruction_{iteration}.png'),
+                        recon_concat)
+
+                z_fixed, reconstructions_fixed = self._session.run(
+                    rae(self._fixed_eval_pixels, include_reconstructions=True))
+
+                if should_save:
+                    concat_fixed = np.concatenate([
+                        self._fixed_eval_pixels,
+                        skimage.util.img_as_ubyte(reconstructions_fixed)
+                    ], axis=2)
+                    recon_concat_fixed = np.vstack(concat_fixed)
+                    # TODO: Put this concat and saving logic in utils.py
+                    skimage.io.imsave(
+                        os.path.join(
+                            save_path,
+                            f'{name}_fixed_reconstruction_{iteration}.png'),
+                        recon_concat_fixed)
+
+                z_diff = np.linalg.norm(z_fixed - self._fixed_eval_latents, axis=1)
+                diagnostics.update({
+                    f'rae/{name}/tracked-latent-l2-difference-with-prev-mean': np.mean(z_diff),
+                    f'rae/{name}/tracked-latent-l2-difference-with-prev-std': np.std(z_diff)
+                })
+                self._fixed_eval_latents = z_fixed
 
         # # State estimator diagnostics
         # if 'pixels' in self._policy.preprocessors and \

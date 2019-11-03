@@ -219,6 +219,19 @@ class ExperimentRunner(tune.Trainable):
             for _ in range(num_goals)
         ])
 
+        # Set the preprocessors to be the same thing for each (Qs, policy) pair
+        preprocessor_params = variant['Q_params']['kwargs']['observation_preprocessors_params']
+        for observation_name, params in preprocessor_params.items():
+            if params and params.get('shared', False):
+                print(f'Setting *{observation_name}* preprocessors to be the same across policy/Qs')
+                for Qs, policy in zip(Qs_per_policy, policies):
+                    preprocessor = Qs[0].observations_preprocessors[observation_name]
+                    policy.preprocessors[observation_name] = preprocessor
+                    assert (
+                        policy.preprocessors[observation_name] is preprocessor and
+                        Qs[1].observations_preprocessors[observation_name] is preprocessor)
+
+
         if 'last_checkpoint_dir' in variant['replay_pool_params']:
             last_checkpoint_dir = variant['replay_pool_params']['last_checkpoint_dir']
         else:
