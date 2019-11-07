@@ -72,7 +72,7 @@ ALGORITHM_PARAMS_BASE = {
         'train_every_n_steps': 1,
         'n_train_repeat': 1,
         'eval_render_kwargs': {},
-        'eval_n_episodes': 3,
+        'eval_n_episodes': 10,
         'eval_deterministic': True,
         'save_training_video_frequency': 5,
         'discount': 0.99,
@@ -190,6 +190,7 @@ ALGORITHM_PARAMS_ADDITIONAL = {
             'classifier_optim_name': 'adam',
             'n_epochs': 500,
             'mixup_alpha': 1.0,
+            'eval_n_episodes': 10,
         },
         'rnd_params': {
             'convnet_params': {
@@ -613,14 +614,14 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_VISION = {
                     'object_angle_sin',
                 ),
             },
-            # Random evaluation environment for free screw 
+            # Random evaluation environment for free screw
             'TurnFreeValve3Fixed-v0': {
                 **FREE_SCREW_VISION_KWARGS,
-                # Single goal + RND reset controller
                 'init_qpos_range': (
                     (-0.08, -0.08, 0, 0, 0, -np.pi),
                     (0.08, 0.08, 0, 0, 0, np.pi)
                 ),
+                # 1 goal for RND reset controller
                 'target_qpos_range': [
                     (0, 0, 0, 0, 0, -np.pi / 2),
                     (0, 0, 0, 0, 0, -np.pi / 2),
@@ -652,7 +653,7 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_VISION = {
                 # 2 goal, no RND reset controller
                 # 'target_qpos_range': [
                 #     (0, 0, 0, 0, 0, -np.pi / 2),
-                #     (0, 0, 0, 0, 0, np.pi / 2), # Second goal is arbitrary
+                #     (0, 0, 0, 0, 0, np.pi / 2),
                 # ],
                 'swap_goal_upon_completion': False,
                 'observation_keys': (
@@ -993,7 +994,7 @@ PIXELS_PREPROCESSOR_PARAMS = {
         'type': 'VAEPreprocessor',
         'kwargs': {
             'trainable': False,
-            # SlideBeads 
+            # === SlideBeads ===
             # 'image_shape': (32, 32, 3),
             # 'latent_dim': 16,
             # 'encoder_path': os.path.join(PROJECT_PATH,
@@ -1001,27 +1002,26 @@ PIXELS_PREPROCESSOR_PARAMS = {
             #                             'models',
             #                             'slide_beads_vae_16_230iters',
             #                             'encoder_16_dim_1_beta.h5'),
-            # Free screw
+            # === Free screw ===
             'image_shape': (32, 32, 3),
             'latent_dim': 32,
-            'encoder_path': os.path.join(PROJECT_PATH,
-                                        'softlearning',
-                                        'models',
-                                        'free_screw_vae_32_dim',
-                                        'encoder_32_dim_0.5_beta_final.h5'),
             # 'encoder_path': os.path.join(PROJECT_PATH,
             #                             'softlearning',
             #                             'models',
             #                             'vae_32_dim_beta_half_free_screw_from_rnd_data',
             #                             'encoder_32_dim_0.5_beta_final.h5'),
-            # Fixed screw
+            'encoder_path': os.path.join(NFS_PATH,
+                                        'pretrained_models',
+                                        'free_screw_vae_32_dim_from_rnd_data',
+                                        'encoder_32_dim_0.5_beta_final.h5'),
+            # === Fixed screw ===
             # 'image_shape': (32, 32, 3),
             # 'latent_dim': 16,
             # 'encoder_path': os.path.join(PROJECT_PATH,
             #                             'softlearning',
             #                             'models',
-            #                             'fixed_screw_vae_16_dim',
-            #                             'encoder_16_dim_5.0_beta_final.h5'),
+            #                             'fixed_screw_16_dim_beta_half',
+            #                             'encoder_16_dim_0.5_beta_210.h5')
         },
     },
     'RAEPreprocessor': {
@@ -1046,21 +1046,8 @@ PIXELS_PREPROCESSOR_PARAMS = {
                     'type': 'flatten',
                 }
             },
+            # Specify a `weights_path` here if you want to load in a pretrained convnet
         }
-        # {
-        #     'type': 'ConvnetPreprocessor',
-        #     'kwargs': {
-        #         'conv_filters': (64, ) * 4,
-        #         'conv_kernel_sizes': (3, ) * 4,
-        #         'conv_strides': (2, ) * 4,
-        #         'normalization_type': normalization_type,
-        #         'downsampling_type': 'conv',
-        #         'output_kwargs': {
-        #             'type': 'flatten',
-        #         },
-        #     },
-        #     # 'weights_path': '/root/nfs/kun1/users/justinvyu/pretrained_models/convnet_64_by_4.pkl',
-        # }
         for normalization_type in (None, )
     ]),
 }

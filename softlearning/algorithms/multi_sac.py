@@ -772,13 +772,17 @@ class MultiSAC(SAC):
         should_save = iteration % self._save_reconstruction_frequency == 0
 
         # Generate random pixels to evaluate the preprocessors
-        random_idxs = np.random.choice(
-            feed_dict[self._placeholders['observations']['pixels']].shape[0],
-            size=self._n_preprocessor_evals_per_epoch)
-        eval_pixels = (
-            feed_dict[self._placeholders['observations']['pixels']][random_idxs])
+        if 'pixels' in self._placeholders['observations']:
+            random_idxs = np.random.choice(
+                feed_dict[self._placeholders['observations']['pixels']].shape[0],
+                size=self._n_preprocessor_evals_per_epoch)
+            eval_pixels = (
+                feed_dict[self._placeholders['observations']['pixels']][random_idxs])
+        else:
+            eval_pixels = None
 
         if self._uses_vae and should_save:
+            assert eval_pixels
             for i, preprocessors in enumerate(self._preprocessors_per_policy):
                 if self._ext_reward_coeffs[i] == 0:
                     continue
@@ -813,6 +817,7 @@ class MultiSAC(SAC):
                             f'{name}_sample_{iteration}.png'),
                         samples_concat)
         elif self._uses_rae:
+            assert eval_pixels
             for i, preprocessors in enumerate(self._preprocessors_per_policy):
                 if self._ext_reward_coeffs[i] == 0:
                     continue
