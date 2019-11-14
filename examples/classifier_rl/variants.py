@@ -55,8 +55,8 @@ POLICY_PARAMS_FOR_DOMAIN.update({
 
 MAX_PATH_LENGTH_PER_DOMAIN = {
     DEFAULT_KEY: 100,
-    'DClaw': 100,
-    # 'DClaw': 50,
+    # 'DClaw': 100,
+    'DClaw': 50,
     # 'DClaw': tune.grid_search([50, 100, 150]), # 100, # 50
 }
 
@@ -179,7 +179,8 @@ ALGORITHM_PARAMS_ADDITIONAL = {
             'target_entropy': 'auto',
             'action_prior': 'uniform',
             'her_iters': tune.grid_search([0]),
-            'rnd_int_rew_coeffs': tune.sample_from([[1, 1]]),
+            'rnd_int_rew_coeffs': [1, 1],
+            # 'rnd_int_rew_coeffs': tune.sample_from([[0, 0]]),
             # === BELOW FOR RND RESET CONTROLLER ===
             'ext_reward_coeffs': [1, 0], # 0 corresponds to reset policy
             # === BELOW FOR 2 GOALS ===
@@ -190,7 +191,8 @@ ALGORITHM_PARAMS_ADDITIONAL = {
             'classifier_optim_name': 'adam',
             'n_epochs': 500,
             'mixup_alpha': 1.0,
-            'eval_n_episodes': 10,
+            # 'eval_n_episodes': 24, # 24 for free screw
+            'eval_n_episodes': 8, # 8 for beads, fixed screw
         },
         'rnd_params': {
             'convnet_params': {
@@ -274,8 +276,11 @@ ALGORITHM_PARAMS_ADDITIONAL = {
             'n_initial_exploration_steps': int(1e3),
             'n_classifier_train_steps': 5,
             'classifier_optim_name': 'adam',
-            'n_epochs': 200,
+            'n_epochs': 1000,
             'mixup_alpha': 1.0,
+            'normalize_ext_reward_gamma': 0.99,
+            'rnd_int_rew_coeff': 0,
+            'eval_n_episodes': 8,
         },
     },
     'VICERAQ': {
@@ -570,7 +575,10 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_VISION = {
             # === FIXED SCREW RANDOM RESET EVAL TASK BELOW ===
             'TurnFixed-v0': {
                 **FIXED_SCREW_VISION_KWARGS,
-                'init_pos_range': (-np.pi, np.pi), # Random reset between -pi, pi
+                # 'init_pos_range': (-np.pi, np.pi), # Random reset between -pi, pi
+                # Reset to every 45 degrees between -pi and pi
+                'init_pos_range': list(np.arange(-np.pi, np.pi, np.pi / 4)),
+
                 # === GOAL = -90 DEGREES ===
                 # Single goal + RND reset controller
                 'target_pos_range': [-np.pi / 2, -np.pi / 2],
@@ -586,17 +594,10 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_VISION = {
                     'object_angle_cos',
                     'object_angle_sin',
                 ),
-                # 'reward_keys_and_weights': {
-                #     'object_to_target_angle_distance_reward': 1,
-                # },
             },
             # === FIXED SCREW RESET FREE TASK BELOW ===
             'TurnResetFree-v0': {
                 **FIXED_SCREW_VISION_KWARGS,
-                'reward_keys_and_weights': {
-                    # 'object_to_target_angle_distance_reward': 1,
-                    'object_to_target_angle_distance_reward': 0, # Just to make sure 0 ext reward
-                },
                 'reset_fingers': True,
                 'init_pos_range': (0, 0),
                 # Single goal + RND reset controller
@@ -617,20 +618,59 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_VISION = {
             # Random evaluation environment for free screw
             'TurnFreeValve3Fixed-v0': {
                 **FREE_SCREW_VISION_KWARGS,
-                'init_qpos_range': (
-                    (-0.08, -0.08, 0, 0, 0, -np.pi),
-                    (0.08, 0.08, 0, 0, 0, np.pi)
-                ),
-                # 1 goal for RND reset controller
-                'target_qpos_range': [
+                # Random init evaluations
+                # 'init_qpos_range': (
+                #     (-0.08, -0.08, 0, 0, 0, -np.pi),
+                #     (0.08, 0.08, 0, 0, 0, np.pi)
+                # ),
+                # Evaluations from fixed set of inits
+                'init_qpos_range': [
+                    (0, 0, 0, 0, 0, 0),
+                    (0, 0, 0, 0, 0, -np.pi),
                     (0, 0, 0, 0, 0, -np.pi / 2),
-                    (0, 0, 0, 0, 0, -np.pi / 2),
+                    (0, 0, 0, 0, 0, np.pi / 2),
+                    (-0.05, 0.075, 0, 0, 0, -np.pi),
+                    (-0.075, 0.05, 0, 0, 0, -np.pi / 2),
+                    (-0.05, 0.05, 0, 0, 0, -3 * np.pi / 4),
+                    (-0.07, 0.07, 0, 0, 0, np.pi / 4),
+                    (0, 0.075, 0, 0, 0, -np.pi),
+                    (0.05, 0.075, 0, 0, 0, -np.pi),
+                    (0.075, 0.05, 0, 0, 0, np.pi / 2),
+                    (0.05, 0.05, 0, 0, 0, 3 * np.pi / 4),
+                    (0.07, 0.07, 0, 0, 0, -np.pi / 4),
+                    (-0.05, -0.075, 0, 0, 0, 0),
+                    (-0.075, -0.05, 0, 0, 0, -np.pi / 2),
+                    (-0.05, -0.05, 0, 0, 0, -np.pi / 4),
+                    (-0.07, -0.07, 0, 0, 0, 3 * np.pi / 4),
+                    (0, -0.075, 0, 0, 0, 0),
+                    (0.05, -0.075, 0, 0, 0, 0),
+                    (0.075, -0.05, 0, 0, 0, np.pi / 2),
+                    (0.05, -0.05, 0, 0, 0, np.pi / 4),
+                    (0.07, -0.07, 0, 0, 0, -3 * np.pi / 4),
+                    (-0.075, 0, 0, 0, 0, -np.pi / 2),
+                    (0.075, 0, 0, 0, 0, np.pi / 2),
                 ],
+                'cycle_inits': True,
+
+                # 1 goal for RND reset controller
+                # 'target_qpos_range': [
+                #     (0, 0, 0, 0, 0, -np.pi / 2),
+                #     (0, 0, 0, 0, 0, -np.pi / 2),
+                # ],
                 # 2 goal, no RND reset controller
                 # 'target_qpos_range': [
                 #     (0, 0, 0, 0, 0, -np.pi / 2),
                 #     (0, 0, 0, 0, 0, np.pi / 2),
                 # ],
+                # 2 goals
+                'target_qpos_range': [
+                    # (top left, center)
+                    # (-0.05, -0.05, 0, 0, 0, -np.pi / 2),
+                    # (0, 0, 0, 0, 0, np.pi / 2),
+                    # bottom right, top right
+                    (0.075, 0.075, 0, 0, 0, -np.pi),
+                    (-0.075, 0.075, 0, 0, 0, -np.pi)
+                ],
                 'observation_keys': (
                     'pixels',
                     'claw_qpos',
@@ -646,15 +686,24 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_VISION = {
                 'init_qpos_range': [(0, 0, 0, 0, 0, 0)],
                 # Below needs to be 2 for a MultiVICEGAN run, since the goals switch
                 # Single goal + RND reset controller
-                'target_qpos_range': [
-                    (0, 0, 0, 0, 0, -np.pi / 2),
-                    (0, 0, 0, 0, 0, -np.pi / 2), # Second goal is arbitrary
-                ],
+                # 'target_qpos_range': [
+                #     (0, 0, 0, 0, 0, -np.pi / 2),
+                #     (0, 0, 0, 0, 0, -np.pi / 2), # Second goal is arbitrary
+                # ],
                 # 2 goal, no RND reset controller
                 # 'target_qpos_range': [
                 #     (0, 0, 0, 0, 0, -np.pi / 2),
                 #     (0, 0, 0, 0, 0, np.pi / 2),
                 # ],
+                # 2 goals
+                'target_qpos_range': [
+                    # (top left, center)
+                    # (-0.05, -0.05, 0, 0, 0, -np.pi / 2),
+                    # (0, 0, 0, 0, 0, np.pi / 2),
+                    # bottom right, top right
+                    (0.075, 0.075, 0, 0, 0, -np.pi),
+                    (-0.075, 0.075, 0, 0, 0, -np.pi)
+                ],
                 'swap_goal_upon_completion': False,
                 'observation_keys': (
                     'pixels',
@@ -778,18 +827,30 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_VISION = {
             # Sliding Tasks
             'SlideBeadsFixed-v0': {
                 **SLIDE_BEADS_VISION_KWARGS,
-                'reward_keys_and_weights': {
-                    'objects_to_targets_mean_distance_reward': 1,
-                },
                 'num_objects': 4,
-                'init_qpos_range': (
-                    (-0.0475, -0.0475, -0.0475, -0.0475),
-                    (0.0475, 0.0475, 0.0475, 0.0475),
-                ),
+                # Random init
+                # 'init_qpos_range': (
+                #     (-0.0475, -0.0475, -0.0475, -0.0475),
+                #     (0.0475, 0.0475, 0.0475, 0.0475),
+                # ),
+                'init_qpos_range': [
+                    (-0.0475, -0.0475, -0.0475, -0.0475), # 4 left
+                    (0.0475, 0.0475, 0.0475, 0.0475), # 4 right
+                    (0, 0, 0, 0), # 4 middle
+                    (-0.0475, -0.0475, -0.0475, 0.0475), # 3 left, 1 right
+                    (-0.0475, 0.0475, 0.0475, 0.0475), # 1 left, 3 right
+                    (-0.0475, -0.0475, 0.0475, 0.0475), # 2 left, 2 right
+                    (-0.0475, -0.02375, 0.02375, 0.0475), # even spaced
+                    (-0.0475, 0, 0, 0.0475), # slides, and 2 in the middle
+                ],
+                'cycle_inits': True,
                 # Goal we want to evaluate:
                 'target_qpos_range': [
+                    # 4 left
+                    # (-0.0475, -0.0475, -0.0475, -0.0475),
+                    # 2 left, 2 right
                     (-0.0475, -0.0475, 0.0475, 0.0475),
-                    # (-0.0475, -0.0475, 0.0475, 0.0475),
+                    (-0.0475, -0.0475, 0.0475, 0.0475),
                     # Remove below for 1 goal reset free
                     # (0, 0, 0, 0)
                 ],
@@ -804,18 +865,18 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_VISION = {
             },
             'SlideBeadsResetFree-v0': {
                 **SLIDE_BEADS_VISION_KWARGS,
-                'reward_keys_and_weights': {
-                    'objects_to_targets_mean_distance_reward': 1,
-                },
                 'init_qpos_range': [(0, 0, 0, 0)],
                 'num_objects': 4,
                 'target_qpos_range': [
+                    # 4 left
+                    # (-0.0475, -0.0475, -0.0475, -0.0475),
+                    # 2 left, 2 right
                     (-0.0475, -0.0475, 0.0475, 0.0475),
-                    # (-0.0475, -0.0475, 0.0475, 0.0475),
+                    (-0.0475, -0.0475, 0.0475, 0.0475),
                     # This second one is arbitrary for training env
                     # (0, 0, 0, 0),
                 ],
-                # 'cycle_goals': True,
+                'reset_fingers': False,
                 'observation_keys': (
                     'pixels',
                     'claw_qpos',
@@ -995,25 +1056,19 @@ PIXELS_PREPROCESSOR_PARAMS = {
         'kwargs': {
             'trainable': False,
             # === SlideBeads ===
-            # 'image_shape': (32, 32, 3),
-            # 'latent_dim': 16,
-            # 'encoder_path': os.path.join(PROJECT_PATH,
-            #                             'softlearning',
-            #                             'models',
-            #                             'slide_beads_vae_16_230iters',
-            #                             'encoder_16_dim_1_beta.h5'),
-            # === Free screw ===
             'image_shape': (32, 32, 3),
-            'latent_dim': 32,
-            # 'encoder_path': os.path.join(PROJECT_PATH,
-            #                             'softlearning',
-            #                             'models',
-            #                             'vae_32_dim_beta_half_free_screw_from_rnd_data',
-            #                             'encoder_32_dim_0.5_beta_final.h5'),
+            'latent_dim': 16,
             'encoder_path': os.path.join(NFS_PATH,
                                         'pretrained_models',
-                                        'free_screw_vae_32_dim_from_rnd_data',
-                                        'encoder_32_dim_0.5_beta_final.h5'),
+                                        'slide_beads_vae_16dim_1beta',
+                                        'encoder_16_dim_1_beta.h5'),
+            # === Free screw ===
+            # 'image_shape': (32, 32, 3),
+            # 'latent_dim': 32,
+            # 'encoder_path': os.path.join(NFS_PATH,
+            #                             'pretrained_models',
+            #                             'free_screw_vae_32_dim',
+            #                             'encoder_32_dim_0.5_beta_final.h5'),
             # === Fixed screw ===
             # 'image_shape': (32, 32, 3),
             # 'latent_dim': 16,
@@ -1032,12 +1087,12 @@ PIXELS_PREPROCESSOR_PARAMS = {
             'latent_dim': 32,
         },
         'shared': True,
-    }
+    },
     'ConvnetPreprocessor': tune.grid_search([
         {
             'type': 'ConvnetPreprocessor',
             'kwargs': {
-                'conv_filters': (16, 32, 64),
+                'conv_filters': (64, ) * 3,
                 'conv_kernel_sizes': (3, ) * 3,
                 'conv_strides': (2, ) * 3,
                 'normalization_type': normalization_type,
@@ -1084,7 +1139,6 @@ def get_variant_spec_base(universe, domain, task, task_eval,
                 'kwargs': get_environment_params(universe, domain, task_eval, from_vision),
             },
         },
-
         'policy_params': deep_update(
             POLICY_PARAMS_BASE[policy],
             POLICY_PARAMS_FOR_DOMAIN[policy].get(domain, {})
