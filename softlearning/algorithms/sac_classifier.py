@@ -32,6 +32,8 @@ class SACClassifier(SAC):
         self._classifier_batch_size = classifier_batch_size
         self._mixup_alpha = mixup_alpha
         self._hindsight_goal_prob = hindsight_goal_prob
+
+        self._training_loss = 0
         super(SACClassifier, self).__init__(**kwargs)
 
     def _build(self):

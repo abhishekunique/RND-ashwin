@@ -12,6 +12,7 @@ import skimage
 
 STATE_KEY = 'state'
 
+from skimage import transform
 
 class PixelObservationWrapper(ObservationWrapper):
     """Augment observations by pixel values."""
@@ -122,10 +123,22 @@ class PixelObservationWrapper(ObservationWrapper):
             width = render_kwargs.get('width')
             height = render_kwargs.get('height')
             _pixels = self.env.render(**{**self._render_kwargs,
-                'width': width * 4, 'height': height * 4})
+                                         'width': width * 4, 'height': height * 4})
+
             # TODO: Do this anti-aliasing in Mujoco render instead
             _pixels = skimage.transform.resize(
                 _pixels, (width, height), anti_aliasing=True, preserve_range=True)
+
+            if 'box_warp' in self._render_kwargs.keys() and self._render_kwargs['box_warp']:
+                # warp image
+                scale_factor = width / 32
+                rect = np.array([[5, 10], [27, 10], [0, 26], [31, 26]], np.float32) * scale_factor
+                dst = np.array([[0, 0], [31, 0], [0, 31], [31, 31]], np.float32) * scale_factor
+                tform3 = transform.ProjectiveTransform()
+                tform3.estimate(dst, rect)
+
+                _pixels = transform.warp(_pixels, tform3, output_shape=(width, height))
+
             _pixels = np.rint(_pixels).astype(np.uint8)
 
             pixels.append(_pixels)
