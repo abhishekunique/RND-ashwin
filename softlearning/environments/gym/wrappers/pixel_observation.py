@@ -136,7 +136,8 @@ class PixelObservationWrapper(ObservationWrapper):
             if self._box_warp:
                 # warp image
                 scale_factor = width / 32
-                if self._env._is_hardware:
+
+                if self._env.env._is_hardware:
                     rect = np.array([[5, 10], [27, 10], [0, 26], [31, 26]], np.float32) * scale_factor
                 else:
                     rect = np.array([[3, 6], [28, 6], [0, 31], [31, 31]], np.float32) * scale_factor
