@@ -231,11 +231,11 @@ class VAE(tfk.Model):
                 # conv2d(filters=32, strides=2),
                 tfkl.Flatten(),
                 # === JUST ADDED A NEW DENSE LAYER ===
-                # tfkl.Dense(
-                #     4 * latent_dim, # 128 for 32-dim latent
-                #     trainable=trainable,
-                #     kernel_regularizer=kernel_regularizer,
-                # ),
+                tfkl.Dense(
+                    4 * latent_dim, # 128 for 32-dim latent
+                    trainable=trainable,
+                    kernel_regularizer=kernel_regularizer,
+                ),
                 tfkl.Dense(
                     latent_dim + latent_dim,
                     trainable=trainable,
