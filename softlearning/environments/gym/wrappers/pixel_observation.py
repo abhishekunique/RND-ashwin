@@ -12,6 +12,7 @@ import skimage
 
 STATE_KEY = 'state'
 
+from skimage import transform
 
 class PixelObservationWrapper(ObservationWrapper):
     """Augment observations by pixel values."""
@@ -72,6 +73,10 @@ class PixelObservationWrapper(ObservationWrapper):
         self._pixels_only = pixels_only
         self._render_kwargs = render_kwargs
         self._observation_key = observation_key
+        if 'box_warp' in render_kwargs.keys():
+            self._box_warp = render_kwargs.pop('box_warp')
+        else:
+            self._box_warp = False
 
         if isinstance(wrapped_observation_space, spaces.Box):
             self._observation_is_dict = False
@@ -122,10 +127,26 @@ class PixelObservationWrapper(ObservationWrapper):
             width = render_kwargs.get('width')
             height = render_kwargs.get('height')
             _pixels = self.env.render(**{**self._render_kwargs,
-                'width': width * 4, 'height': height * 4})
+                                         'width': width * 4, 'height': height * 4})
+
             # TODO: Do this anti-aliasing in Mujoco render instead
             _pixels = skimage.transform.resize(
                 _pixels, (width, height), anti_aliasing=True, preserve_range=True)
+
+            if self._box_warp:
+                # warp image
+                scale_factor = width / 32
+
+                if self._env.env._is_hardware:
+                    rect = np.array([[5, 10], [27, 10], [0, 26], [31, 26]], np.float32) * scale_factor
+                else:
+                    rect = np.array([[3, 6], [28, 6], [0, 31], [31, 31]], np.float32) * scale_factor
+                dst = np.array([[0, 0], [31, 0], [0, 31], [31, 31]], np.float32) * scale_factor
+                tform3 = transform.ProjectiveTransform()
+                tform3.estimate(dst, rect)
+
+                _pixels = transform.warp(_pixels, tform3, output_shape=(width, height))
+
             _pixels = np.rint(_pixels).astype(np.uint8)
 
             pixels.append(_pixels)

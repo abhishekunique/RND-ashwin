@@ -55,9 +55,7 @@ POLICY_PARAMS_FOR_DOMAIN.update({
 
 MAX_PATH_LENGTH_PER_DOMAIN = {
     DEFAULT_KEY: 100,
-    # 'DClaw': 100,
-    'DClaw': 50,
-    # 'DClaw': tune.grid_search([50, 100, 150]), # 100, # 50
+    'DClaw': 100,
 }
 
 """
@@ -72,7 +70,7 @@ ALGORITHM_PARAMS_BASE = {
         'train_every_n_steps': 1,
         'n_train_repeat': 1,
         'eval_render_kwargs': {},
-        'eval_n_episodes': 10,
+        'eval_n_episodes': 3,
         'eval_deterministic': True,
         'save_training_video_frequency': 5,
         'discount': 0.99,
@@ -95,8 +93,6 @@ ALGORITHM_PARAMS_BASE = {
     }
 }
 
-# TODO(Avi): Most of the algorithm params for classifier-style methods
-# are shared. Rewrite this part to reuse the params
 ALGORITHM_PARAMS_ADDITIONAL = {
     'SAC': {
         'type': 'SAC',
@@ -179,17 +175,18 @@ ALGORITHM_PARAMS_ADDITIONAL = {
             'target_entropy': 'auto',
             'action_prior': 'uniform',
             'her_iters': tune.grid_search([0]),
-            'rnd_int_rew_coeffs': [1, 1],
-            # 'rnd_int_rew_coeffs': tune.sample_from([[0, 0]]),
             # === BELOW FOR RND RESET CONTROLLER ===
+            'rnd_int_rew_coeffs': tune.sample_from([[1, 1]]),
             'ext_reward_coeffs': [1, 0], # 0 corresponds to reset policy
             # === BELOW FOR 2 GOALS ===
+            # 'rnd_int_rew_coeffs': tune.sample_from([[0, 0]]),
             # 'ext_reward_coeffs': [1, 1],
+            'n_initial_exploration_steps': int(1e4),
             'normalize_ext_reward_gamma': 0.99,
             'share_pool': False,
             'n_classifier_train_steps': 5,
             'classifier_optim_name': 'adam',
-            'n_epochs': 500,
+            'n_epochs': 200,
             'mixup_alpha': 1.0,
             # 'eval_n_episodes': 24, # 24 for free screw
             'eval_n_episodes': 8, # 8 for beads, fixed screw
@@ -271,12 +268,16 @@ ALGORITHM_PARAMS_ADDITIONAL = {
             'tau': 5e-3,
             'target_entropy': 'auto',
             'action_prior': 'uniform',
+            'rnd_int_rew_coeff': tune.sample_from([5]),
+            # Only train with RND reset controller
+            'ext_reward_coeff': 0, # 0 corresponds to reset policy
+            # 'normalize_ext_reward_gamma': 0.99,
+            'n_initial_exploration_steps': int(1e4),
+            'n_classifier_train_steps': 0,
             'classifier_lr': 1e-4,
             'classifier_batch_size': 128,
-            'n_initial_exploration_steps': int(1e3),
-            'n_classifier_train_steps': 5,
             'classifier_optim_name': 'adam',
-            'n_epochs': 1000,
+            'n_epochs': 1500,
             'mixup_alpha': 1.0,
             'normalize_ext_reward_gamma': 0.99,
             'rnd_int_rew_coeff': 0,
@@ -378,6 +379,7 @@ CLASSIFIER_PARAMS_PER_UNIVERSE_DOMAIN_TASK = {
                     'TurnResetFree-v0',
                     'TurnFreeValve3ResetFree-v0',
                     'SlideBeadsResetFree-v0',
+                    'TurnFreeValve3Hardware-v0',
                 )
             },
             **{
@@ -714,6 +716,29 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_VISION = {
                     'object_z_orientation_cos',
                     'object_z_orientation_sin',
                 ),
+            },
+            # === FREE SCREW HARDWARE ===
+            'TurnFreeValve3Hardware-v0': {
+                'pixel_wrapper_kwargs': {
+                    'pixels_only': False,
+                    'normalize': False,
+                    'render_kwargs': {
+                       'width': 32,
+                       'height': 32,
+                       'camera_id': -1,
+                       'box_warp': True,
+                    }
+                },
+                'observation_keys': (
+                    'claw_qpos',
+                    'pixels',
+                    'last_action',
+                ),
+                'device_path': '/dev/ttyUSB0',
+                'camera_config': {
+                    'topic': '/kinect2_001161563647/qhd/image_color',
+                    'image_shape': (256, 256, 3),
+                }
             },
             'TurnFreeValve3ResetFreeSwapGoal-v0': {
                 **FREE_SCREW_VISION_KWARGS,
@@ -1055,21 +1080,28 @@ PIXELS_PREPROCESSOR_PARAMS = {
         'type': 'VAEPreprocessor',
         'kwargs': {
             'trainable': False,
-            # === SlideBeads ===
-            'image_shape': (32, 32, 3),
-            'latent_dim': 16,
-            'encoder_path': os.path.join(NFS_PATH,
-                                        'pretrained_models',
-                                        'slide_beads_vae_16dim_1beta',
-                                        'encoder_16_dim_1_beta.h5'),
-            # === Free screw ===
+            # === Bead manipulation ===
             # 'image_shape': (32, 32, 3),
-            # 'latent_dim': 32,
-            # 'encoder_path': os.path.join(NFS_PATH,
-            #                             'pretrained_models',
-            #                             'free_screw_vae_32_dim',
-            #                             'encoder_32_dim_0.5_beta_final.h5'),
-            # === Fixed screw ===
+            # 'latent_dim': 16,
+            # 'encoder_path': os.path.join(PROJECT_PATH,
+            #                             'softlearning',
+            #                             'models',
+            #                             'slide_beads_vae_16_230iters',
+            #                             'encoder_16_dim_1_beta.h5'),
+            # === Free Screw ===
+            'image_shape': (32, 32, 3),
+            'latent_dim': 32, # 8,
+            'encoder_path': os.path.join(PROJECT_PATH,
+                                        'softlearning',
+                                        'models',
+                                        'hardware_free_screw_vae_black_box',
+                                        'encoder_32_dim_0.5_beta_final.h5'),
+            # 'encoder_path': os.path.join(PROJECT_PATH,
+            #                             'softlearning',
+            #                             'models',
+            #                             'hardware_free_screw_vae_rnd_filtered_warped_include_claw',
+            #                             'encoder_8_dim_0.5_beta_final.h5'),
+            # === Fixed Screw ===
             # 'image_shape': (32, 32, 3),
             # 'latent_dim': 16,
             # 'encoder_path': os.path.join(PROJECT_PATH,

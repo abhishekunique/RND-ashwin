@@ -57,6 +57,19 @@ GOAL_POOL_PATHS_PER_ENV_PER_NUM_GOALS = {
             for i, goal in enumerate([-90, 90])
         ),
     },
+    'TurnFreeValve3Hardware-v0': {
+        # '2': (
+        #     f'free_screw_2_goals/goal_{i}_{goal}'
+        #     for i, goal in enumerate([-90, 90])
+        # ),
+        '2': (
+            'free_screw_lighting_fix/'
+            # 'free_screw_goal_images_black_box/'
+            # 'free_screw_goal_images_black_box_more_friction/'
+            for i, goal in enumerate([90, 90])
+        ),
+    },
+
     'LiftDDResetFree-v0': {
         '1': ('dodecahedron_lifting_bowl_arena/', ),
     },

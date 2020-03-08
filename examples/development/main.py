@@ -320,7 +320,7 @@ class ExperimentRunner(tune.Trainable):
                 'variant': self._variant,
                 'training_environment': self.training_environment,
                 'evaluation_environment': self.evaluation_environment,
-                'samplers': self._samplers,
+                # 'samplers': self._samplers, don't save sampler. Involves saving entire pool.
                 'algorithm': self.algorithm,
                 'policy_weights': [policy.get_weights() for policy in self._policies],
                 'rnd_networks': self.rnd_networks,
@@ -329,7 +329,7 @@ class ExperimentRunner(tune.Trainable):
             'variant': self._variant,
             'training_environment': self.training_environment,
             'evaluation_environment': self.evaluation_environment,
-            'sampler': self.sampler,
+            # 'sampler': self.sampler,
             'algorithm': self.algorithm,
             'policy_weights': self.policy.get_weights(),
             'rnd_networks': self.rnd_networks,
@@ -377,6 +377,13 @@ class ExperimentRunner(tune.Trainable):
                         checkpoint_dir,
                         f'Qs_{i}_{j}')
                     Q.load_weights(checkpoint_path)
+            for i, Q_targets in enumerate(self._Q_targets_per_policy):
+                for j, Q in enumerate(Q_targets):
+                    checkpoint_path = os.path.join(
+                        checkpoint_dir,
+                        f'Qs_{i}_{j}')
+                    Q.load_weights(checkpoint_path)
+
         else:
             if isinstance(self.Qs, tf.keras.Model):
                 Qs = [self.Qs]
@@ -533,7 +540,8 @@ class ExperimentRunner(tune.Trainable):
         if variant['run_params'].get('checkpoint_replay_pool', False):
             self._restore_replay_pool(checkpoint_dir)
 
-        sampler = self.sampler = picklable['sampler']
+        sampler = self.sampler = get_sampler_from_variant(
+            variant)
         Qs = self.Qs = get_Q_function_from_variant(
             variant, training_environment)
         self._restore_value_functions(checkpoint_dir)
@@ -589,12 +597,20 @@ class ExperimentRunner(tune.Trainable):
             ])
             self._restore_replay_pools(checkpoint_dir)
 
-        samplers = self._samplers = picklable['samplers']
+        samplers = self._samplers = tuple([
+            get_sampler_from_variant(variant)
+            for _ in range(num_goals)
+        ])
 
         Qs_per_policy = self._Qs_per_policy = tuple([
             get_Q_function_from_variant(variant, training_environment)
             for _ in range(num_goals)
         ])
+        Q_targets_per_policy = self._Q_targets_per_policy = tuple([
+            get_Q_function_from_variant(variant, training_environment)
+            for _ in range(num_goals)
+        ])
+
         self._restore_value_functions(checkpoint_dir)
 
         policies = self._policies = tuple([
@@ -623,6 +639,7 @@ class ExperimentRunner(tune.Trainable):
             'policies': policies,
             'initial_exploration_policy': initial_exploration_policy,
             'Qs_per_policy': Qs_per_policy,
+            'Q_targets_per_policy': Q_targets_per_policy,
             'pools': replay_pools,
             'samplers': samplers,
             'session': self._session,
@@ -671,6 +688,7 @@ class ExperimentRunner(tune.Trainable):
                 Q_target.set_weights(Q.get_weights())
 
         self._built = True
+        print("Finished Restoring")
 
 
 def main(argv=None):

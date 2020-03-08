@@ -61,6 +61,7 @@ class ExperimentRunnerClassifierRL(ExperimentRunner):
         if 'reward_classifier' in picklable.keys():
             reward_classifier = self.reward_classifier = picklable[
                 'reward_classifier']
+
             algorithm_kwargs['classifier'] = reward_classifier
 
             goal_examples_train, goal_examples_validation = (
@@ -84,7 +85,6 @@ class ExperimentRunnerClassifierRL(ExperimentRunner):
             algorithm_kwargs['classifiers'] = reward_classifiers
             goal_pools_train, goal_pools_validation = (
                 get_example_pools_from_variant(variant))
-            algorithm_kwargs['classifiers'] = reward_classifiers
             algorithm_kwargs['goal_example_pools'] = goal_pools_train
             algorithm_kwargs['goal_example_validation_pools'] = goal_pools_validation
         return algorithm_kwargs

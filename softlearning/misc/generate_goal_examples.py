@@ -32,6 +32,8 @@ GOAL_IMAGE_PATH_PER_ENVIRONMENT = {
     # 'TurnFreeValve3Fixed-v0': 'free_screw_180_regular_box_48/',
     'TurnFreeValve3Fixed-v0': 'free_screw_180/',
     'TurnFixed-v0': 'fixed_screw_180_no_normalization/',
+    'TurnResetFree-v0': '/home/abhigupta/Libraries/vice/goal_classifier/fixed_screw_180/', #'fixed_screw_-75',
+    'TurnFreeValve3Hardware-v0': 'fixed_screw_180', # Dummy goal images
     'TurnMultiGoalResetFree-v0': 'fixed_screw_2_goals_mixed_pool_goal_index/',
     'LiftDDResetFree-v0': 'dodecahedron_lifting_flat_bowl_arena_red',
     'SlideBeadsResetFree-v0': '4_beads_475',
