@@ -20,12 +20,11 @@ dask==1.0.0
 decorator==4.3.0
 docutils==0.14
 deepdiff==3.3.0
-git+https://github.com/deepmind/dm_control.git@e681949dda5ef1b05acf4fad99a134101469d8e7
 flatbuffers==1.10
 flatten-dict==0.0.3.post1
 funcsigs==1.0.2
 future==0.17.1
-gast==0.2.0
+gast==0.2.2
 gitdb2==2.0.5
 GitPython==2.1.11
 glfw==1.7.0
@@ -36,7 +35,7 @@ google-compute-engine==2.8.13
 grpcio==1.16.1
 gtimer==1.0.0b5
 # gym==0.12.1
-git+https://github.com/hartikainen/gym.git@ddef8a1418724354e93f82a5109ee9b7006521a5
+gym==0.15.6
 h5py==2.8.0
 httplib2==0.12.0
 idna==2.7
@@ -51,15 +50,16 @@ lockfile==0.12.2
 Markdown==3.0.1
 matplotlib==3.0.2
 more-itertools==4.3.0
-git+https://github.com/hartikainen/mujoco-py.git@435d2143abe04fe4648c6c0c1b848bf1fc06b73b
-git+https://github.com/avisingh599/multiworld.git@19bf319422c0016260166bf64e194552bf2a9e68
+# git+https://github.com/hartikainen/mujoco-py.git@435d2143abe04fe4648c6c0c1b848bf1fc06b73b
+# git+https://github.com/avisingh599/multiworld.git@19bf319422c0016260166bf64e194552bf2a9e68
+mujoco-py<2.1,>=2.0
 networkx==2.2
-numpy==1.16.0
+numpy==1.17.3
 opencv-python==4.0.0.21
 pandas==0.23.4
 Pillow==5.3.0
 plotly==1.9.6
-pluggy==0.8.0
+pluggy==0.9.0
 protobuf==3.6.1
 py==1.7.0
 pyasn1==0.4.4
@@ -82,7 +82,7 @@ redis==3.0.1
 requests==2.20.1
 # robosuite==0.1.0
 rsa==3.4.2
-ruamel-yaml==0.15.46
+# ruamel-yaml==0.15.46
 s3transfer==0.2.0
 scikit-image==0.14.2
 scikit-video==1.1.11
@@ -92,11 +92,11 @@ git+https://github.com/hartikainen/serializable.git@76516385a3a716ed4a2a9ad877e2
 setproctitle==1.1.10
 six==1.11.0
 smmap2==2.0.5
-tensorboard==1.14.0
-tensorflow==1.15rc2
+tensorboard==1.15.0
+tensorflow==1.15
 tensorflow-probability==0.7.0
 termcolor==1.1.0
 toolz==0.9.0
 uritemplate==3.0.0
-urllib3==1.25.1
+urllib3<1.25,>=1.21.1
 Werkzeug==0.14.1
