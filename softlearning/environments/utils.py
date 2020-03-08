@@ -31,6 +31,15 @@ except ModuleNotFoundError as e:
     print("Warning: robosuite package not found. Run `pip install robosuite`"
           " to use robosuite environments.")
 
+try:
+    import multiworld
+    multiworld.register_all_envs()
+except ModuleNotFoundError as e:
+    if 'multiworld' not in e.msg:
+        raise
+    print("Warning: multiworld package not found.")
+
+
 UNIVERSES = set(ADAPTERS.keys())
 
 def get_environment(universe, domain, task, environment_kwargs):

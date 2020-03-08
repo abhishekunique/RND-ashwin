@@ -12,8 +12,6 @@ import os
 
 DEFAULT_KEY = '__DEFAULT_KEY__'
 
-# M = 256
-# N = 2
 M = 512
 N = 2
 
@@ -396,57 +394,11 @@ CLASSIFIER_PARAMS_PER_UNIVERSE_DOMAIN_TASK = {
 ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_STATE = {
     'gym': {
         'DClaw': {
-            # FIXED SCREW
-            'TurnMultiGoalResetFree-v0': {
-                'goals': (
-                    -np.pi / 2,
-                    np.pi / 2
-                ),
-                'initial_goal_index': 0,
-                'swap_goals_upon_completion': False,
-                'use_concatenated_goal': False,
-                'one_hot_goal_index': True,
-                'reward_keys_and_weights': {
-                    'object_to_target_angle_dist': 1,
-                },
-                'observation_keys': (
-                    'claw_qpos',
-                    'last_action',
-                    'goal_index',
-                    # 'one_hot_goal_index',
-                    # 'object_angle_cos',
-                    # 'object_angle_sin',
-                ),
-            },
-            'TurnMultiGoal-v0': { # eval environment
-                'goals': (
-                    -np.pi / 2,
-                    np.pi / 2
-                ),
-                'initial_goal_index': 0,
-                'swap_goals_upon_completion': False,
-                'use_concatenated_goal': False,
-                'one_hot_goal_index': True,
-                'reward_keys_and_weights': {
-                    'object_to_target_angle_dist': 1,
-                },
-                'observation_keys': (
-                    'claw_qpos',
-                    'last_action',
-                    'goal_index',
-                    # 'one_hot_goal_index',
-                    # 'object_angle_cos',
-                    # 'object_angle_sin',
-                ),
-            },
-
             'TurnResetFree-v0': {
                 'init_object_pos_range': (0., 0.),
                 'target_pos_range': (-np.pi, np.pi),
                 'reward_keys': ('object_to_target_angle_dist_cost', )
             },
-
-            # FREE SCREW
             'TurnFreeValve3ResetFree-v0': {
                 'reward_keys_and_weights': {
                     'object_to_target_position_distance_reward': 2,
@@ -500,7 +452,6 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_STATE = {
                     'object_to_target_orientation_distance_cost': 1,
                 },
             },
-
             # LIFTING
             'LiftDDFixed-v0': {
                 'reset_policy_checkpoint_path': None,
@@ -819,7 +770,6 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_VISION = {
                     'object_to_target_xy_position_distance_reward': 0,
                     'object_to_target_orientation_distance_reward': 0, #tune.sample_from([1, 5]), #5,
                 },
-                # 'reset_policy_checkpoint_path': '/home/abhigupta/ray_results/gym/DClaw/LiftDDResetFree-v0/2019-08-12T22-28-02-random_translate/id=1efced72-seed=3335_2019-08-12_22-28-03bqyu82da/checkpoint_1500/',
                 # 'target_qpos_range': (
                 #      (-0.1, -0.1, 0.0, 0, 0, 0),
                 #      (0.1, 0.1, 0.0, 0, 0, 0), # bgreen side up

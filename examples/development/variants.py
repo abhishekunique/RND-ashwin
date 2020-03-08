@@ -9,8 +9,6 @@ DEFAULT_KEY = "__DEFAULT_KEY__"
 
 # M = number of hidden units per layer
 # N = number of hidden layers
-# M = 256
-# N = 2
 M = 512
 N = 2
 
@@ -145,7 +143,7 @@ MAX_PATH_LENGTH_PER_UNIVERSE_DOMAIN_TASK = {
     DEFAULT_KEY: 1000,
     'gym': {
         DEFAULT_KEY: 1000,
-        'Point2DEnv': {
+        'Point2D': {
             DEFAULT_KEY: 50,
         },
         'Pendulum': {
@@ -283,8 +281,20 @@ NUM_EPOCHS_PER_UNIVERSE_DOMAIN_TASK = {
 
 ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_STATE = {
     'gym': {
-        'DClaw': {
-            # FIXED SCREW
+        'Point2D': {
+            # === Point Mass ===
+            'Fixed-v0': {
+                'ball_radius': 0.5,
+                'target_radius': 0.5,
+                'boundary_distance': 4,
+                'images_are_rgb': True,
+                'init_pos_range': None,
+                'target_pos_range': None,
+                'observation_keys': ('state_observation', 'state_desired_goal')
+            },
+        },
+        'DClaw': { 
+            # === Fixed Screw ===
             'TurnMultiGoalResetFree-v0': {
                 'goals': (
                     -np.pi / 2,
@@ -527,25 +537,7 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_STATE = {
                 'reset_fingers': tune.grid_search([True, False]),
                 'reset_arm': False,
             },
-            'ScrewFixed-v0': {},
-            'ScrewRandom-v0': {},
-            'ScrewRandomDynamics-v0': {},
-
             # Lifting Tasks
-            # 'LiftDDFixed-v0': {
-            #     'reward_keys_and_weights': {
-            #         'object_to_target_z_position_distance_reward': 10,
-            #         'object_to_target_xy_position_distance_reward': 0,
-            #         'object_to_target_orientation_distance_reward': 0, #5,
-            #     },
-            #     'init_qpos_range': [(0, 0, 0.041, 1.017, 0, 0)],
-            #     'target_qpos_range': [(0, 0, 0.05, 0, 0, 0)]
-            #     # [  # target pos relative to init
-            #     #      (0, 0, 0, 0, 0, np.pi),
-            #     #      (0, 0, 0, np.pi, 0, 0), # bgreen side up
-            #     #      (0, 0, 0, 1.017, 0, 2*np.pi/5), # black side up
-            #     #  ],
-            # },
             'LiftDDFixed-v0': {
                 'reward_keys_and_weights': {
                     'object_to_target_z_position_distance_reward': 10,
@@ -562,20 +554,6 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_STATE = {
                 ),
                 'use_bowl_arena': False,
             },
-
-            # 'LiftDDResetFree-v0': {
-            #     'reward_keys_and_weights': {
-            #         'object_to_target_z_position_distance_reward': 10,
-            #         'object_to_target_xy_position_distance_reward': 0,
-            #         'object_to_target_orientation_distance_reward': 0,
-            #     },
-            #     # 'init_qpos_range': [(0, 0, 0.041, 1.017, 0, 0)],
-            #     'init_qpos_range': (
-            #         (0, 0, 0.041, -np.pi, -np.pi, -np.pi),
-            #         (0, 0, 0.041, np.pi, np.pi, np.pi),
-            #     ),
-            #     'target_qpos_range': [(0, 0, 0.05, 0, 0, 0)],
-            # },
             'LiftDDResetFree-v0': {
                 'reward_keys_and_weights': {
                     'object_to_target_z_position_distance_reward': 0,

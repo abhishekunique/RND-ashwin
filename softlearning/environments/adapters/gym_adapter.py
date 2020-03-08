@@ -140,9 +140,13 @@ class GymAdapter(SoftlearningEnv):
         return observation
 
     def render(self, *args, width=100, height=100, **kwargs):
-        if isinstance(self._env.unwrapped, MujocoEnv):
-            self._env.render(*args, width=width, height=height, **kwargs)
-        return self._env.render(*args, width=width, height=height, **kwargs)
+        try:
+            if isinstance(self._env.unwrapped, MujocoEnv):
+                self._env.render(*args, width=width, height=height, **kwargs)
+            rendered = self._env.render(*args, width=width, height=height, **kwargs)
+        except:
+            rendered = self._env.render(*args, **kwargs)
+        return rendered
 
     def seed(self, *args, **kwargs):
         return self._env.seed(*args, **kwargs)
