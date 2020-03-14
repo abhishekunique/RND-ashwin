@@ -91,3 +91,9 @@ class GoalReplayPool(FlexibleReplayPool):
 
         return super(GoalReplayPool, self).add_samples(
             samples, *args, **kwargs)
+
+    def random_batch(self, batch_size, **kwargs):
+        batch = super(GoalReplayPool, self).random_batch(batch_size, **kwargs)
+        # batch['observations'] = {**batch['observations'], **batch['goals']}
+        # batch['next_observations'] = {**batch['next_observations'], **batch['goals']}
+        return batch

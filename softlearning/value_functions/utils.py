@@ -29,10 +29,11 @@ def get_Q_function_from_variant(variant, env, *args, **kwargs):
         'observation_preprocessors_params', {}).copy()
     observation_keys = Q_kwargs.pop(
         'observation_keys', None) or env.observation_keys
+    goal_keys = Q_kwargs.pop('goal_keys', tuple())
 
     observation_shapes = OrderedDict((
         (key, value) for key, value in env.observation_shape.items()
-        if key in observation_keys
+        if key in observation_keys + goal_keys
     ))
     action_shape = env.action_shape
     input_shapes = {
@@ -59,6 +60,7 @@ def get_Q_function_from_variant(variant, env, *args, **kwargs):
     Q_function = VALUE_FUNCTIONS[Q_type](
         input_shapes=input_shapes,
         observation_keys=observation_keys,
+        goal_keys=goal_keys,
         *args,
         preprocessors=preprocessors,
         **Q_kwargs,

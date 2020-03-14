@@ -118,7 +118,7 @@ def REPLACE_FLAT_OBSERVATION(original_batch,
     resampled_batch_flat = flatten(resampled_batch)
     observation_keys = [
         key for key in batch_flat.keys()
-        if key[0] == 'observations' or key[0] == 'next_observations' 
+        if key[0] == 'observations' or key[0] == 'next_observations'
     ]
     for key in observation_keys:
         state_size = int(batch_flat[key].shape[1] / 2)
@@ -148,7 +148,7 @@ class HindsightExperienceReplayPool(ResamplingReplayPool):
         batch['resampled_distances'] = np.full(
             (batch_size, 1), np.float('inf'))
         batch['resampled'] = np.zeros((batch_size, 1), dtype='bool')
-
+        import ipdb; ipdb.set_trace()
         if her_strategy:
             her_strategy_type = self._her_strategy['type']
             goal_resampling_probability = self._her_strategy[

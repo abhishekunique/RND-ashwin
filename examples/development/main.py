@@ -57,9 +57,9 @@ class ExperimentRunner(tune.Trainable):
             get_environment_from_params(environment_params['evaluation'])
             if 'evaluation' in environment_params
             else training_environment)
+
         replay_pool = self.replay_pool = (
             get_replay_pool_from_variant(variant, training_environment))
-
         policy = self.policy = get_policy_from_variant(
             variant, training_environment)
 
@@ -68,7 +68,7 @@ class ExperimentRunner(tune.Trainable):
         Q_targets = self.Q_targets = get_Q_function_from_variant(
             variant, training_environment)
 
-        # Set the preprocessors to be the same thing
+        # Set the preprocessors to be the same
         preprocessor_params = variant['Q_params']['kwargs']['observation_preprocessors_params']
         for observation_name, params in preprocessor_params.items():
             if params and params.get('shared', False):
@@ -79,7 +79,7 @@ class ExperimentRunner(tune.Trainable):
                     policy.preprocessors[observation_name] is preprocessor and
                     Qs[1].observations_preprocessors[observation_name] is preprocessor)
 
-        # ==== LOADING IN CONVNET FROM WORKING RUN EXPERIMENT ====
+        # ==== LOADING IN CONVNET EXPERIMENT ====
         if ('pixels' in preprocessor_params
                 and 'ConvnetPreprocessor' == preprocessor_params['pixels']['type']
                 and preprocessor_params['pixels'].get('weights_path', None) is not None):
@@ -115,8 +115,7 @@ class ExperimentRunner(tune.Trainable):
         # else:
         #     state_estimator = None
 
-        sampler = self.sampler = get_sampler_from_variant(
-            variant)
+        sampler = self.sampler = get_sampler_from_variant(variant)
             # state_estimator=state_estimator)
 
         last_checkpoint_dir = variant['replay_pool_params'].get(

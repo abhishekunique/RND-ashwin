@@ -191,14 +191,14 @@ class SAC(RLAlgorithm):
     def _get_Q_target(self):
         policy_inputs = flatten_input_structure({
             name: self._placeholders['next_observations'][name]
-            for name in self._policy.observation_keys
+            for name in self._policy.all_keys
         })
         next_actions = self._policy.actions(policy_inputs)
         next_log_pis = self._policy.log_pis(policy_inputs, next_actions)
 
         next_Q_observations = {
             name: self._placeholders['next_observations'][name]
-            for name in self._Qs[0].observation_keys
+            for name in self._Qs[0].all_keys
         }
         next_Q_inputs = flatten_input_structure(
             {**next_Q_observations, 'actions': next_actions})
@@ -388,7 +388,7 @@ class SAC(RLAlgorithm):
 
         Q_observations = {
             name: self._placeholders['observations'][name]
-            for name in self._Qs[0].observation_keys
+            for name in self._Qs[0].all_keys
         }
         Q_inputs = flatten_input_structure({
             **Q_observations, 'actions': self._placeholders['actions']})
@@ -428,7 +428,7 @@ class SAC(RLAlgorithm):
         """
         policy_inputs = flatten_input_structure({
             name: self._placeholders['observations'][name]
-            for name in self._policy.observation_keys
+            for name in self._policy.all_keys
         })
         actions = self._policy.actions(policy_inputs)
         log_pis = self._policy.log_pis(policy_inputs, actions)
@@ -466,7 +466,7 @@ class SAC(RLAlgorithm):
 
         Q_observations = {
             name: self._placeholders['observations'][name]
-            for name in self._Qs[0].observation_keys
+            for name in self._Qs[0].all_keys
         }
         Q_inputs = flatten_input_structure({
             **Q_observations, 'actions': actions})
@@ -503,7 +503,7 @@ class SAC(RLAlgorithm):
         })
         policy_inputs = flatten_input_structure({
             name: self._placeholders['observations'][name]
-            for name in self._policy.observation_keys
+            for name in self._policy.all_keys
         })
 
         targets = tf.stop_gradient(self._rnd_target(policy_inputs))
@@ -611,6 +611,7 @@ class SAC(RLAlgorithm):
 
     def _do_training(self, iteration, batch):
         """Runs the operations for updating training and target ops."""
+        import ipdb; ipdb.set_trace()
         feed_dict = self._get_feed_dict(iteration, batch)
 
         # ======
@@ -742,16 +743,17 @@ class SAC(RLAlgorithm):
             for key, value in
             self._policy.get_diagnostics(flatten_input_structure({
                 name: batch['observations'][name]
-                for name in self._policy.observation_keys
+                for name in self._policy.all_keys
             })).items()
         ]))
 
         # VAE diagnostics
-        random_idxs = np.random.choice(
-            feed_dict[self._placeholders['observations']['pixels']].shape[0],
-            size=self._n_preprocessor_evals_per_epoch)
-        eval_pixels = (
-            feed_dict[self._placeholders['observations']['pixels']][random_idxs])
+        if self._uses_vae or self._uses_rae:
+            random_idxs = np.random.choice(
+                feed_dict[self._placeholders['observations']['pixels']].shape[0],
+                size=self._n_preprocessor_evals_per_epoch)
+            eval_pixels = (
+                feed_dict[self._placeholders['observations']['pixels']][random_idxs])
 
         should_save = self._save_reconstruction_frequency == 0
         if self._uses_vae and should_save:

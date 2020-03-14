@@ -56,10 +56,11 @@ def get_policy_from_params(policy_params, env, *args, **kwargs):
         'observation_preprocessors_params', {})
     observation_keys = policy_kwargs.pop(
         'observation_keys', None) or env.observation_keys
+    goal_keys = policy_kwargs.pop('goal_keys', None) or tuple()
 
     observation_shapes = OrderedDict((
         (key, value) for key, value in env.observation_shape.items()
-        if key in observation_keys
+        if key in observation_keys + goal_keys
     ))
 
     observation_preprocessors = OrderedDict()
@@ -80,6 +81,7 @@ def get_policy_from_params(policy_params, env, *args, **kwargs):
         input_shapes=observation_shapes,
         output_shape=env.action_space.shape,
         observation_keys=observation_keys,
+        goal_keys=goal_keys,
         *args,
         preprocessors=observation_preprocessors,
         **policy_kwargs,

@@ -1118,7 +1118,15 @@ def get_variant_spec_base(universe, domain, task, task_eval,
                 'domain': domain,
                 'task': task_eval,
                 'universe': universe,
-                'kwargs': get_environment_params(universe, domain, task_eval, from_vision),
+                'kwargs': (
+                    tune.sample_from(lambda spec: (
+                        spec.get('config', spec)
+                        ['environment_params']
+                        ['training']
+                        .get('kwargs')
+                    ))
+                    if task == task_eval
+                    else get_environment_params(universe, domain, task_eval, from_vision)),
             },
         },
         'policy_params': deep_update(
@@ -1176,6 +1184,7 @@ def get_variant_spec_base(universe, domain, task, task_eval,
         },
     }
 
+    import ipdb; ipdb.set_trace()
     # Filter out parts of the state relating to the object when training from pixels
     env_kwargs = variant_spec['environment_params']['training']['kwargs']
     if from_vision and "device_path" not in env_kwargs.keys():

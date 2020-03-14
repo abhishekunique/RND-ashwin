@@ -7,6 +7,7 @@ def create_feedforward_Q_function(input_shapes,
                                   *args,
                                   preprocessors=None,
                                   observation_keys=None,
+                                  goal_keys=None,
                                   name='feedforward_Q',
                                   **kwargs):
     inputs_flat = create_inputs(input_shapes)
@@ -33,7 +34,9 @@ def create_feedforward_Q_function(input_shapes,
     Q_function = PicklableModel(inputs_flat, Q_function(preprocessed_inputs))
     preprocessed_inputs_fn = PicklableModel(inputs_flat, preprocessed_inputs)
 
-    Q_function.observation_keys = observation_keys
+    Q_function.observation_keys = observation_keys or ()
+    Q_function.goal_keys = goal_keys or ()
+    Q_function.all_keys = observation_keys + goal_keys
 
     Q_function.actions_preprocessors = preprocessors['actions']
     Q_function.observations_preprocessors = preprocessors['observations']

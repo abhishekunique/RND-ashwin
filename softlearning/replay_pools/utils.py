@@ -28,8 +28,8 @@ DEFAULT_REPLAY_POOL = 'SimpleReplayPool'
 
 
 def get_replay_pool_from_params(replay_pool_params, env, *args, **kwargs):
-    replay_pool_type = replay_pool_params['type']
-    replay_pool_kwargs = replay_pool_params['kwargs'].copy()
+    replay_pool_type = replay_pool_params.pop('type', DEFAULT_REPLAY_POOL)
+    replay_pool_kwargs = replay_pool_params.pop('kwargs', {})
 
     replay_pool = POOL_CLASSES[replay_pool_type](
         *args,

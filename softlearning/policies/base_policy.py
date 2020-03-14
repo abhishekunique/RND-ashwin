@@ -12,13 +12,22 @@ class PreprocessorConfig(object):
         self.config = config
 
 class BasePolicy(Serializable):
-    def __init__(self, observation_keys):
+    def __init__(self, observation_keys, goal_keys=()):
         self._observation_keys = observation_keys
+        self._goal_keys = goal_keys
         self._deterministic = False
 
     @property
     def observation_keys(self):
         return self._observation_keys
+
+    @property
+    def goal_keys(self):
+        return self._goal_keys
+
+    @property
+    def all_keys(self):
+        return self._observation_keys + self._goal_keys
 
     @property
     def input_names(self):
