@@ -6,7 +6,6 @@ import os
 
 from softlearning.misc.utils import PROJECT_PATH
 goal_directory = os.path.join(PROJECT_PATH, 'goal_classifier')
-print(goal_directory)
 
 PICK_TASKS = [
     'StateSawyerPickAndPlaceEnv-v0',
@@ -27,16 +26,23 @@ PUSH_TASKS = [
     'Image48SawyerPushForwardEnv-v0',
 ]
 
-GOAL_IMAGE_PATH_PER_ENVIRONMENT = {
-    'TurnFreeValve3ResetFree-v0': 'free_screw_180/',
-    # 'TurnFreeValve3Fixed-v0': 'free_screw_180_regular_box_48/',
-    'TurnFreeValve3Fixed-v0': 'free_screw_180/',
-    'TurnFixed-v0': 'fixed_screw_180_no_normalization/',
-    'TurnResetFree-v0': '/home/abhigupta/Libraries/vice/goal_classifier/fixed_screw_180/', #'fixed_screw_-75',
-    'TurnFreeValve3Hardware-v0': 'fixed_screw_180', # Dummy goal images
-    'TurnMultiGoalResetFree-v0': 'fixed_screw_2_goals_mixed_pool_goal_index/',
-    'LiftDDResetFree-v0': 'dodecahedron_lifting_flat_bowl_arena_red',
-    'SlideBeadsResetFree-v0': '4_beads_475',
+GOAL_PATH_PER_UNIVERSE_DOMAIN_TASK = {
+    'gym': {
+        'Point2D': {
+            'Fixed-v0': 'pointmass_nowalls',
+            'SingleWall-v0': 'pointmass_nowalls',
+            'BoxWall-v1': 'pointmass_boxwall',
+        },
+        'DClaw': {
+            'TurnFreeValve3ResetFree-v0': 'free_screw_180',
+            'TurnFreeValve3Fixed-v0': 'free_screw_180',
+            'TurnFixed-v0': 'fixed_screw_180_no_normalization',
+            'TurnFreeValve3Hardware-v0': 'fixed_screw_180',
+            'TurnMultiGoalResetFree-v0': 'fixed_screw_2_goals_mixed_pool_goal_index',
+            'LiftDDResetFree-v0': 'dodecahedron_lifting_flat_bowl_arena_red',
+            'SlideBeadsResetFree-v0': '4_beads_475',
+        },
+    },
 }
 
 
@@ -44,9 +50,11 @@ def get_goal_example_from_variant(variant):
     train_env_params = variant['environment_params']['training']
 
     env = get_environment_from_params(train_env_params)
-    total_goal_examples = variant['data_params']['n_goal_examples'] \
-        + variant['data_params']['n_goal_examples_validation_max']
+    total_goal_examples = (variant['data_params']['n_goal_examples']
+                           + variant['data_params']['n_goal_examples_validation_max'])
 
+    universe = train_env_params['universe']
+    domain = train_env_params['domain']
     task = train_env_params['task']
 
     if task in DOOR_TASKS:
@@ -55,11 +63,16 @@ def get_goal_example_from_variant(variant):
         goal_examples = generate_push_goal_examples(total_goal_examples, env)
     elif task in PICK_TASKS:
         goal_examples = generate_pick_goal_examples(total_goal_examples, env, variant['task'])
-    elif task in GOAL_IMAGE_PATH_PER_ENVIRONMENT.keys():
-        env_path = os.path.join(goal_directory, GOAL_IMAGE_PATH_PER_ENVIRONMENT[task])
-        path = os.path.join(env_path, 'positives.pkl')
-        with open(path, 'rb') as file:
-            goal_examples = pickle.load(file)
+
+    elif (universe in GOAL_PATH_PER_UNIVERSE_DOMAIN_TASK
+            and domain in GOAL_PATH_PER_UNIVERSE_DOMAIN_TASK.get(universe)
+            and task in GOAL_PATH_PER_UNIVERSE_DOMAIN_TASK.get(universe).get(domain)):
+        env_path = os.path.join(
+            goal_directory,
+            GOAL_PATH_PER_UNIVERSE_DOMAIN_TASK[universe][domain][task])
+        pkl_path = os.path.join(env_path, 'positives.pkl')
+        with open(pkl_path, 'rb') as f:
+            goal_examples = pickle.load(f)
     else:
         raise NotImplementedError
 

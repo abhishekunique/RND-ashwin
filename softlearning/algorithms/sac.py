@@ -611,7 +611,6 @@ class SAC(RLAlgorithm):
 
     def _do_training(self, iteration, batch):
         """Runs the operations for updating training and target ops."""
-        import ipdb; ipdb.set_trace()
         feed_dict = self._get_feed_dict(iteration, batch)
 
         # ======

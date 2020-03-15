@@ -12,7 +12,7 @@ import os
 
 DEFAULT_KEY = '__DEFAULT_KEY__'
 
-M = 512
+M = 128
 N = 2
 
 REPARAMETERIZE = True
@@ -26,9 +26,9 @@ Policy params
 GAUSSIAN_POLICY_PARAMS_BASE = {
     'type': 'GaussianPolicy',
     'kwargs': {
-        'hidden_layer_sizes': (M, M),
+        'hidden_layer_sizes': (M, ) * N,
         'squash': True,
-        'observation_keys': None, # can specify some keys to look at
+        'observation_keys': None,
         'observation_preprocessors_params': {}
     }
 }
@@ -53,6 +53,7 @@ POLICY_PARAMS_FOR_DOMAIN.update({
 
 MAX_PATH_LENGTH_PER_DOMAIN = {
     DEFAULT_KEY: 100,
+    'Point2D': 50,
     'DClaw': 100,
 }
 
@@ -77,18 +78,18 @@ ALGORITHM_PARAMS_BASE = {
         # 'normalize_ext_reward_gamma': 0.99,
         # 'rnd_int_rew_coeff': tune.sample_from([0]),
     },
-    'rnd_params': {
-        'convnet_params': {
-            'conv_filters': (16, 32, 64),
-            'conv_kernel_sizes': (3, 3, 3),
-            'conv_strides': (2, 2, 2),
-            'normalization_type': None,
-        },
-        'fc_params': {
-            'hidden_layer_sizes': (256, 256),
-            'output_size': 512,
-        },
-    }
+    # 'rnd_params': {
+    #     'convnet_params': {
+    #         'conv_filters': (16, 32, 64),
+    #         'conv_kernel_sizes': (3, 3, 3),
+    #         'conv_strides': (2, 2, 2),
+    #         'normalization_type': None,
+    #     },
+    #     'fc_params': {
+    #         'hidden_layer_sizes': (256, 256),
+    #         'output_size': 512,
+    #     },
+    # }
 }
 
 ALGORITHM_PARAMS_ADDITIONAL = {
@@ -156,10 +157,10 @@ ALGORITHM_PARAMS_ADDITIONAL = {
             'classifier_lr': 1e-4,
             'classifier_batch_size': 128,
             'n_initial_exploration_steps': int(1e3),
-            'n_classifier_train_steps': 2, # tune.grid_search([2, 5]),
+            'n_classifier_train_steps': 2,
             'classifier_optim_name': 'adam',
             'n_epochs': 200,
-            'mixup_alpha': 1.0,
+            'mixup_alpha': tune.grid_search([1., 0.]),
             'save_training_video_frequency': 0,
         }
     },
@@ -188,61 +189,6 @@ ALGORITHM_PARAMS_ADDITIONAL = {
             'mixup_alpha': 1.0,
             # 'eval_n_episodes': 24, # 24 for free screw
             'eval_n_episodes': 8, # 8 for beads, fixed screw
-        },
-        'rnd_params': {
-            'convnet_params': {
-                'conv_filters': (16, 32, 64),
-                'conv_kernel_sizes': (3, 3, 3),
-                'conv_strides': (2, 2, 2),
-                'normalization_type': None,
-            },
-            'fc_params': {
-                'hidden_layer_sizes': (256, 256),
-                'output_size': 512,
-            },
-        },
-    },
-    'VICEGANTwoGoal': {
-        'type': 'VICEGANTwoGoal',
-        'kwargs': {
-            'reparameterize': REPARAMETERIZE,
-            'lr': 3e-4,
-            'target_update_interval': 1,
-            'tau': 5e-3,
-            'target_entropy': 'auto',
-            'action_prior': 'uniform',
-            'classifier_lr': 1e-4,
-            'classifier_batch_size': 128,
-            'n_initial_exploration_steps': int(1e3),
-            'n_classifier_train_steps': 5, # tune.grid_search([2, 5]),
-            'classifier_optim_name': 'adam',
-            'n_epochs': 500,
-            'mixup_alpha': 1.0,
-            'save_training_video_frequency': 5,
-        }
-    },
-    'VICEGANMultiGoal': {
-        'type': 'VICEGANMultiGoal',
-        'kwargs': {
-            'reparameterize': REPARAMETERIZE,
-            'lr': 3e-4,
-            'target_update_interval': 1,
-            'tau': 5e-3,
-            'target_entropy': 'auto',
-            'action_prior': 'uniform',
-            'classifier_lr': 1e-4,
-            'classifier_batch_size': 128,
-            'n_initial_exploration_steps': int(1e3),
-            'n_classifier_train_steps': tune.grid_search([5]), # 5,
-            'classifier_optim_name': 'adam',
-            'n_epochs': 500,
-            'mixup_alpha': 1.0,
-            'save_training_video_frequency': 5,
-
-            # RND options inherited from SAC
-            'normalize_ext_reward_gamma': 0.99,
-            'rnd_int_rew_coeff': tune.sample_from([1]),
-
         },
         'rnd_params': {
             'convnet_params': {
@@ -301,24 +247,6 @@ ALGORITHM_PARAMS_ADDITIONAL = {
             'mixup_alpha': 1.0,
         }
     },
-    'SQL': {
-        'type': 'SQL',
-        'kwargs': {
-            'policy_lr': 3e-4,
-            'td_target_update_interval': 1,
-            'n_initial_exploration_steps': int(1e3),
-            'reward_scale': tune.sample_from(lambda spec: (
-                {
-                    'Swimmer': 30,
-                    'Hopper': 30,
-                    'HalfCheetah': 30,
-                    'Walker': 10,
-                    'Ant': 300,
-                    'Humanoid': 100,
-                }[spec.get('config', spec)['domain']],
-            ))
-        }
-    }
 }
 
 DEFAULT_NUM_EPOCHS = 200
@@ -328,48 +256,26 @@ NUM_CHECKPOINTS = 10
 Environment params
 """
 
-GOALS_PER_UNIVERSE_DOMAIN_TASK = {
-    'gym': {
-        'DClaw': {
-            'TurnFreeValve3MultiGoalResetFree-v0': {
-                '2': (
-                    (0.01, 0.01, 0, 0, 0, np.pi),
-                    (0.01, 0.01, 0, 0, 0, np.pi),
-                ),
-                '4': (
-                    (0.01, 0.01, 0, 0, 0, 0),
-                    (0.01, -0.01, 0, 0, 0, np.pi / 2),
-                    (-0.01, -0.01, 0, 0, 0, np.pi),
-                    (-0.01, 0.01, 0, 0, 0, -np.pi / 2),
-                ),
-            },
-            # TODO: Remove this redundancy
-            'TurnFreeValve3MultiGoal-v0': {
-                '2': (
-                    (0.01, 0.01, 0, 0, 0, np.pi),
-                    (0.01, 0.01, 0, 0, 0, np.pi),
-                ),
-                '4': (
-                    (0.01, 0.01, 0, 0, 0, 0),
-                    (0.01, -0.01, 0, 0, 0, np.pi / 2),
-                    (-0.01, -0.01, 0, 0, 0, np.pi),
-                    (-0.01, 0.01, 0, 0, 0, -np.pi / 2),
-                ),
-            }
-        }
-    }
-}
-
 CLASSIFIER_PARAMS_BASE = {
     'type': 'feedforward_classifier',
     'kwargs': {
-        'hidden_layer_sizes': (M, M),
+        'hidden_layer_sizes': (M, ) * N,
         'observation_keys': ('pixels', ),
     }
 
 }
 CLASSIFIER_PARAMS_PER_UNIVERSE_DOMAIN_TASK = {
     'gym': {
+        'Point2D': {
+            **{
+                key: {'observation_keys': ('state_observation', )}
+                for key in (
+                    'Fixed-v0',
+                    'SingleWall-v0',
+                    'BoxWall-v1',
+                )
+            },
+        },
         'DClaw': {
             **{
                 key: {'observation_keys': ('pixels', )}
@@ -393,6 +299,35 @@ CLASSIFIER_PARAMS_PER_UNIVERSE_DOMAIN_TASK = {
 
 ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_STATE = {
     'gym': {
+        'Point2D': {
+            # === Point Mass ===
+            'Fixed-v0': {
+                'action_scale': tune.grid_search([1.0, 0.5]),
+                'images_are_rgb': True,
+                # 'init_pos_range': ((0, 0), (0, 0)), # Fixed reset
+                'init_pos_range': None,             # Random reset
+                'target_pos_range': ((2, 2), (2, 2)), # Set the goal to (x, y) = (2, 2)
+                'render_onscreen': False,
+                'observation_keys': ('state_observation', ),
+            },
+            'SingleWall-v0': {
+                # 'boundary_distance': tune.grid_search([4, 8]),
+                'action_scale': tune.grid_search([1.0]),
+                'images_are_rgb': True,
+                'init_pos_range': None,   # Random reset
+                'target_pos_range': ((2, 2), (2, 2)), # Set the goal to (x, y) = (2, 2)
+                'render_onscreen': False,
+                'observation_keys': ('state_observation', ),
+            },
+            'BoxWall-v1': {
+                'action_scale': tune.grid_search([1.0]),
+                'images_are_rgb': True,
+                'init_pos_range': None,   # Random reset
+                'target_pos_range': ((3.5, 3.5), (3.5, 3.5)), # Random target
+                'render_onscreen': False,
+                'observation_keys': ('state_observation', ),
+            },
+        },
         'DClaw': {
             'TurnResetFree-v0': {
                 'init_object_pos_range': (0., 0.),
@@ -1184,7 +1119,6 @@ def get_variant_spec_base(universe, domain, task, task_eval,
         },
     }
 
-    import ipdb; ipdb.set_trace()
     # Filter out parts of the state relating to the object when training from pixels
     env_kwargs = variant_spec['environment_params']['training']['kwargs']
     if from_vision and "device_path" not in env_kwargs.keys():
@@ -1346,16 +1280,6 @@ def get_variant_spec(args):
              ['observation_preprocessors_params']) = {
                 'pixels': reward_classifier_preprocessor_params
             }
-            # (variant_spec
-            #  ['reward_classifier_params']
-            #  ['kwargs']
-            #  ['observation_preprocessors_params']) = (
-            #     tune.sample_from(lambda spec: (
-            #         spec.get('config', spec)
-            #         ['policy_params']
-            #         ['kwargs']
-            #         ['observation_preprocessors_params']
-            #     )))
 
     if args.checkpoint_replay_pool is not None:
         variant_spec['run_params']['checkpoint_replay_pool'] = (

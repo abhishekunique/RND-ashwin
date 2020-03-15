@@ -118,11 +118,11 @@ ALGORITHM_PARAMS_ADDITIONAL = {
 
 
 MAX_PATH_LENGTH_PER_UNIVERSE_DOMAIN_TASK = {
-    DEFAULT_KEY: 1000,
+    DEFAULT_KEY: 100,
     'gym': {
-        DEFAULT_KEY: 1000,
+        DEFAULT_KEY: 100,
         'Point2D': {
-            DEFAULT_KEY: 50,
+            DEFAULT_KEY: 100,
         },
         'MiniGrid': {
             DEFAULT_KEY: 50,
@@ -204,6 +204,15 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_STATE = {
                 'reward_type': tune.grid_search(['dense', 'sparse']),
                 'observation_keys': ('state_observation', 'state_desired_goal'),
                 # 'goal_keys': ('state_desired_goal', ),
+            },
+            'BoxWall-v1': {
+                'action_scale': tune.grid_search([1.0, 0.5]),
+                'images_are_rgb': True,
+                'init_pos_range': None,   # Random reset
+                'target_pos_range': None, # Random target
+                'render_onscreen': False,
+                'reward_type': tune.grid_search(['dense', 'sparse']),
+                'observation_keys': ('state_observation', 'state_desired_goal'),
             },
 
 #             'Fixed-v0': {
@@ -1079,7 +1088,15 @@ def get_variant_spec_base(universe, domain, task, task_eval, policy, algorithm, 
                 'domain': domain,
                 'task': task_eval,
                 'universe': universe,
-                'kwargs': get_environment_params(universe, domain, task_eval, from_vision),
+                'kwargs': (
+                    tune.sample_from(lambda spec: (
+                        spec.get('config', spec)
+                        ['environment_params']
+                        ['training']
+                        .get('kwargs')
+                    ))
+                    if task == task_eval
+                    else get_environment_params(universe, domain, task_eval, from_vision)),
             },
         },
         'policy_params': get_policy_params(universe, domain, task),
