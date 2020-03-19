@@ -15,23 +15,28 @@ class SQIL(SAC):
         **kwargs,
     ):
         self._goal_transitions = goal_transitions
+
         self._goal_negative_ratio = goal_negative_ratio
         self._lambda_samp = lambda_samp
 
+        self._num_goal_transitions = goal_transitions['actions'].shape[0]
+
         # Fill goal transitions with reward 1 terminal states
-        self._goal_transitions['rewards'] = np.ones((
-            goal_transitions[next(iter(goal_transitions))].shape[0], 1),
+        self._goal_transitions['rewards'] = np.ones(
+            (self._num_goal_transitions, 1),
             dtype=np.float32)
-        self._goal_transitions['terminals'] = np.full((
-            goal_transitions[next(iter(goal_transitions))].shape[0], 1),
+        self._goal_transitions['terminals'] = np.full(
+            (self._num_goal_transitions, 1),
             fill_value=True,
             dtype=np.bool)
+
+        self._goal_transitions_flat = flatten(self._goal_transitions)
 
         super(SQIL, self).__init__(**kwargs)
 
     def _build(self):
         super(SQIL, self)._build()
-        self._init_goal_placeholders()
+        # self._init_goal_placeholders()
 
     def _init_goal_placeholders(self):
         self._placeholders.update({
@@ -156,10 +161,10 @@ class SQIL(SAC):
 
         # TODO: Allow for different ratio of data
         goal_feed_dict = self._get_goal_feed_dict(
-            batch_size=samp_feed_dict[next(iter(samp_feed_dict))].shape[0])
+            batch_size=batch_flat[next(iter(batch_flat))].shape[0])
 
         feed_dict = {
-            np.concatentate([samp_feed_dict[key], goal_feed_dict[key]], axis=0)
+            key: np.concatenate([samp_feed_dict[key], goal_feed_dict[key]], axis=0)
             for key in samp_feed_dict
         }
 
@@ -176,12 +181,22 @@ class SQIL(SAC):
 
     def _get_goal_feed_dict(self, batch_size):
         rand_idxs = np.random.randint(
-            self._goal_transitions[next(iter(self._goal_transitions))].shape[0],
+            self._num_goal_transitions,
             size=batch_size)
+
+        placeholders_flat = flatten(self._placeholders)
+
         goal_feed_dict = {
-            self._placeholders[goal_key]: self._goal_transitions[rand_idxs]
-            for goal_key in self._goal_transitions
+            placeholders_flat[key]: self._goal_transitions_flat[key][rand_idxs]
+            for key in placeholders_flat
+            if key in self._goal_transitions_flat.keys()
         }
+        goal_feed_dict[self._placeholders['reward']['running_ext_rew_std']] = (
+            self._running_ext_rew_std)
+        if self._rnd_int_rew_coeff:
+            goal_feed_dict[self._placeholders['reward']['running_int_rew_std']] = (
+                self._running_int_rew_std)
+
         return goal_feed_dict
 
     def get_diagnostics(self,

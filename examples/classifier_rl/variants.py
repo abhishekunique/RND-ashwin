@@ -125,6 +125,21 @@ ALGORITHM_PARAMS_ADDITIONAL = {
             'mixup_alpha': 1.0,
         }
     },
+    'SQIL': {
+        'type': 'SQIL',
+        'kwargs': {
+            'reparameterize': REPARAMETERIZE,
+            'lr': 3e-4,
+            'target_update_interval': 1,
+            'tau': 5e-3,
+            'target_entropy': 'auto',
+            'action_prior': 'uniform',
+            'n_initial_exploration_steps': int(1e3),
+            'n_epochs': 200,
+            'goal_negative_ratio': 1.0,
+            'lambda_samp': 1.0,
+        }
+    },
     'RAQ': {
         'type': 'RAQ',
         'kwargs': {
@@ -302,11 +317,12 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_STATE = {
         'Point2D': {
             # === Point Mass ===
             'Fixed-v0': {
-                'action_scale': tune.grid_search([1.0, 0.5]),
+                'action_scale': tune.grid_search([0.5]),
                 'images_are_rgb': True,
                 # 'init_pos_range': ((0, 0), (0, 0)), # Fixed reset
                 'init_pos_range': None,             # Random reset
-                'target_pos_range': ((2, 2), (2, 2)), # Set the goal to (x, y) = (2, 2)
+                # 'target_pos_range': ((2, 2), (2, 2)), # Set the goal to (x, y) = (2, 2)
+                'target_pos_range': ((0, 0), (0, 0)), # Set the goal to (x, y) = (0, 0)
                 'render_onscreen': False,
                 'observation_keys': ('state_observation', ),
             },
@@ -320,10 +336,11 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_STATE = {
                 'observation_keys': ('state_observation', ),
             },
             'BoxWall-v1': {
-                'action_scale': tune.grid_search([1.0]),
+                'action_scale': tune.grid_search([0.5]),
                 'images_are_rgb': True,
                 'init_pos_range': None,   # Random reset
-                'target_pos_range': ((3.5, 3.5), (3.5, 3.5)), # Random target
+                # 'target_pos_range': ((3.5, 3.5), (3.5, 3.5)),
+                'target_pos_range': ((0, 3), (0, 3)),
                 'render_onscreen': False,
                 'observation_keys': ('state_observation', ),
             },
@@ -1106,7 +1123,7 @@ def get_variant_spec_base(universe, domain, task, task_eval,
                 # 'min_pool_size': get_max_path_length(universe, domain, task),
                 'max_path_length': get_max_path_length(universe, domain, task),
                 'min_pool_size': 50,
-                'batch_size': 256,
+                'batch_size': tune.grid_search([128, 256]),
                 'store_last_n_paths': 20,
             }
         },

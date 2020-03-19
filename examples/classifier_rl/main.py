@@ -1,34 +1,28 @@
-import os
-import copy
-import pickle
 import sys
-
-import tensorflow as tf
-
-from softlearning.environments.utils import (
-    get_goal_example_environment_from_variant, get_environment_from_params)
-from softlearning.algorithms.utils import get_algorithm_from_variant
 from softlearning.policies.utils import (
     get_policy_from_variant, get_policy_from_params, get_policy)
-from softlearning.replay_pools.utils import get_replay_pool_from_variant
-from softlearning.samplers.utils import get_sampler_from_variant
-from softlearning.value_functions.utils import get_Q_function_from_variant
 from softlearning.models.utils import get_reward_classifier_from_variant
 from softlearning.misc.generate_goal_examples import (
-    get_goal_example_from_variant)
+    get_goal_example_from_variant, get_goal_transitions_from_variant)
 from softlearning.misc.get_multigoal_example_pools import (
     get_example_pools_from_variant)
-from softlearning.misc.utils import initialize_tf_variables
 from examples.instrument import run_example_local
 from examples.development.main import ExperimentRunner
-from softlearning.environments.adapters.gym_adapter import GymAdapter
 
 
 class ExperimentRunnerClassifierRL(ExperimentRunner):
     def _get_algorithm_kwargs(self, variant):
         algorithm_kwargs = super()._get_algorithm_kwargs(variant)
-        # === LOAD SINGLE GOAL POOL ===
-        if variant['algorithm_params']['type'] in ['SACClassifier', 'RAQ', 'VICE', 'VICEGAN', 'VICERAQ']:
+        algorithm_type = variant['algorithm_params']['type']
+
+        # TODO: Replace this with a common API for single vs multigoal
+        # === SINGLE GOAL POOL ===
+        if algorithm_type in (
+                'SACClassifier',
+                'RAQ',
+                'VICE',
+                'VICEGAN',
+                'VICERAQ'):
             reward_classifier = self.reward_classifier = (
                 get_reward_classifier_from_variant(
                     self._variant, algorithm_kwargs['training_environment']))
@@ -41,17 +35,26 @@ class ExperimentRunnerClassifierRL(ExperimentRunner):
                 goal_examples_validation)
 
         # === LOAD GOAL POOLS FOR MULTI GOAL ===
-        elif variant['algorithm_params']['type'] in ['VICEGANMultiGoal', 'MultiVICEGAN']:
+        elif algorithm_type in (
+                'VICEGANMultiGoal',
+                'MultiVICEGAN'):
             goal_pools_train, goal_pools_validation = (
                 get_example_pools_from_variant(variant))
             num_goals = len(goal_pools_train)
 
-            reward_classifiers = self.reward_classifiers = [get_reward_classifier_from_variant(
-                variant, algorithm_kwargs['training_environment']) for _ in range(num_goals)]
+            reward_classifiers = self.reward_classifiers = tuple(
+                get_reward_classifier_from_variant(
+                    variant,
+                    algorithm_kwargs['training_environment'])
+                for _ in range(num_goals))
 
             algorithm_kwargs['classifiers'] = reward_classifiers
             algorithm_kwargs['goal_example_pools'] = goal_pools_train
             algorithm_kwargs['goal_example_validation_pools'] = goal_pools_validation
+
+        elif algorithm_type == 'SQIL':
+            goal_transitions = get_goal_transitions_from_variant(variant)
+            algorithm_kwargs['goal_transitions'] = goal_transitions
 
         return algorithm_kwargs
 
@@ -73,14 +76,17 @@ class ExperimentRunnerClassifierRL(ExperimentRunner):
         return algorithm_kwargs
 
     def _restore_multi_algorithm_kwargs(self, picklable, checkpoint_dir, variant):
-        algorithm_kwargs = super()._restore_multi_algorithm_kwargs(picklable, checkpoint_dir, variant)
+        algorithm_kwargs = super()._restore_multi_algorithm_kwargs(
+            picklable, checkpoint_dir, variant)
 
         if 'reward_classifiers' in picklable.keys():
 
             reward_classifiers = self.reward_classifiers = picklable[
                 'reward_classifiers']
             for reward_classifier in self.reward_classifiers:
-                reward_classifier.observation_keys = variant['reward_classifier_params']['kwargs']['observation_keys']
+                reward_classifier.observation_keys = (variant['reward_classifier_params']
+                                                             ['kwargs']
+                                                             ['observation_keys'])
 
             algorithm_kwargs['classifiers'] = reward_classifiers
             goal_pools_train, goal_pools_validation = (

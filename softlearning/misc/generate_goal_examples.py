@@ -29,9 +29,9 @@ PUSH_TASKS = [
 GOAL_PATH_PER_UNIVERSE_DOMAIN_TASK = {
     'gym': {
         'Point2D': {
-            'Fixed-v0': 'pointmass_nowalls',
-            'SingleWall-v0': 'pointmass_nowalls',
-            'BoxWall-v1': 'pointmass_boxwall',
+            'Fixed-v0': 'pointmass_nowalls/center',
+            'SingleWall-v0': 'pointmass_nowalls/bottom_right',
+            'BoxWall-v1': 'pointmass_nowalls/bottom_middle',
         },
         'DClaw': {
             'TurnFreeValve3ResetFree-v0': 'free_screw_180',
@@ -44,6 +44,89 @@ GOAL_PATH_PER_UNIVERSE_DOMAIN_TASK = {
         },
     },
 }
+
+
+def get_goal_transitions_from_variant(variant):
+    """
+    Returns SQIL goal transitions (s, a, s', r = 1)
+    """
+    train_env_params = variant['environment_params']['training']
+
+    env = get_environment_from_params(train_env_params)
+
+    universe = train_env_params['universe']
+    domain = train_env_params['domain']
+    task = train_env_params['task']
+
+    try:
+        gen_func = SUPPORTED_ENVS_UNIVERSE_DOMAIN_TASK[universe][domain][task]
+        # TODO: Add goal kwargs
+        goal_transitions = gen_func(env)
+    except:
+        raise NotImplementedError
+
+    return goal_transitions
+
+
+def generate_point_2d_goals(env,
+                            num_total_examples=500,
+                            rollout_length=15,
+                            goal_threshold=0.25,
+                            include_transitions=True):
+    from copy import deepcopy
+    from gym.spaces import Box
+    env = deepcopy(env)
+    # === Modify the init range ===
+    env.unwrapped.init_pos_range = Box(env.target_pos_range.low - goal_threshold,
+                                       env.target_pos_range.high + goal_threshold,
+                                       dtype='float32')
+
+    observations = []
+    actions = []
+    next_observations = []
+
+    num_positives = 0
+    while num_positives <= num_total_examples:
+        # === Initialize variables ===
+        prev_obs = env.reset()
+        last_action = env.action_space.sample()
+        obs, rew, done, info = env.step(last_action)
+        t = 0
+        while t < rollout_length:
+            action = env.action_space.sample()
+            prev_obs = obs
+            # === GOAL CRITERIA ===
+            if info['distance_to_target'] < goal_threshold:
+                observations.append(prev_obs)
+                obs, rew, done, info = env.step(action)
+                next_observations.append(obs)
+                actions.append(action)
+                num_positives += 1
+            else:
+                obs, rew, done, info = env.step(action)
+            t += 1
+
+    # === Package goals in dicts ===
+    goal_obs = {
+        key: np.concatenate([
+            obs[key][None] for obs in observations
+        ], axis=0)
+        for key in observations[0].keys()
+    }
+    goal_next_obs = {
+        key: np.concatenate([
+            obs[key][None] for obs in next_observations
+        ], axis=0)
+        for key in next_observations[0].keys()
+    }
+    goal_actions = np.vstack(actions)
+
+    goal_transitions = {
+        'observations': goal_obs,
+        'next_observations': goal_next_obs,
+        'actions': goal_actions,
+    }
+    return goal_transitions
 
 
 def get_goal_example_from_variant(variant):
@@ -63,18 +146,16 @@ def get_goal_example_from_variant(variant):
         goal_examples = generate_push_goal_examples(total_goal_examples, env)
     elif task in PICK_TASKS:
         goal_examples = generate_pick_goal_examples(total_goal_examples, env, variant['task'])
-
-    elif (universe in GOAL_PATH_PER_UNIVERSE_DOMAIN_TASK
-            and domain in GOAL_PATH_PER_UNIVERSE_DOMAIN_TASK.get(universe)
-            and task in GOAL_PATH_PER_UNIVERSE_DOMAIN_TASK.get(universe).get(domain)):
-        env_path = os.path.join(
-            goal_directory,
-            GOAL_PATH_PER_UNIVERSE_DOMAIN_TASK[universe][domain][task])
-        pkl_path = os.path.join(env_path, 'positives.pkl')
-        with open(pkl_path, 'rb') as f:
-            goal_examples = pickle.load(f)
     else:
-        raise NotImplementedError
+        try:
+            env_path = os.path.join(
+                goal_directory,
+                GOAL_PATH_PER_UNIVERSE_DOMAIN_TASK[universe][domain][task])
+            pkl_path = os.path.join(env_path, 'positives.pkl')
+            with open(pkl_path, 'rb') as f:
+                goal_examples = pickle.load(f)
+        except:
+            raise NotImplementedError
 
     n_goal_examples = variant['data_params']['n_goal_examples']
     total_samples = len(goal_examples[next(iter(goal_examples))])
@@ -289,3 +370,13 @@ def generate_door_goal_examples(total_goal_examples, env):
     }
 
     return goal_examples
+
+SUPPORTED_ENVS_UNIVERSE_DOMAIN_TASK = {
+    'gym': {
+        'Point2D': {
+            'Fixed-v0': generate_point_2d_goals,
+            'BoxWall-v1': generate_point_2d_goals,
+        }
+    }
+}
+

@@ -98,6 +98,11 @@ def create_MultiVICEGAN_algorithm(variant, *args, **kwargs):
 
     return algorithm
 
+def create_SQIL_algorithm(variant, *args, **kwargs):
+    from .sqil import SQIL
+    algorithm = SQIL(*args, **kwargs)
+    return algorithm
+
 
 ALGORITHM_CLASSES = {
     'SAC': create_SAC_algorithm,
@@ -113,6 +118,7 @@ ALGORITHM_CLASSES = {
     'VICEGANMultiGoal': create_VICEGANMultiGoal_algorithm,
     'MultiSAC': create_MultiSAC_algorithm,
     'MultiVICEGAN': create_MultiVICEGAN_algorithm,
+    'SQIL': create_SQIL_algorithm,
 }
 
 
