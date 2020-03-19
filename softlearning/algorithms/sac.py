@@ -217,8 +217,10 @@ class SAC(RLAlgorithm):
             self._int_reward = self._rnd_int_rew_coeff * self._unscaled_int_reward
         else:
             self._int_reward = 0
+
         self._normalized_ext_reward = (
             self._unscaled_ext_reward / self._placeholders['reward']['running_ext_rew_std'])
+
         self._ext_reward = self._normalized_ext_reward * self._ext_reward_coeff
         self._total_reward = self._ext_reward + self._int_reward
 
@@ -518,9 +520,8 @@ class SAC(RLAlgorithm):
             name="rnd_optimizer")
         rnd_train_op = self._rnd_optimizer.minimize(
             loss=self._rnd_loss)
-        self._training_ops.update(
-            {'rnd_train_op': rnd_train_op}
-        )
+        self._training_ops.update({
+            'rnd_train_op': rnd_train_op})
 
     def _init_diagnostics_ops(self):
         diagnosables = OrderedDict((
