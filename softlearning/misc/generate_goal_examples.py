@@ -3,6 +3,7 @@ import numpy as np
 from softlearning.environments.utils import get_environment_from_params
 import pickle
 import os
+import matplotlib.pyplot as plt
 
 from softlearning.misc.utils import PROJECT_PATH
 goal_directory = os.path.join(PROJECT_PATH, 'goal_classifier')
@@ -46,6 +47,26 @@ GOAL_PATH_PER_UNIVERSE_DOMAIN_TASK = {
 }
 
 
+def get_ddl_goal_state_from_variant(variant):
+    train_env_params = variant['environment_params']['training']
+    env = get_environment_from_params(train_env_params)
+
+    universe = train_env_params['universe']
+    domain = train_env_params['domain']
+    task = train_env_params['task']
+
+    gen_func = SUPPORTED_ENVS_UNIVERSE_DOMAIN[universe][domain]
+    goal_state = gen_func(env,
+                             include_transitions=False,
+                             num_total_examples=1,
+                             goal_threshold=0.01)
+    goal_state = {
+        key: val[0]
+        for key, val in goal_state.items()
+    }
+    return goal_state
+
+
 def get_goal_transitions_from_variant(variant):
     """
     Returns SQIL goal transitions (s, a, s', r = 1)
@@ -59,20 +80,98 @@ def get_goal_transitions_from_variant(variant):
     task = train_env_params['task']
 
     try:
-        gen_func = SUPPORTED_ENVS_UNIVERSE_DOMAIN_TASK[universe][domain][task]
+        gen_func = SUPPORTED_ENVS_UNIVERSE_DOMAIN[universe][domain]
         # TODO: Add goal kwargs
-        goal_transitions = gen_func(env)
-    except:
+        goal_transitions = gen_func(env, include_transitions=True)
+    except KeyError:
         raise NotImplementedError
 
     return goal_transitions
+
+def generate_pusher_2d_goals(env,
+                             num_total_examples=500,
+                             rollout_length=15,
+                             goal_threshold=0.15,
+                             include_transitions=True,
+                             save_image=True):
+    from copy import deepcopy
+    from gym.spaces import Box
+    env = deepcopy(env)
+    # === Modify the init range ===
+    env.unwrapped.set_init_qpos_range(Box(
+        np.concatenate([
+            env.target_pos_range.low - goal_threshold,
+            np.array([-np.pi])]),
+        np.concatenate([
+            env.target_pos_range.high + goal_threshold,
+            np.array([np.pi])]),
+        dtype=np.float32))
+    env.unwrapped.set_init_object_pos_range(Box(env.target_pos_range.low - goal_threshold,
+                                                env.target_pos_range.high + goal_threshold,
+                                                dtype='float32'))
+    observations = []
+    actions = []
+    next_observations = []
+
+    num_positives = 0
+    while num_positives <= num_total_examples:
+        # === Initialize variables ===
+        prev_obs = env.reset()
+        last_action = env.action_space.sample()
+        obs, rew, done, info = env.step(last_action)
+        t = 0
+        while t < rollout_length:
+            action = env.action_space.sample()
+            prev_obs = obs
+            # === GOAL CRITERIA ===
+            if env.unwrapped.compute_reward(action, env.unwrapped._get_obs()) < goal_threshold:
+                observations.append(prev_obs)
+                obs, rew, done, info = env.step(action)
+                next_observations.append(obs)
+                actions.append(action)
+                num_positives += 1
+            else:
+                obs, rew, done, info = env.step(action)
+            t += 1
+
+    # === Package goals in dicts ===
+    goal_obs = {
+        key: np.concatenate([
+            obs[key][None] for obs in observations
+        ], axis=0)
+        for key in observations[0].keys()
+    }
+    goal_next_obs = {
+        key: np.concatenate([
+            obs[key][None] for obs in next_observations
+        ], axis=0)
+        for key in next_observations[0].keys()
+    }
+    goal_actions = np.vstack(actions)
+
+    if save_image:
+        plt.figure(figsize=(4, 4))
+        plt.imshow(env.render(mode='rgb_array'))
+        path = os.path.join(os.getcwd(), 'env_frame.jpg')
+        plt.savefig(path)
+
+    if include_transitions:
+        goal_transitions = {
+            'observations': goal_obs,
+            'next_observations': goal_next_obs,
+            'actions': goal_actions,
+        }
+        return goal_transitions
+    else:
+        return goal_obs
 
 
 def generate_point_2d_goals(env,
                             num_total_examples=500,
                             rollout_length=15,
                             goal_threshold=0.25,
-                            include_transitions=True):
+                            include_transitions=True,
+                            save_image=True):
     from copy import deepcopy
     from gym.spaces import Box
     env = deepcopy(env)
@@ -121,12 +220,31 @@ def generate_point_2d_goals(env,
     }
     goal_actions = np.vstack(actions)
 
-    goal_transitions = {
-        'observations': goal_obs,
-        'next_observations': goal_next_obs,
-        'actions': goal_actions,
-    }
-    return goal_transitions
+    if 'state_observation' in goal_obs and save_image:
+        plt.figure(figsize=(4, 4))
+        plt.xlim(-env.unwrapped.boundary_dist, env.unwrapped.boundary_dist)
+        plt.ylim(-env.unwrapped.boundary_dist, env.unwrapped.boundary_dist)
+        plt.gca().invert_yaxis()
+        goal_pos = goal_obs['state_observation']
+        plt.title(f'Collected goals for {env.unwrapped.__class__.__name__}')
+        plt.scatter(goal_pos[:, 0], goal_pos[:, 1], s=2)
+        path = os.path.join(os.getcwd(), 'goals.jpg')
+        plt.savefig(path)
+
+        plt.figure(figsize=(4, 4))
+        plt.imshow(env.render(mode='rgb_array'))
+        path = os.path.join(os.getcwd(), 'env_frame.jpg')
+        plt.savefig(path)
+
+    if include_transitions:
+        goal_transitions = {
+            'observations': goal_obs,
+            'next_observations': goal_next_obs,
+            'actions': goal_actions,
+        }
+        return goal_transitions
+    else:
+        return goal_obs
 
 
 def get_goal_example_from_variant(variant):
@@ -146,6 +264,11 @@ def get_goal_example_from_variant(variant):
         goal_examples = generate_push_goal_examples(total_goal_examples, env)
     elif task in PICK_TASKS:
         goal_examples = generate_pick_goal_examples(total_goal_examples, env, variant['task'])
+    elif SUPPORTED_ENVS_UNIVERSE_DOMAIN.get(universe, {}).get(domain, None):
+        gen_func = SUPPORTED_ENVS_UNIVERSE_DOMAIN[universe][domain]
+        goal_examples = gen_func(env,
+                                 include_transitions=False,
+                                 num_total_examples=total_goal_examples)
     else:
         try:
             env_path = os.path.join(
@@ -154,7 +277,7 @@ def get_goal_example_from_variant(variant):
             pkl_path = os.path.join(env_path, 'positives.pkl')
             with open(pkl_path, 'rb') as f:
                 goal_examples = pickle.load(f)
-        except:
+        except KeyError:
             raise NotImplementedError
 
     n_goal_examples = variant['data_params']['n_goal_examples']
@@ -371,12 +494,11 @@ def generate_door_goal_examples(total_goal_examples, env):
 
     return goal_examples
 
-SUPPORTED_ENVS_UNIVERSE_DOMAIN_TASK = {
+
+SUPPORTED_ENVS_UNIVERSE_DOMAIN = {
     'gym': {
-        'Point2D': {
-            'Fixed-v0': generate_point_2d_goals,
-            'BoxWall-v1': generate_point_2d_goals,
-        }
+        'Point2D': generate_point_2d_goals,
+        'Pusher2D': generate_pusher_2d_goals,
     }
 }
 

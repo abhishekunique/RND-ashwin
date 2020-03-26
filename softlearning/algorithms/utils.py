@@ -98,9 +98,16 @@ def create_MultiVICEGAN_algorithm(variant, *args, **kwargs):
 
     return algorithm
 
+
 def create_SQIL_algorithm(variant, *args, **kwargs):
     from .sqil import SQIL
     algorithm = SQIL(*args, **kwargs)
+    return algorithm
+
+
+def create_DDL_algorithm(variant, *args, **kwargs):
+    from .ddl import DDL
+    algorithm = DDL(*args, **kwargs)
     return algorithm
 
 
@@ -119,6 +126,7 @@ ALGORITHM_CLASSES = {
     'MultiSAC': create_MultiSAC_algorithm,
     'MultiVICEGAN': create_MultiVICEGAN_algorithm,
     'SQIL': create_SQIL_algorithm,
+    'DDL': create_DDL_algorithm,
 }
 
 

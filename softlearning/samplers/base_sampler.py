@@ -18,6 +18,10 @@ class BaseSampler(object):
         self.policy = None
         self.pool = None
 
+    @property
+    def max_path_length(self):
+        return self._max_path_length
+
     def initialize(self, env, policy, pool):
         self.env = env
         self.policy = policy

@@ -7,6 +7,53 @@ from softlearning.utils.tensorflow import nest
 from softlearning.preprocessors.utils import get_preprocessor_from_params
 
 
+def get_distance_estimator_from_variant(variant, env, *args, **kwargs):
+    from softlearning.models.ddl.distance_estimator import (
+        create_distance_estimator)
+
+    distance_fn_params = deepcopy(variant['distance_fn_params'])
+    distance_fn_kwargs = deepcopy(distance_fn_params['kwargs'])
+
+    observation_preprocessors_params = distance_fn_kwargs.pop(
+        'observation_preprocessors_params', {}).copy()
+    observation_keys = distance_fn_kwargs.pop(
+        'observation_keys', None) or env.observation_keys
+
+    observation_shapes = OrderedDict((
+        (key, value)
+        for key, value in env.observation_shape.items()
+        if key in observation_keys
+    ))
+
+    input_shapes = {
+        's1': observation_shapes,
+        's2': observation_shapes,
+    }
+
+    observation_preprocessors = OrderedDict()
+    for name, observation_shape in observation_shapes.items():
+        preprocessor_params = observation_preprocessors_params.get(name, None)
+        if not preprocessor_params:
+            observation_preprocessors[name] = None
+            continue
+        observation_preprocessors[name] = get_preprocessor_from_params(
+            env, preprocessor_params)
+
+    preprocessors = {
+        's1': observation_preprocessors,
+        's2': observation_preprocessors,
+    }
+
+    distance_fn = create_distance_estimator(
+        input_shapes=input_shapes,
+        observation_keys=observation_keys,
+        *args,
+        preprocessors=preprocessors,
+        **distance_fn_kwargs,
+        **kwargs)
+    return distance_fn
+
+
 def get_vae(encoder_path=None, decoder_path=None, **kwargs):
     from softlearning.models.vae import VAE
     assert encoder_path is not None and decoder_path is not None, (
@@ -17,6 +64,7 @@ def get_vae(encoder_path=None, decoder_path=None, **kwargs):
     vae.encoder.trainable = False
     vae.decoder.trainable = False
     return vae
+
 
 def get_reward_classifier_from_variant(variant, env, *args, **kwargs):
     from .vice_models import create_feedforward_reward_classifier_function
@@ -86,9 +134,9 @@ def create_input(name, input_shape):
     input_ = tf.keras.layers.Input(
         shape=input_shape,
         name=name,
-        dtype=(tf.uint8 # Image observation
+        dtype=(tf.uint8  # Image observation
                if len(input_shape) == 3 and input_shape[-1] in (1, 3)
-               else tf.float32) # Non-image
+               else tf.float32)  # Non-image
     )
     return input_
 
