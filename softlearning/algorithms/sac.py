@@ -632,6 +632,7 @@ class SAC(RLAlgorithm):
         #     input_ph: inputs_np[i]
         #     for i, input_ph in enumerate(preprocessed.input)
         # }
+
         self._session.run(self._training_ops, feed_dict)
 
         if self._rnd_int_rew_coeff:

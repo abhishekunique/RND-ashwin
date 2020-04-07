@@ -91,7 +91,7 @@ class DDL(SAC):
         s1_indices = self.sampler.pool.random_indices(self._ddl_batch_size)
         max_path_length = self.sampler.max_path_length
 
-        distances = np.random.randint(max_path_length + 1 - s1_indices % max_path_length)
+        distances = np.random.randint(max_path_length - s1_indices % max_path_length)
         s2_indices = s1_indices + distances
 
         s1 = self.sampler.pool.batch_by_indices(s1_indices)
