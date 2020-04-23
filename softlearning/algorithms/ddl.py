@@ -141,7 +141,7 @@ class DDL(SAC):
             {**Q_observations, 'actions': actions})
         return Q_inputs
 
-    def _init_external_reward(self):
+    def _init_extrinsic_reward(self):
         """
         Initializes the DDL reward as -(distance to goal)
         The feed dict should set one of the s1/s2 placeholders the goal

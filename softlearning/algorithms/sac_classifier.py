@@ -48,7 +48,7 @@ class SACClassifier(SAC):
             name='labels',
         )
 
-    def _init_external_reward(self):
+    def _init_extrinsic_reward(self):
         classifier_inputs = flatten_input_structure({
             name: self._placeholders['observations'][name]
             for name in self._classifier.observation_keys

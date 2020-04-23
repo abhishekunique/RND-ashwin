@@ -58,14 +58,12 @@ class SAC(RLAlgorithm):
             normalize_ext_reward_gamma=1,
             ext_reward_coeff=1,
 
-            # state_estimator=None,
-            # state_estimator_iters=None,
-            # train_state_estimator_online=False,
-
             rnd_networks=(),
             rnd_lr=1e-4,
             rnd_int_rew_coeff=0,
             rnd_gamma=0.99,
+
+            use_env_intrinsic_reward=False,
 
             online_vae=True,
             n_vae_train_steps=50,
@@ -139,12 +137,6 @@ class SAC(RLAlgorithm):
         self._save_full_state = save_full_state
         self._save_eval_paths = save_eval_paths
 
-        # State estimator
-        # self._state_estimator = state_estimator
-        # self._state_estimator_iters = state_estimator_iters
-        # self._train_state_estimator_online = train_state_estimator_online
-        # self._state_estimator_optimizer = tf.keras.optimizers.Adam(learning_rate=3e-4)
-
         # VAE
         self._preprocessed_Q_inputs = self._Qs[0].preprocessed_inputs_fn
         self._n_preprocessor_evals_per_epoch = 3
@@ -161,6 +153,8 @@ class SAC(RLAlgorithm):
         self._running_ext_rew_std = 1
         self._rnd_int_rew_coeff = 0
 
+        self._use_env_intrinsic_reward = use_env_intrinsic_reward
+
         if rnd_networks:
             self._rnd_target = rnd_networks[0]
             self._rnd_predictor = rnd_networks[1]
@@ -170,23 +164,55 @@ class SAC(RLAlgorithm):
             self._running_int_rew_std = 1
             # self._rnd_gamma = 1
             # self._running_int_rew_std = 1
+
         self._build()
 
     def _build(self):
         super(SAC, self)._build()
-        self._init_external_reward()
-        if self._rnd_int_rew_coeff:
-            self._init_rnd_update()
+        self._init_extrinsic_reward()
+        self._init_intrinsic_reward()
         self._init_actor_update()
         self._init_critic_update()
+
         if self._uses_vae:
             self._init_vae_update()
         elif self._uses_rae:
             self._init_rae_update()
         self._init_diagnostics_ops()
 
-    def _init_external_reward(self):
+    def _policy_inputs(self, observations):
+        policy_inputs = flatten_input_structure({
+            name: observations[name]
+            for name in self._policy.observation_keys
+        })
+        return policy_inputs
+
+    def _Q_inputs(self, observations, actions):
+        Q_observations = {
+            name: observations[name]
+            for name in self._Qs[0].observation_keys
+        }
+        Q_inputs = flatten_input_structure(
+            {**Q_observations, 'actions': actions})
+        return Q_inputs
+
+    def _init_extrinsic_reward(self):
         self._unscaled_ext_reward = self._placeholders['rewards']
+
+    def _init_intrinsic_reward(self):
+        # === Using RND ===
+        if self._rnd_int_rew_coeff:
+            self._init_rnd_update()
+            self._unscaled_int_reward = tf.clip_by_value(
+                self._rnd_errors / self._placeholders['reward']['running_int_rew_std'],
+                0, 1000
+            )
+            self._int_reward = self._rnd_int_rew_coeff * self._unscaled_int_reward
+        # === Use environment reward as intrinsic reward ===
+        elif self._use_env_intrinsic_reward:
+            self._int_reward = self._placeholders['rewards']
+        else:
+            self._int_reward = 0
 
     def _get_Q_target(self):
         policy_inputs = flatten_input_structure({
@@ -209,14 +235,14 @@ class SAC(RLAlgorithm):
 
         terminals = tf.cast(self._placeholders['terminals'], next_values.dtype)
 
-        if self._rnd_int_rew_coeff:
-            self._unscaled_int_reward = tf.clip_by_value(
-                self._rnd_errors / self._placeholders['reward']['running_int_rew_std'],
-                0, 1000
-            )
-            self._int_reward = self._rnd_int_rew_coeff * self._unscaled_int_reward
-        else:
-            self._int_reward = 0
+        # if self._rnd_int_rew_coeff:
+        #     self._unscaled_int_reward = tf.clip_by_value(
+        #         self._rnd_errors / self._placeholders['reward']['running_int_rew_std'],
+        #         0, 1000
+        #     )
+        #     self._int_reward = self._rnd_int_rew_coeff * self._unscaled_int_reward
+        # else:
+        #     self._int_reward = 0
 
         self._normalized_ext_reward = (
             self._unscaled_ext_reward / self._placeholders['reward']['running_ext_rew_std'])
@@ -830,105 +856,6 @@ class SAC(RLAlgorithm):
                     f'rae/{name}/tracked-latent-l2-difference-with-prev-std': np.std(z_diff)
                 })
                 self._fixed_eval_latents = z_fixed
-
-        # # State estimator diagnostics
-        # if 'pixels' in self._policy.preprocessors and \
-        #         self._state_estimator is not none and \
-        #         self._state_estimator.name == 'state_estimator_preprocessor':
-        #     # train the state estimator on the diagnostic batch
-        #     if self._train_state_estimator_online:
-        #         self._state_estimator.trainable = true
-        #         self._state_estimator.compile(optimizer=self._state_estimator_optimizer, loss='mse')
-        #         train_obs = batch['observations']
-        #         # obs_keys_to_estimate = (
-        #         #     'object_position',
-        #         #     'object_orientation_cos',
-        #         #     'object_orientation_sin',
-        #         # )
-        #         pos = train_obs['object_position'][:, :2]
-        #         pos = normalize(pos, -0.1, 0.1, -1, 1)
-        #         num_samples = pos.shape[0]
-        #         ground_truth_state = np.concatenate([
-        #             pos,
-        #             train_obs['object_orientation_cos'][:, 2].reshape((num_samples, 1)),
-        #             train_obs['object_orientation_sin'][:, 2].reshape((num_samples, 1))
-        #         ], axis=1)
-
-        #         pixels = train_obs['pixels']
-        #         # ground_truth_state = np.concatenate(
-        #         #     [train_obs[key] for key in obs_keys_to_estimate], axis=1)
-
-        #         self._state_estimator.fit(
-        #             x=pixels,
-        #             y=ground_truth_state,
-        #             batch_size=32,
-        #             epochs=self._state_estimator_iters or 1
-        #         )
-        #         self._state_estimator.trainable = false
-
-        #         self._state_estimator.compile(optimizer=self._state_estimator_optimizer, loss='mse')
-        #         # copy over weights to the other state estimators
-        #         for q, q_target in zip(self._qs, self._q_targets):
-        #             q.get_layer('state_estimator_preprocessor').set_weights(
-        #                     self._state_estimator.get_weights())
-        #             q_target.get_layer('state_estimator_preprocessor').set_weights(
-        #                     self._state_estimator.get_weights())
-
-        #     # evaluate on the current diagnostic batch
-        #     state_estimators = [
-        #         self._state_estimator,
-        #         self._qs[0].get_layer('state_estimator_preprocessor'),
-        #         self._qs[1].get_layer('state_estimator_preprocessor')
-        #     ]
-        #     state_estimator_descriptors = ('policy', 'q0', 'q1')
-        #     # state_estimator = self._state_estimator
-        #     eval_obs = batch['observations']
-        #     # obs_keys_to_estimate = (
-        #     #     'object_position',
-        #     #     'object_orientation_cos',
-        #     #     'object_orientation_sin',
-        #     # )
-        #     pixels = eval_obs['pixels']
-        #     # ground_truth_state = np.concatenate(
-        #     #     [eval_obs[key] for key in obs_keys_to_estimate], axis=1)
-
-        #     # pos = eval_obs['object_position'][:, :2]
-
-        #     assert 'object_xy_position' in eval_obs
-        #     pos = eval_obs['object_xy_position']
-        #     from softlearning.models.state_estimation import normalize
-        #     pos = normalize(pos, -0.1, 0.1, -1, 1)
-        #     num_samples = pos.shape[0]
-        #     assert 'object_z_orientation_cos' in eval_obs and 'object_z_orientation_sin' in eval_obs
-        #     labels = np.concatenate([
-        #         pos,
-        #         eval_obs['object_z_orientation_cos'].reshape((num_samples, 1)),
-        #         eval_obs['object_z_orientation_sin'].reshape((num_samples, 1))
-        #         # eval_obs['object_orientation_cos'][:, 2].reshape((num_samples, 1)),
-        #         # eval_obs['object_orientation_sin'][:, 2].reshape((num_samples, 1)),
-        #     ], axis=1)
-        #     preds_per_state_estimator = [
-        #         state_estimator.predict(pixels)
-        #         for state_estimator in state_estimators
-        #     ]
-
-        #     true_angles = np.arctan2(labels[:, 3], labels[:, 2]) * 180 / np.pi
-        #     for preds, desc in zip(preds_per_state_estimator, state_estimator_descriptors):
-        #         pos_errors_xy = np.abs(labels[:, :2] - preds[:, :2])
-        #         pos_errors = np.linalg.norm(pos_errors_xy, axis=1)
-        #         pos_errors = 15 * pos_errors
-
-        #         pred_angles = np.arctan2(preds[:, 3], preds[:, 2]) * 180 / np.pi
-        #         angle_errors = angle_distance(true_angles, pred_angles)
-
-        #         diagnostics.update({
-        #             f'state_estimator/{desc}/xy_position_error_in_cm': np.mean(
-        #                 pos_errors
-        #             ),
-        #             f'state_estimator/{desc}/angle_error_in_degrees_policy': np.mean(
-        #                 angle_errors
-        #             )
-        #         })
 
         if self._save_eval_paths:
             import pickle

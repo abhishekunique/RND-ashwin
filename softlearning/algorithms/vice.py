@@ -17,26 +17,34 @@ class VICE(SACClassifier):
     Dibya Ghosh, Larry Yang, Sergey Levine, NIPS 2018.
     """
 
-    # def __init__(self, *args, **kwargs):
-    #     super().__init__(*args, **kwargs)
-    #     # Redefine the classifier to force it to be a negative log prob
-    #     self._classifier = tf.math.log_sigmoid(self._classifier)
+    def __init__(self, *args, positive_on_first_occurence=False, **kwargs):
+        super(VICE, self).__init__(*args, **kwargs)
+        self._positive_on_first_occurence = positive_on_first_occurence
+        self._seen_states = set()
 
-    # TODO Avi This class has  a lot of code repeated from SACClassifier due
-    # to labels having different dimensions in the two classes, but this can
-    # likely be fixed
-    def _init_external_reward(self):
-        classifier_inputs = flatten_input_structure({
-            name: self._placeholders['observations'][name]
-            for name in self._classifier.observation_keys
-        })
-        observation_log_p = self._classifier(classifier_inputs)
-        self._reward_t = self._unscaled_ext_reward = observation_log_p
+    # def _init_extrinsic_reward(self):
+    #     classifier_inputs = flatten_input_structure({
+    #         name: self._placeholders['observations'][name]
+    #         for name in self._classifier.observation_keys
+    #     })
+    #     observation_log_p = self._classifier(classifier_inputs)
+    #     self._reward_t = self._unscaled_ext_reward = observation_log_p
 
     def _get_classifier_feed_dict(self):
         negatives = self.sampler.random_batch(
             self._classifier_batch_size
         )['observations']
+
+        if self._positive_on_first_occurence:
+            # Still things left to explore
+            env = self._training_environment.unwrapped
+            first_occ_idxs = []
+            for i, negative in enumerate(negatives['state_observation']):
+                # TODO: Make this general for any enviornment
+                x_d, y_d = env._discretize_observation(negative)
+                if (x_d, y_d) not in self._seen_states:
+                    first_occ_idxs.append(i)
+                    self._seen_states.add((x_d, y_d))
 
         # DEBUG: Testing with the same negatives pool for each training iteration
         # negatives = type(self._pool.data)(
@@ -51,11 +59,24 @@ class VICE(SACClassifier):
             key: values[rand_positive_ind]
             for key, values in self._goal_examples.items()
         }
-        labels_batch = np.zeros(
-            (2 * self._classifier_batch_size, 2),
-            dtype=np.int32)
-        labels_batch[:self._classifier_batch_size, 0] = 1
-        labels_batch[self._classifier_batch_size:, 1] = 1
+        if self._positive_on_first_occurence:
+            positives = {
+                key: np.concatenate([val, negatives[key][first_occ_idxs]], axis=0)
+                for key, val in positives.items()
+            }
+            labels_batch = np.zeros(
+                (self._classifier_batch_size +
+                (self._classifier_batch_size + len(first_occ_idxs)), 2),
+                dtype=np.int32)
+            labels_batch[:self._classifier_batch_size, 0] = 1
+            labels_batch[self._classifier_batch_size:, 1] = 1
+
+        else:
+            labels_batch = np.zeros(
+                (2 * self._classifier_batch_size, 2),
+                dtype=np.int32)
+            labels_batch[:self._classifier_batch_size, 0] = 1
+            labels_batch[self._classifier_batch_size:, 1] = 1
 
         observations_batch = {
             key: np.concatenate((negatives[key], positives[key]), axis=0)
