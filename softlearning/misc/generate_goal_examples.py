@@ -57,9 +57,9 @@ def get_ddl_goal_state_from_variant(variant):
 
     gen_func = SUPPORTED_ENVS_UNIVERSE_DOMAIN[universe][domain]
     goal_state = gen_func(env,
-                             include_transitions=False,
-                             num_total_examples=1,
-                             goal_threshold=0.01)
+                          include_transitions=False,
+                          num_total_examples=1,
+                          goal_threshold=0.0)
     goal_state = {
         key: val[0]
         for key, val in goal_state.items()
@@ -94,21 +94,51 @@ def generate_pusher_2d_goals(env,
                              goal_threshold=0.15,
                              include_transitions=True,
                              save_image=True):
+    # TODO: Make goal collecting better for both VICE and SQIL
     from copy import deepcopy
     from gym.spaces import Box
     env = deepcopy(env)
     # === Modify the init range ===
     env.unwrapped.set_init_qpos_range(Box(
         np.concatenate([
-            env.target_pos_range.low - goal_threshold,
+            env.target_pos_range.low - 0.15,
             np.array([-np.pi])]),
         np.concatenate([
-            env.target_pos_range.high + goal_threshold,
+            env.target_pos_range.high + 0.15,
             np.array([np.pi])]),
         dtype=np.float32))
     env.unwrapped.set_init_object_pos_range(Box(env.target_pos_range.low - goal_threshold,
                                                 env.target_pos_range.high + goal_threshold,
                                                 dtype='float32'))
+
+    if goal_threshold == 0.0 and not include_transitions:
+        # Collect a single goal for DDL (align the gripper correctly)
+        low = env.target_pos_range.low
+        high = env.target_pos_range.high
+        rand_target_xy = np.random.uniform(low - goal_threshold, high + goal_threshold)
+        rand_gripper_xy = np.random.uniform(low - 0.15, high + 0.15)
+        diff = rand_target_xy - rand_gripper_xy
+        angle = np.arctan2(diff[1], diff[0])
+
+        env.unwrapped.set_init_qpos_range(
+            Box(np.append(rand_gripper_xy, angle),
+                np.append(rand_gripper_xy, angle),
+                dtype=np.float32))
+        env.unwrapped.set_init_object_pos_range(
+            Box(rand_target_xy,
+                rand_target_xy,
+                dtype=np.float32))
+
+        obs = env.reset()
+        plt.figure(figsize=(4, 4))
+        plt.imshow(env.render(mode='rgb_array', width=256, height=256))
+        path = os.path.join(os.getcwd(), 'env_frame.jpg')
+        plt.savefig(path)
+        return {
+            k: v[None]
+            for k, v in obs.items()
+        }
+
     observations = []
     actions = []
     next_observations = []
@@ -179,6 +209,13 @@ def generate_point_2d_goals(env,
     env.unwrapped.init_pos_range = Box(env.target_pos_range.low - goal_threshold,
                                        env.target_pos_range.high + goal_threshold,
                                        dtype='float32')
+
+    if goal_threshold == 0.0 and not include_transitions:
+        obs = env.reset()
+        return {
+            k: v[None]
+            for k, v in obs.items()
+        }
 
     observations = []
     actions = []
@@ -266,9 +303,11 @@ def get_goal_example_from_variant(variant):
         goal_examples = generate_pick_goal_examples(total_goal_examples, env, variant['task'])
     elif SUPPORTED_ENVS_UNIVERSE_DOMAIN.get(universe, {}).get(domain, None):
         gen_func = SUPPORTED_ENVS_UNIVERSE_DOMAIN[universe][domain]
+        include_transitions = (
+            variant['algorithm_params']['type'] == 'VICEDynamicsAware')
         goal_examples = gen_func(env,
-                                 include_transitions=False,
-                                 num_total_examples=total_goal_examples)
+                         include_transitions=include_transitions,
+                         num_total_examples=total_goal_examples)
     else:
         try:
             env_path = os.path.join(
@@ -281,21 +320,25 @@ def get_goal_example_from_variant(variant):
             raise NotImplementedError
 
     n_goal_examples = variant['data_params']['n_goal_examples']
-    total_samples = len(goal_examples[next(iter(goal_examples))])
+    # total_samples = len(goal_examples[next(iter(goal_examples))])
 
     # Shuffle the goal images before assigning training/validation
-    shuffle = np.random.permutation(total_samples)
-    positive_indices = shuffle[:n_goal_examples]
-    negative_indices = shuffle[n_goal_examples:]
+    shuffle = np.random.permutation(total_goal_examples)
+    train_indices = shuffle[:n_goal_examples]
+    valid_indices = shuffle[n_goal_examples:]
 
-    goal_examples_train = {
-        key: goal_examples[key][positive_indices]
-        for key in goal_examples.keys()
-    }
-    goal_examples_validation = {
-        key: goal_examples[key][negative_indices]
-        for key in goal_examples.keys()
-    }
+    goal_examples_train = dict([
+        (key, {obs_key: value[obs_key][train_indices] for obs_key in value})
+        if isinstance(value, dict)
+        else (key, value[train_indices])
+        for key, value in goal_examples.items()
+    ])
+    goal_examples_validation = dict([
+        (key, {obs_key: value[obs_key][valid_indices] for obs_key in value})
+        if isinstance(value, dict)
+        else (key, value[valid_indices])
+        for key, value in goal_examples.items()
+    ])
 
     return goal_examples_train, goal_examples_validation
 

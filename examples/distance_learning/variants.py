@@ -56,9 +56,11 @@ NUM_EPOCHS_UNIVERSE_DOMAIN_TASK = {
     'gym': {
         'Point2D': {
             DEFAULT_KEY: 100,
+            'Maze-v0': 200,
+            'BoxWall-v1': 200,
         },
         'Pusher2D': {
-            DEFAULT_KEY: 100,
+            DEFAULT_KEY: 300,
         }
     },
 }
@@ -111,7 +113,11 @@ ALGORITHM_PARAMS_ADDITIONAL = {
             'n_initial_exploration_steps': int(1e3),
             'n_epochs': 200,
 
-            'train_distance_fn_every_n_steps': tune.grid_search([16, 64]),
+            'train_distance_fn_every_n_steps': 64, # tune.grid_search([16, 64]),
+
+            # 'ext_rew_coeff': tune.grid_search([0.5, 1]),
+            'normalize_ext_reward_gamma': tune.grid_search([0.99, 1]),
+            'use_env_intrinsic_reward': tune.grid_search([True]),
             'ddl_batch_size': 256,
         }
     },
@@ -139,10 +145,19 @@ DISTANCE_FN_KWARGS_UNIVERSE_DOMAIN_TASK = {
             **{
                 key: {'observation_keys': ('state_observation', )}
                 for key in (
-                    'Fixed-v0',
+                    # 'Fixed-v0',
                     'SingleWall-v0',
                     'Maze-v0',
                     'BoxWall-v1',
+                )
+            },
+            **{
+                key: {'observation_keys': ('onehot_observation', )}
+                for key in (
+                    'Fixed-v0',
+                    # 'SingleWall-v0',
+                    # 'Maze-v0',
+                    # 'BoxWall-v1',
                 )
             },
         },
@@ -165,12 +180,16 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_STATE = {
             'Fixed-v0': {
                 'action_scale': tune.grid_search([0.5]),
                 'images_are_rgb': True,
-                # 'init_pos_range': ((0, 0), (0, 0)), # Fixed reset
-                'init_pos_range': None,             # Random reset
-                # 'target_pos_range': ((2, 2), (2, 2)), # Set the goal to (x, y) = (2, 2)
-                'target_pos_range': ((0, 0), (0, 0)), # Set the goal to (x, y) = (0, 0)
+                'init_pos_range': ((-2, -2), (-2, -2)), # Fixed reset
+                # 'init_pos_range': None,             # Random reset
+                'target_pos_range': ((2, 2), (2, 2)), # Set the goal to (x, y) = (2, 2)
+                # 'target_pos_range': ((0, 0), (0, 0)), # Set the goal to (x, y) = (0, 0)
                 'render_onscreen': False,
-                'observation_keys': ('state_observation', ),
+
+                'n_bins': 10,
+                'show_discrete_grid': True,
+                'observation_keys': ('onehot_observation', ),
+                # 'observation_keys': ('state_observation', ),
             },
             'SingleWall-v0': {
                 # 'boundary_distance': tune.grid_search([4, 8]),
@@ -184,23 +203,30 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_STATE = {
             'BoxWall-v1': {
                 'action_scale': tune.grid_search([0.5]),
                 'images_are_rgb': True,
-                'init_pos_range': None,   # Random reset
+                'init_pos_range': ((-3, -3), (-3, -3)),
+                # 'init_pos_range': None,   # Random reset
                 # 'target_pos_range': ((3.5, 3.5), (3.5, 3.5)),
-                'target_pos_range': ((0, 3), (0, 3)),
+                'target_pos_range': ((3, 3), (3, 3)),
                 'render_onscreen': False,
                 'observation_keys': ('state_observation', ),
             },
             'Maze-v0': {
                 'action_scale': tune.grid_search([0.5]),
                 'images_are_rgb': True,
+
+                'reward_type': 'none',
+                'use_count_reward': True,
+                'show_discrete_grid': False,
+                'n_bins': 50,
+
                 # === EASY ===
-                # 'wall_shape': 'easy-maze',
-                # 'init_pos_range': ((-2.5, -3), (-2.5, -3)),
-                # 'target_pos_range': ((2.5, -3), (2.5, -3)),
+                'wall_shape': 'easy-maze',
+                'init_pos_range': ((-2.5, -3), (-2.5, -3)),
+                'target_pos_range': ((2.5, -3), (2.5, -3)),
                 # === MEDIUM ===
-                'wall_shape': 'medium-maze',
-                'init_pos_range': ((-3, -3), (-3, -3)),
-                'target_pos_range': ((3, 3), (3, 3)),
+                # 'wall_shape': 'medium-maze',
+                # 'init_pos_range': ((-3, -3), (-3, -3)),
+                # 'target_pos_range': ((3, 3), (3, 3)),
                 # === HARD ===
                 # 'wall_shape': 'hard-maze',
                 # 'init_pos_range': ((-3, -3), (-3, -3)),

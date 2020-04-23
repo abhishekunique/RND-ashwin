@@ -11,7 +11,7 @@ DEFAULT_KEY = "__DEFAULT_KEY__"
 # N = number of hidden layers
 # M = 512
 # N = 2
-M = 128
+M = 256
 N = 2
 
 REPARAMETERIZE = True
@@ -58,31 +58,29 @@ ALGORITHM_PARAMS_ADDITIONAL = {
             'lr': 3e-4,
             'target_update_interval': 1,
             'tau': 5e-3,
-            'n_initial_exploration_steps': int(5e3),
+            'n_initial_exploration_steps': int(1e3),
             'target_entropy': 'auto',
             'action_prior': 'uniform',
-            'her_iters': tune.grid_search([0]),
-            # === TO TRAIN ON RND REWARD ONLY ===
-            # 'ext_reward_coeff': 1,
-            # === DONT DO EVAL EPISODES FOR DATA COLLECTION ===
-            'eval_n_episodes': 3,
-            # 'rnd_int_rew_coeff': tune.sample_from([1]), # 1
-            # 'normalize_ext_reward_gamma': 0.99,
-            'online_vae': True, # False --> train at the end of each epoch
             'verbose': True,
+
+            'eval_n_episodes': 3,
+
+            'ext_reward_coeff': 1,
+            'rnd_int_rew_coeff': 1,
+            # 'normalize_ext_reward_gamma': 0.99,
         },
-        # 'rnd_params': {
-        #     'convnet_params': {
-        #         'conv_filters': (16, 32, 64),
-        #         'conv_kernel_sizes': (3, 3, 3),
-        #         'conv_strides': (2, 2, 2),
-        #         'normalization_type': None,
-        #     },
-        #     'fc_params': {
-        #         'hidden_layer_sizes': (256, 256),
-        #         'output_size': 512,
-        #     },
-        # }
+        'rnd_params': {
+            'convnet_params': {
+                'conv_filters': (16, 32, 64),
+                'conv_kernel_sizes': (3, 3, 3),
+                'conv_strides': (2, 2, 2),
+                'normalization_type': None,
+            },
+            'fc_params': {
+                'hidden_layer_sizes': (256, 256),
+                'output_size': 512,
+            },
+        }
     },
     'MultiSAC': {
         'type': 'MultiSAC',
@@ -114,6 +112,26 @@ ALGORITHM_PARAMS_ADDITIONAL = {
             },
         },
     },
+    'HERQLearning': {
+        'type': 'HERQLearning',
+        'kwargs': {
+            'reparameterize': REPARAMETERIZE,
+            'lr': 3e-4,
+            'target_update_interval': 1,
+            'tau': 5e-3,
+            'n_initial_exploration_steps': int(5e3),
+            'target_entropy': 'auto',
+            'action_prior': 'uniform',
+            'ext_reward_coeff': 1,
+            'eval_n_episodes': 3,
+            'rnd_int_rew_coeff': tune.grid_search([0]),
+            # 'normalize_ext_reward_gamma': 0.99,
+            'verbose': True,
+
+            'replace_original_reward': tune.grid_search([True, False]), # True,
+        },
+    },
+
 }
 
 
@@ -122,7 +140,12 @@ MAX_PATH_LENGTH_PER_UNIVERSE_DOMAIN_TASK = {
     'gym': {
         DEFAULT_KEY: 100,
         'Point2D': {
+            DEFAULT_KEY: 200,
+        },
+        'Pusher2D': {
             DEFAULT_KEY: 100,
+            'Simple-v0': 150,
+            'Test-v0': 150,
         },
         'MiniGrid': {
             DEFAULT_KEY: 50,
@@ -168,13 +191,17 @@ NUM_EPOCHS_PER_UNIVERSE_DOMAIN_TASK = {
     'gym': {
         DEFAULT_KEY: 200,
         'Point2D': {
-            DEFAULT_KEY: int(50),
+            DEFAULT_KEY: int(300),
+        },
+        'Pusher2D': {
+            DEFAULT_KEY: int(100),
         },
         'MiniGrid': {
             DEFAULT_KEY: 100,
         },
         'DClaw': {
-            DEFAULT_KEY: int(1.5e3),
+            DEFAULT_KEY: int(250),
+            'TurnFreeValve3Fixed-v0': 750
         },
     },
 }
@@ -185,13 +212,15 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_STATE = {
             # === Point Mass ===
             'Fixed-v0': {
                 # 'boundary_distance': tune.grid_search([8, 16]),
-                'action_scale': tune.grid_search([0.5, 0.25]),
+                # 'action_scale': tune.grid_search([0.5, 0.25]),
+                'action_scale': 0.5,
                 'images_are_rgb': True,
                 'init_pos_range': None,   # Random reset
                 'target_pos_range': None, # Random target
                 'render_onscreen': False,
-                'reward_type': tune.grid_search(['dense', 'sparse']),
-                'observation_keys': ('state_observation', 'state_desired_goal'),
+                # 'reward_type': tune.grid_search(['dense', 'sparse']),
+                'reward_type': tune.grid_search(['sparse']),
+                'observation_keys': ('state_achieved_goal', 'state_desired_goal'),
                 # 'goal_keys': ('state_desired_goal', ),
             },
             'SingleWall-v0': {
@@ -206,16 +235,39 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_STATE = {
                 # 'goal_keys': ('state_desired_goal', ),
             },
             'BoxWall-v1': {
-                'action_scale': tune.grid_search([1.0, 0.5]),
+                'action_scale': tune.grid_search([0.5]),
                 'images_are_rgb': True,
-                'init_pos_range': None,   # Random reset
-                'target_pos_range': None, # Random target
+                'reward_type': tune.grid_search(['sparse']),
+                'init_pos_range': ((-3, -3), (-3, -3)),
+                # 'init_pos_range': None,   # Random reset
+                'target_pos_range': ((3, 3), (3, 3)),
                 'render_onscreen': False,
-                'reward_type': tune.grid_search(['dense', 'sparse']),
-                'observation_keys': ('state_observation', 'state_desired_goal'),
+                'observation_keys': ('state_achieved_goal', 'state_desired_goal'),
+            },
+            'Maze-v0': {
+                'action_scale': tune.grid_search([0.5]),
+                'images_are_rgb': True,
+                'reward_type': tune.grid_search(['sparse']),
+                'render_onscreen': False,
+                'observation_keys': ('state_achieved_goal', 'state_desired_goal'),
+                'use_count_reward': tune.grid_search([True, False]),
+                'n_bins': 10,
+
+                # === EASY ===
+                # 'wall_shape': 'easy-maze',
+                # 'init_pos_range': ((-2.5, -3), (-2.5, -3)),
+                # 'target_pos_range': ((2.5, -3), (2.5, -3)),
+                # === MEDIUM ===
+                'wall_shape': 'medium-maze',
+                'init_pos_range': ((-3, -3), (-3, -3)),
+                'target_pos_range': ((3, 3), (3, 3)),
+                # === HARD ===
+                # 'wall_shape': 'hard-maze',
+                # 'init_pos_range': ((-3, -3), (-3, -3)),
+                # 'target_pos_range': ((-0.5, 1.25), (-0.5, 1.25)),
             },
 
-#             'Fixed-v0': {
+#             'Fixed-v1': {
 #                 'ball_radius': 0.5,
 #                 'target_radius': 0.5,
 #                 'boundary_distance': 4,
@@ -228,59 +280,49 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_STATE = {
 #                 'goal_keys': ('state_desired_goal', ),
 #             },
         },
-        'DClaw': {
-            # === Fixed Screw ===
-            'TurnMultiGoalResetFree-v0': {
-                'goals': (
-                    -np.pi / 2,
-                    np.pi / 2
-                ),
-                'initial_goal_index': 0,
-                'swap_goals_upon_completion': False,
-                'use_concatenated_goal': False,
-                'one_hot_goal_index': True,
-                'reward_keys_and_weights': {
-                    'object_to_target_angle_dist_cost': 1,
-                },
+        'Pusher2D': {
+            'Simple-v0': {
+                'init_qpos_range': ((0, 0, 0), (0, 0, 0)),
+                'init_object_pos_range': ((1, 0), (1, 0)),
+                'target_pos_range': ((2, 2), (2, 2)),
+                'reset_gripper': True,
+                'reset_object': True,
                 'observation_keys': (
-                    'claw_qpos',
-                    'last_action',
-                    'goal_index',
-                    # 'one_hot_goal_index',
-                    'object_angle_cos',
-                    'object_angle_sin',
+                    # 'observation',
+                    'gripper_qpos',
+                    'gripper_qvel',
+                    'object_pos',
+                    'object_vel',
+                    'target_pos',
                 ),
             },
-            'TurnMultiGoal-v0': { # eval environment
-                'goals': (
-                    -np.pi / 2,
-                    np.pi / 2
-                ),
-                'initial_goal_index': 0,
-                'swap_goals_upon_completion': False,
-                'use_concatenated_goal': False,
-                'one_hot_goal_index': True,
+            'Test-v0': {
+                'do_reset': True,
+                'multi_reset': False,
+                'multi_reset_block': False,
+                'reset_block': True,
+                'reset_gripper': True,
+            }
+        },
+        'DClaw': {
+            # === Fixed Screw ===
+            'TurnFixed-v0': {
                 'reward_keys_and_weights': {
-                    'object_to_target_angle_dist_cost': 1,
+                    # 'object_to_target_angle_distance_reward': 1,
+                    'sparse_reward': 1,
                 },
+                'init_pos_range': (0, 0),
+                'target_pos_range': (np.pi, np.pi),
                 'observation_keys': (
-                    'claw_qpos',
-                    'last_action',
-                    'goal_index',
                     'object_angle_cos',
                     'object_angle_sin',
+                    'claw_qpos',
+                    'last_action'
                 ),
             },
 
             'PoseStatic-v0': {},
             'PoseDynamic-v0': {},
-            'TurnFixed-v0': {
-                'reward_keys_and_weights': {
-                    'object_to_target_angle_distance_reward': 1,
-                },
-                'target_pos_range': (np.pi, np.pi),
-                'init_pos_range': (-np.pi, np.pi),
-            },
             'TurnRandom-v0': {},
             'TurnResetFree-v0': {
                 'reward_keys_and_weights': {
@@ -305,8 +347,9 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_STATE = {
             'TurnRandomDynamics-v0': {},
             'TurnFreeValve3Fixed-v0': {
                 'reward_keys_and_weights': {
-                    'object_to_target_position_distance_reward': tune.grid_search([2]),
-                    'object_to_target_orientation_distance_reward': 1,
+                    # 'object_to_target_position_distance_reward': tune.grid_search([2]),
+                    # 'object_to_target_orientation_distance_reward': 1,
+                    'sparse_reward': 1,
                 },
                 'observation_keys': (
                     'claw_qpos',
@@ -315,15 +358,16 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_STATE = {
                     'object_z_orientation_cos',
                     'object_z_orientation_sin',
                 ),
-                # 'target_qpos_range': [(0, 0, 0, 0, 0, 0)],
-                'target_qpos_range': [
-                    (0.01, 0.01, 0, 0, 0, -np.pi / 2),
-                    (-0.01, -0.01, 0, 0, 0, np.pi / 2)
-                ],
-                'init_qpos_range': (
-                    (-0.08, -0.08, 0, 0, 0, -np.pi),
-                    (0.08, 0.08, 0, 0, 0, np.pi)
-                ),
+                'init_qpos_range': ((0, 0, 0, 0, 0, 0), ) * 2,
+                'target_qpos_range': ((0, 0, 0, 0, 0, np.pi), ) * 2,
+                # 'target_qpos_range': [
+                #     (0.01, 0.01, 0, 0, 0, -np.pi / 2),
+                #     (-0.01, -0.01, 0, 0, 0, np.pi / 2)
+                # ],
+                # 'init_qpos_range': (
+                #     (-0.08, -0.08, 0, 0, 0, -np.pi),
+                #     (0.08, 0.08, 0, 0, 0, np.pi)
+                # ),
             },
             'TurnFreeValve3ResetFree-v0': {
                 'observation_keys': (
@@ -1149,7 +1193,7 @@ def get_variant_spec_base(universe, domain, task, task_eval, policy, algorithm, 
                     spec.get('config', spec)
                     ['sampler_params']['kwargs']['max_path_length']
                 )),
-                'batch_size': 256,
+                'batch_size': 256, # tune.grid_search([128, 256]),
                 'store_last_n_paths': 20,
             }
         }, SAMPLER_PARAMS_PER_DOMAIN.get(domain, {})),
@@ -1167,8 +1211,8 @@ def get_variant_spec_base(universe, domain, task, task_eval, policy, algorithm, 
 
     # TODO: Clean this up
     env_kwargs = variant_spec['environment_params']['training']['kwargs']
-    env_obs_keys = env_kwargs.get('observation_keys', None)
-    env_goal_keys = env_kwargs.get('goal_keys', None)
+    env_obs_keys = env_kwargs.get('observation_keys', tuple())
+    env_goal_keys = env_kwargs.get('goal_keys', tuple())
 
     # === FROM VISION ===
     if from_vision and "pixel_wrapper_kwargs" in env_kwargs.keys() and \
@@ -1398,7 +1442,7 @@ def get_variant_spec_image(universe,
         # Assign preprocessor to all parts of the state
         assert preprocessor_type in STATE_PREPROCESSOR_PARAMS
         preprocessor_params = STATE_PREPROCESSOR_PARAMS[preprocessor_type]
-        obs_keys = variant_spec['environment_params']['training']['kwargs']['observation_keys']
+        obs_keys = variant_spec['environment_params']['training']['kwargs'].get('observation_keys', tuple())
 
         variant_spec['policy_params']['kwargs']['hidden_layer_sizes'] = (M, ) * N
         variant_spec['policy_params']['kwargs'][
