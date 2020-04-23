@@ -1,7 +1,8 @@
 import sys
 from softlearning.policies.utils import (
     get_policy_from_variant, get_policy_from_params, get_policy)
-from softlearning.models.utils import get_reward_classifier_from_variant
+from softlearning.models.utils import (
+    get_reward_classifier_from_variant, get_dynamics_model_from_variant)
 from softlearning.misc.generate_goal_examples import (
     get_goal_example_from_variant, get_goal_transitions_from_variant)
 from softlearning.misc.get_multigoal_example_pools import (
@@ -22,7 +23,9 @@ class ExperimentRunnerClassifierRL(ExperimentRunner):
                 'RAQ',
                 'VICE',
                 'VICEGAN',
-                'VICERAQ'):
+                'VICERAQ',
+                'VICEDynamicsAware'):
+
             reward_classifier = self.reward_classifier = (
                 get_reward_classifier_from_variant(
                     self._variant, algorithm_kwargs['training_environment']))
@@ -33,6 +36,10 @@ class ExperimentRunnerClassifierRL(ExperimentRunner):
             algorithm_kwargs['goal_examples'] = goal_examples_train
             algorithm_kwargs['goal_examples_validation'] = (
                 goal_examples_validation)
+
+            if algorithm_type == 'VICEDynamicsAware':
+                algorithm_kwargs['dynamics_model'] = (get_dynamics_model_from_variant(
+                    self._variant, algorithm_kwargs['training_environment']))
 
         # === LOAD GOAL POOLS FOR MULTI GOAL ===
         elif algorithm_type in (

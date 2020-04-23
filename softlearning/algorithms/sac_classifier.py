@@ -268,11 +268,16 @@ class SACClassifier(SAC):
         learned_reward = self._session.run(
             self._reward_t,
             feed_dict={
-                self._placeholders['observations'][name]: np.concatenate([
-                    episode['observations'][name]
-                    for episode in episodes
+                **{
+                    self._placeholders['observations'][name]: np.concatenate([
+                        episode['observations'][name]
+                        for episode in episodes
+                    ])
+                    for name in self._classifier.observation_keys
+                },
+                self._placeholders['actions']: np.concatenate([
+                    episode['actions'] for episode in episodes
                 ])
-                for name in self._classifier.observation_keys
             })
 
         diagnostics[f'reward_learning/reward-mean'] = np.mean(learned_reward)

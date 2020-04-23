@@ -25,6 +25,12 @@ def create_VICE_algorithm(variant, *args, **kwargs):
     return algorithm
 
 
+def create_VICEDynamicsAware_algorithm(variant, *args, **kwargs):
+    from .vice_dynamics_aware import VICEDynamicsAware
+    algorithm = VICEDynamicsAware(*args, **kwargs)
+    return algorithm
+
+
 def create_VICEGANTwoGoal_algorithm(variant, *args, **kwargs):
     from .vice_multigoal import VICEGANTwoGoal
     algorithm = VICEGANTwoGoal(*args, **kwargs)
@@ -110,6 +116,11 @@ def create_DDL_algorithm(variant, *args, **kwargs):
     algorithm = DDL(*args, **kwargs)
     return algorithm
 
+def create_HERQLearning_algorithm(variant, *args, **kwargs):
+    from .her_qlearning import HERQLearning
+    algorithm = HERQLearning(*args, **kwargs)
+    return algorithm
+
 
 ALGORITHM_CLASSES = {
     'SAC': create_SAC_algorithm,
@@ -117,6 +128,7 @@ ALGORITHM_CLASSES = {
     'SACClassifier': create_SAC_Classifier_algorithm,
     'RAQ': create_RAQ_algorithm,
     'VICE': create_VICE_algorithm,
+    'VICEDynamicsAware': create_VICEDynamicsAware_algorithm,
     'VICEGAN': create_VICE_GAN_algorithm,
     'VICERAQ': create_VICE_RAQ_algorithm,
     'VICEGoalConditioned': create_VICEGoalConditioned_algorithm,
@@ -127,6 +139,7 @@ ALGORITHM_CLASSES = {
     'MultiVICEGAN': create_MultiVICEGAN_algorithm,
     'SQIL': create_SQIL_algorithm,
     'DDL': create_DDL_algorithm,
+    'HERQLearning': create_HERQLearning_algorithm,
 }
 
 

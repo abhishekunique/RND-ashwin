@@ -12,7 +12,8 @@ import os
 
 DEFAULT_KEY = '__DEFAULT_KEY__'
 
-M = 128
+M = 256
+# M = 128
 N = 2
 
 REPARAMETERIZE = True
@@ -53,7 +54,7 @@ POLICY_PARAMS_FOR_DOMAIN.update({
 
 MAX_PATH_LENGTH_PER_DOMAIN = {
     DEFAULT_KEY: 100,
-    'Point2D': 50,
+    'Point2D': 100,
     'DClaw': 100,
 }
 
@@ -175,8 +176,39 @@ ALGORITHM_PARAMS_ADDITIONAL = {
             'n_classifier_train_steps': 2,
             'classifier_optim_name': 'adam',
             'n_epochs': 200,
-            'mixup_alpha': tune.grid_search([1., 0.]),
+            'mixup_alpha': tune.grid_search([1.]),
             'save_training_video_frequency': 0,
+
+            # Tune over the reward scaling between count based bonus and VICE reward
+            # 'ext_reward_coeff': tune.grid_search([0.25, 0.5, 1]),
+            # 'normalize_ext_reward_gamma': tune.grid_search([0.99, 1]),
+            # 'use_env_intrinsic_reward': tune.grid_search([True]),
+
+            'positive_on_first_occurence': True,
+        }
+    },
+    'VICEDynamicsAware': {
+        'type': 'VICEDynamicsAware',
+        'kwargs': {
+            'reparameterize': REPARAMETERIZE,
+            'lr': 3e-4,
+            'target_update_interval': 1,
+            'tau': 5e-3,
+            'target_entropy': 'auto',
+            'action_prior': 'uniform',
+            'classifier_lr': 1e-4,
+            'classifier_batch_size': 128,
+            'n_initial_exploration_steps': int(1e3),
+            'n_classifier_train_steps': 2,
+            'classifier_optim_name': 'adam',
+            'mixup_alpha': tune.grid_search([1.]),
+
+            'train_dynamics_model_every_n_steps': tune.grid_search([16, 64]),
+            'dynamics_model_lr': 3e-4,
+            'dynamics_model_batch_size': 256,
+
+            # 'normalize_ext_reward_gamma': tune.grid_search([0.99, 1]),
+            # 'use_env_intrinsic_reward': tune.grid_search([True, False]),
         }
     },
     'MultiVICEGAN': {
@@ -267,18 +299,14 @@ ALGORITHM_PARAMS_ADDITIONAL = {
 DEFAULT_NUM_EPOCHS = 200
 NUM_CHECKPOINTS = 10
 
-"""
-Environment params
-"""
-
 CLASSIFIER_PARAMS_BASE = {
     'type': 'feedforward_classifier',
     'kwargs': {
         'hidden_layer_sizes': (M, ) * N,
         'observation_keys': ('pixels', ),
     }
-
 }
+
 CLASSIFIER_PARAMS_PER_UNIVERSE_DOMAIN_TASK = {
     'gym': {
         'Point2D': {
@@ -287,7 +315,30 @@ CLASSIFIER_PARAMS_PER_UNIVERSE_DOMAIN_TASK = {
                 for key in (
                     'Fixed-v0',
                     'SingleWall-v0',
+                    'Maze-v0',
+                    # 'BoxWall-v1',
+                )
+            },
+            **{
+                key: {'observation_keys': ('onehot_observation', )}
+                for key in (
+                    # 'Fixed-v0',
+                    # 'SingleWall-v0',
+                    # 'Maze-v0',
                     'BoxWall-v1',
+                )
+            },
+        },
+        'Pusher2D': {
+            **{
+                key: {
+                    'observation_keys': tune.grid_search([
+                        ('object_pos', ),
+                        ('gripper_qpos', 'object_pos'),
+                    ]),
+                }
+                for key in (
+                    'Simple-v0',
                 )
             },
         },
@@ -312,6 +363,21 @@ CLASSIFIER_PARAMS_PER_UNIVERSE_DOMAIN_TASK = {
     }
 }
 
+DYNAMICS_MODEL_PARAMS_BASE = {
+    # 'type': 'feedforward_classifier',
+    'kwargs': {
+        'action_input': True,
+        'encoder_kwargs': {
+            'hidden_layer_sizes': (64, 64),
+        },
+        'decoder_kwargs': {
+            'hidden_layer_sizes': (64, 64),
+        },
+        'dynamics_latent_dim': 16,
+    }
+}
+
+
 ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_STATE = {
     'gym': {
         'Point2D': {
@@ -319,19 +385,21 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_STATE = {
             'Fixed-v0': {
                 'action_scale': tune.grid_search([0.5]),
                 'images_are_rgb': True,
-                # 'init_pos_range': ((0, 0), (0, 0)), # Fixed reset
-                'init_pos_range': None,             # Random reset
-                # 'target_pos_range': ((2, 2), (2, 2)), # Set the goal to (x, y) = (2, 2)
-                'target_pos_range': ((0, 0), (0, 0)), # Set the goal to (x, y) = (0, 0)
+                'init_pos_range': ((-2, -3), (-3, -3)), # Fixed reset
+                # 'init_pos_range': None,             # Random reset
+                'target_pos_range': ((3, 3), (3, 3)), # Set the goal to (x, y) = (2, 2)
+                # 'target_pos_range': ((0, 0), (0, 0)), # Set the goal to (x, y) = (0, 0)
                 'render_onscreen': False,
                 'observation_keys': ('state_observation', ),
+                'n_bins': 50,
+                # 'observation_keys': ('onehot_observation', ),
             },
             'SingleWall-v0': {
                 # 'boundary_distance': tune.grid_search([4, 8]),
-                'action_scale': tune.grid_search([1.0]),
+                'action_scale': tune.grid_search([0.5]),
                 'images_are_rgb': True,
                 'init_pos_range': None,   # Random reset
-                'target_pos_range': ((2, 2), (2, 2)), # Set the goal to (x, y) = (2, 2)
+                'target_pos_range': ((0, 3), (0, 3)), # Set the goal to (x, y) = (2, 2)
                 'render_onscreen': False,
                 'observation_keys': ('state_observation', ),
             },
@@ -342,7 +410,48 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_STATE = {
                 # 'target_pos_range': ((3.5, 3.5), (3.5, 3.5)),
                 'target_pos_range': ((0, 3), (0, 3)),
                 'render_onscreen': False,
+                'observation_keys': ('onehot_observation', ),
+                # 'observation_keys': ('state_observation', ),
+            },
+            'Maze-v0': {
+                'action_scale': tune.grid_search([0.5]),
+                'images_are_rgb': True,
+
+                # === Use environment's count-based reward ===
+                'reward_type': 'none',
+                'use_count_reward': True,
+                'n_bins': 50,  # Number of bins to discretize the space with
+
+                # === EASY ===
+                'wall_shape': 'easy-maze',
+                'init_pos_range': ((-2.5, -3), (-2.5, -3)),
+                'target_pos_range': ((2.5, -3), (2.5, -3)),
+                # === MEDIUM ===
+                # 'wall_shape': 'medium-maze',
+                # 'init_pos_range': ((-3, -3), (-3, -3)),
+                # 'target_pos_range': ((3, 3), (3, 3)),
+                # === HARD ===
+                # 'wall_shape': 'hard-maze',
+                # 'init_pos_range': ((-3, -3), (-3, -3)),
+                # 'target_pos_range': ((-0.5, 1.25), (-0.5, 1.25)),
+
+                'render_onscreen': False,
                 'observation_keys': ('state_observation', ),
+            },
+        },
+        'Pusher2D': {
+            'Simple-v0': {
+                'init_qpos_range': ((0, 0, 0), (0, 0, 0)),
+                'init_object_pos_range': ((1, 0), (1, 0)),
+                'target_pos_range': ((2, 2), (2, 2)),
+                'reset_gripper': True,
+                'reset_object': True,
+                'observation_keys': (
+                    'gripper_qpos',
+                    'gripper_qvel',
+                    'object_pos',
+                    # 'target_pos'
+                ),
             },
         },
         'DClaw': {
@@ -894,6 +1003,14 @@ def get_classifier_params(universe, domain, task):
     return classifier_params
 
 
+def get_dynamics_model_params(universe, domain, task):
+    params = DYNAMICS_MODEL_PARAMS_BASE.copy()
+    # classifier_params['kwargs'].update(
+    #     CLASSIFIER_PARAMS_PER_UNIVERSE_DOMAIN_TASK.get(
+    #         universe, {}).get(domain, {}).get(task, {}))
+    return params
+
+
 def get_checkpoint_frequency(spec):
     config = spec.get('config', spec)
     checkpoint_frequency = (
@@ -1055,6 +1172,7 @@ def get_variant_spec_base(universe, domain, task, task_eval,
             ALGORITHM_PARAMS_ADDITIONAL.get(algorithm, {})
         )
 
+    import tensorflow as tf
     num_goals = 2
     variant_spec = {
         'git_sha': get_git_rev(),
@@ -1106,7 +1224,11 @@ def get_variant_spec_base(universe, domain, task, task_eval,
                     ['kwargs']
                     .get('observation_keys')
                 )), # None means everything, pass in all keys but the goal_index
-                'observation_preprocessors_params': {}
+                'observation_preprocessors_params': {},
+                'kernel_regularizer': tune.grid_search([
+                    None,
+                    # tf.keras.regularizers.l1(5e-4)
+                ]),
             }
         },
         'algorithm_params': algorithm_params,
@@ -1123,7 +1245,7 @@ def get_variant_spec_base(universe, domain, task, task_eval,
                 # 'min_pool_size': get_max_path_length(universe, domain, task),
                 'max_path_length': get_max_path_length(universe, domain, task),
                 'min_pool_size': 50,
-                'batch_size': tune.grid_search([128, 256]),
+                'batch_size': 256, # tune.grid_search([128, 256]),
                 'store_last_n_paths': 20,
             }
         },
@@ -1168,6 +1290,7 @@ def get_variant_spec_classifier(universe,
         universe, domain, task, task_eval, policy, algorithm, from_vision, *args, **kwargs)
 
     variant_spec['reward_classifier_params'] = get_classifier_params(universe, domain, task)
+    variant_spec['dynamics_model_params'] = get_dynamics_model_params(universe, domain, task)
     variant_spec['data_params'] = {
         'n_goal_examples': n_goal_examples,
         'n_goal_examples_validation_max': 100,
@@ -1218,6 +1341,7 @@ CLASSIFIER_ALGS = (
     'SACClassifier',
     'RAQ',
     'VICE',
+    'VICEDynamicsAware',
     'VICEGAN',
     'VICERAQ',
     'VICEGANTwoGoal',
@@ -1233,7 +1357,7 @@ def get_variant_spec(args):
 
     from_vision = args.vision
 
-    if args.algorithm in CLASSIFIER_ALGS:
+    if algorithm in CLASSIFIER_ALGS:
         variant_spec = get_variant_spec_classifier(
             universe, domain, task, task_eval, args.policy, algorithm,
             args.n_goal_examples, from_vision)

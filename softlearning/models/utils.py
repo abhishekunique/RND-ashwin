@@ -66,6 +66,63 @@ def get_vae(encoder_path=None, decoder_path=None, **kwargs):
     return vae
 
 
+def get_dynamics_model_from_variant(variant, env, *args, **kwargs):
+    from .dynamics_model import create_dynamics_model
+
+    dynamics_model_params = deepcopy(variant['dynamics_model_params'])
+    # dynamics_model_type = deepcopy(dynamics_model_params['type'])
+    dynamics_model_kwargs = deepcopy(dynamics_model_params['kwargs'])
+
+    observation_preprocessors_params = dynamics_model_kwargs.pop(
+        'observation_preprocessors_params', {}).copy()
+    observation_keys = dynamics_model_kwargs.pop(
+        'observation_keys', None) or env.observation_keys
+
+    encoder_kwargs = dynamics_model_kwargs.pop('encoder_kwargs', {}).copy()
+    decoder_kwargs = dynamics_model_kwargs.pop('decoder_kwargs', {}).copy()
+    dynamics_latent_dim = dynamics_model_kwargs.pop('dynamics_latent_dim', 16)
+
+    observation_shapes = OrderedDict((
+        (key, value) for key, value in env.observation_shape.items()
+        if key in observation_keys
+    ))
+    action_shape = env.action_shape
+
+    input_shapes = {
+        'observations': observation_shapes,
+        'actions': action_shape,
+    }
+
+    observation_preprocessors = OrderedDict()
+    for name, observation_shape in observation_shapes.items():
+        preprocessor_params = observation_preprocessors_params.get(name, None)
+        if not preprocessor_params:
+            observation_preprocessors[name] = None
+            continue
+
+        observation_preprocessors[name] = get_preprocessor_from_params(
+            env, preprocessor_params)
+
+    action_preprocessor = None
+    preprocessors = {
+        'observations': observation_preprocessors,
+        'actions': action_preprocessor,
+    }
+
+    dynamics_model = create_dynamics_model(
+        input_shapes=input_shapes,
+        dynamics_latent_dim=dynamics_latent_dim,
+        *args,
+        observation_keys=observation_keys,
+        preprocessors=preprocessors,
+        encoder_kwargs=encoder_kwargs,
+        decoder_kwargs=decoder_kwargs,
+        **dynamics_model_kwargs,
+        **kwargs)
+
+    return dynamics_model
+
+
 def get_reward_classifier_from_variant(variant, env, *args, **kwargs):
     from .vice_models import create_feedforward_reward_classifier_function
 
@@ -80,10 +137,24 @@ def get_reward_classifier_from_variant(variant, env, *args, **kwargs):
     observation_keys = reward_classifier_kwargs.pop(
         'observation_keys', None) or env.observation_keys
 
+    # TODO: Clean this up
+    dynamics_aware = variant['algorithm_params']['type'] == 'VICEDynamicsAware'
+
     observation_shapes = OrderedDict((
         (key, value) for key, value in env.observation_shape.items()
         if key in observation_keys
     ))
+
+    if dynamics_aware:
+        dynamics_model_kwargs = deepcopy(variant['dynamics_model_params']['kwargs'])
+        dynamics_latent_dim = dynamics_model_kwargs['dynamics_latent_dim']
+        dynamics_features_shape = tf.TensorShape(dynamics_latent_dim)
+        input_shapes = {
+            'observations': observation_shapes,
+            'dynamics_features': dynamics_features_shape
+        }
+    else:
+        input_shapes = observation_shapes
 
     observation_preprocessors = OrderedDict()
     for name, observation_shape in observation_shapes.items():
@@ -94,11 +165,19 @@ def get_reward_classifier_from_variant(variant, env, *args, **kwargs):
         observation_preprocessors[name] = get_preprocessor_from_params(
             env, preprocessor_params)
 
+    if dynamics_aware:
+        preprocessors = {
+            'observations': observation_preprocessors,
+            'dynamics_features': None,
+        }
+    else:
+        preprocessors = observation_preprocessors
+
     reward_classifier = create_feedforward_reward_classifier_function(
-        input_shapes=observation_shapes,
+        input_shapes=input_shapes,
         observation_keys=observation_keys,
         *args,
-        preprocessors=observation_preprocessors,
+        preprocessors=preprocessors,
         **reward_classifier_kwargs,
         **kwargs)
 

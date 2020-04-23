@@ -155,7 +155,7 @@ def unflatten(flattened, separator='.'):
     return result
 
 
-def mixup(features, labels, alpha=0.2):
+def mixup(features, labels, alpha=0.2, return_permutation=False):
     assert isinstance(features, dict), (type(features), features)
     assert all(features[key].shape[0] == labels.shape[0]
                for key in features.keys())
@@ -184,7 +184,11 @@ def mixup(features, labels, alpha=0.2):
     ))
     labels_convex = lambda_ * labels + (1 - lambda_) * shuffled_labels
 
+    if return_permutation:
+        return features_convex, labels_convex, permutation_idx
+
     return features_convex, labels_convex
+
 
 
 def angle_distance(deg1, deg2):
