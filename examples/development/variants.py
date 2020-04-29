@@ -66,8 +66,8 @@ ALGORITHM_PARAMS_ADDITIONAL = {
             'eval_n_episodes': 3,
 
             'ext_reward_coeff': 1,
-            'rnd_int_rew_coeff': 1,
-            # 'normalize_ext_reward_gamma': 0.99,
+            'rnd_int_rew_coeff': tune.grid_search([0, 1]),
+            'normalize_ext_reward_gamma': 0.99,
         },
         'rnd_params': {
             'convnet_params': {
@@ -166,6 +166,8 @@ MAX_PATH_LENGTH_PER_UNIVERSE_DOMAIN_TASK = {
 
             # Translating Tasks
             'TranslatePuckFixed-v0': 50,
+            'TranslateMultiPuckFixed-v0': 100,
+
             'TranslatePuckResetFree-v0': 50,
 
             # Lifting Tasks
@@ -201,7 +203,8 @@ NUM_EPOCHS_PER_UNIVERSE_DOMAIN_TASK = {
         },
         'DClaw': {
             DEFAULT_KEY: int(250),
-            'TurnFreeValve3Fixed-v0': 750
+            'TurnFreeValve3Fixed-v0': 750,
+            'TranslateMultiPuckFixed-v0': 500,
         },
     },
 }
@@ -571,6 +574,29 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_STATE = {
                     'object_to_target_orientation_distance_reward': 20,
                 },
             },
+
+            # === Translation Tasks ===
+            'TranslateMultiPuckFixed-v0': {
+                'init_qpos_ranges': (
+                    ((0.1, 0.1, 0, 0, 0, 0), (0.1, 0.1, 0, 0, 0, 0)),
+                    ((-0.1, -0.1, 0, 0, 0, 0), (-0.1, -0.1, 0, 0, 0, 0)),
+                ),
+                'target_qpos_ranges': (
+                    ((0.1, -0.1, 0, 0, 0, 0), (0.1, -0.1, 0, 0, 0, 0)),
+                    ((-0.1, 0.1, 0, 0, 0, 0), (-0.1, 0.1, 0, 0, 0, 0)),
+                ),
+                'observation_keys': (
+                    'claw_qpos',
+                    'last_action',
+                    'object1_xy_position',
+                    'object2_xy_position',
+                ),
+                'reward_keys_and_weights': {
+                    'object1_to_target_position_distance_log_reward': 1,
+                    'object2_to_target_position_distance_log_reward': 1,
+                }
+            }
+
         }
     }
 }

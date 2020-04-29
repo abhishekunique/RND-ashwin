@@ -105,6 +105,21 @@ ALGORITHM_PARAMS_ADDITIONAL = {
             'action_prior': 'uniform',
             'n_initial_exploration_steps': int(1e3),
             'n_epochs': 200,
+
+            'normalize_ext_reward_gamma': 0.99,
+            'rnd_int_rew_coeff': tune.sample_from([0, 1]),
+        },
+        'rnd_params': {
+            'convnet_params': {
+                'conv_filters': (16, 32, 64),
+                'conv_kernel_sizes': (3, 3, 3),
+                'conv_strides': (2, 2, 2),
+                'normalization_type': None,
+            },
+            'fc_params': {
+                'hidden_layer_sizes': (256, 256),
+                'output_size': 512,
+            },
         }
     },
     'SACClassifier': {
@@ -513,7 +528,7 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_STATE = {
                     'object_to_target_orientation_distance_cost': 1,
                 },
             },
-            # LIFTING
+            # === LIFTING === 
             'LiftDDFixed-v0': {
                 'reset_policy_checkpoint_path': None,
                 'init_qpos_range': (
@@ -525,6 +540,26 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_STATE = {
                 'target_qpos_range': [
                     (0, 0, 0.04, 0, 0, 0)
                 ],
+            },
+            'TranslateMultiPuckFixed-v0': {
+                'init_qpos_ranges': (
+                    ((0.1, 0.1, 0, 0, 0, 0), (0.1, 0.1, 0, 0, 0, 0)),
+                    ((-0.1, -0.1, 0, 0, 0, 0), (-0.1, -0.1, 0, 0, 0, 0)),
+                ),
+                'target_qpos_ranges': (
+                    ((0.1, -0.1, 0, 0, 0, 0), (0.1, -0.1, 0, 0, 0, 0)),
+                    ((-0.1, 0.1, 0, 0, 0, 0), (-0.1, 0.1, 0, 0, 0, 0)),
+                ),
+                'observation_keys': (
+                    'claw_qpos',
+                    'last_action',
+                    'object1_xy_position',
+                    'object2_xy_position',
+                ),
+                'reward_keys_and_weights': {
+                    'object1_to_target_position_distance_log_reward': 1,
+                    'object2_to_target_position_distance_log_reward': 1,
+                }
             }
         }
     },
