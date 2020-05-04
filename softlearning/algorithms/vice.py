@@ -20,7 +20,13 @@ class VICE(SACClassifier):
     def __init__(self, *args, positive_on_first_occurence=False, **kwargs):
         super(VICE, self).__init__(*args, **kwargs)
         self._positive_on_first_occurence = positive_on_first_occurence
-        self._seen_states = set()
+        if positive_on_first_occurence:
+            env = self._training_environment.unwrapped
+            # self._seen_states = set()
+            self._seen_states = [
+                [False for _ in range(env.n_bins + 1)]
+                for _ in range(env.n_bins + 1)
+            ]
 
     # def _init_extrinsic_reward(self):
     #     classifier_inputs = flatten_input_structure({
@@ -42,9 +48,11 @@ class VICE(SACClassifier):
             for i, negative in enumerate(negatives['state_observation']):
                 # TODO: Make this general for any enviornment
                 x_d, y_d = env._discretize_observation(negative)
-                if (x_d, y_d) not in self._seen_states:
+                if not self._seen_states[x_d][y_d]:
+                # if (x_d, y_d) not in self._seen_states:
                     first_occ_idxs.append(i)
-                    self._seen_states.add((x_d, y_d))
+                    # self._seen_states.add((x_d, y_d))
+                    self._seen_states[x_d][y_d] = True
 
         # DEBUG: Testing with the same negatives pool for each training iteration
         # negatives = type(self._pool.data)(

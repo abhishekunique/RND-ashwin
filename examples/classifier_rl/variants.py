@@ -106,8 +106,8 @@ ALGORITHM_PARAMS_ADDITIONAL = {
             'n_initial_exploration_steps': int(1e3),
             'n_epochs': 200,
 
-            'normalize_ext_reward_gamma': 0.99,
             'rnd_int_rew_coeff': tune.sample_from([0, 1]),
+            'normalize_ext_reward_gamma': tune.grid_search([0.99]),
         },
         'rnd_params': {
             'convnet_params': {
@@ -198,9 +198,23 @@ ALGORITHM_PARAMS_ADDITIONAL = {
             # 'ext_reward_coeff': tune.grid_search([0.25, 0.5, 1]),
             # 'normalize_ext_reward_gamma': tune.grid_search([0.99, 1]),
             # 'use_env_intrinsic_reward': tune.grid_search([True]),
+            # 'rnd_int_rew_coeff': tune.sample_from([1]),
 
-            'positive_on_first_occurence': True,
-        }
+            'positive_on_first_occurence': tune.grid_search([True, False]),
+        },
+        # === Using RND ===
+        # 'rnd_params': {
+        #     'convnet_params': {
+        #         'conv_filters': (16, 32, 64),
+        #         'conv_kernel_sizes': (3, 3, 3),
+        #         'conv_strides': (2, 2, 2),
+        #         'normalization_type': None,
+        #     },
+        #     'fc_params': {
+        #         'hidden_layer_sizes': (256, 256),
+        #         'output_size': 512,
+        #     },
+        # }
     },
     'VICEDynamicsAware': {
         'type': 'VICEDynamicsAware',
@@ -318,7 +332,7 @@ CLASSIFIER_PARAMS_BASE = {
     'type': 'feedforward_classifier',
     'kwargs': {
         'hidden_layer_sizes': (M, ) * N,
-        'observation_keys': ('pixels', ),
+        'observation_keys': None,
     }
 }
 
@@ -358,6 +372,12 @@ CLASSIFIER_PARAMS_PER_UNIVERSE_DOMAIN_TASK = {
             },
         },
         'DClaw': {
+            # **{
+            #     key: {'observation_keys': ('object_position', 'object_quaternion')}
+            #     for key in (
+            #         'LiftDDFixed-v0',
+            #     )
+            # },
             **{
                 key: {'observation_keys': ('pixels', )}
                 for key in (
@@ -434,13 +454,13 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_STATE = {
 
                 # === Use environment's count-based reward ===
                 'reward_type': 'none',
-                'use_count_reward': True,
+                # 'use_count_reward': True,
                 'n_bins': 50,  # Number of bins to discretize the space with
 
                 # === EASY ===
                 'wall_shape': 'easy-maze',
-                'init_pos_range': ((-2.5, -3), (-2.5, -3)),
-                'target_pos_range': ((2.5, -3), (2.5, -3)),
+                'init_pos_range': ((-2.5, -2.5), (-2.5, -2.5)),
+                'target_pos_range': ((2.5, -2.5), (2.5, -2.5)),
                 # === MEDIUM ===
                 # 'wall_shape': 'medium-maze',
                 # 'init_pos_range': ((-3, -3), (-3, -3)),
@@ -530,25 +550,50 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_STATE = {
             },
             # === LIFTING === 
             'LiftDDFixed-v0': {
-                'reset_policy_checkpoint_path': None,
-                'init_qpos_range': (
-                    (0, 0, 0.041, 1.017, 0, 0),
-                    (0, 0, 0.041, 1.017, 0, 0),
-                    # (0, 0, 0.041, -np.pi, -np.pi, -np.pi),
-                    # (0, 0, 0.041, np.pi, np.pi, np.pi),
-                ),
+                'init_qpos_range': tune.grid_search([
+                    (
+                        (0, 0, 0.041, 1.017, 0, 0),
+                        (0, 0, 0.041, 1.017, 0, 0),
+                    ),
+                    # (
+                    #     (0, 0, 0.041, -np.pi, -np.pi, -np.pi),
+                    #     (0, 0, 0.041, np.pi, np.pi, np.pi),
+                    # )
+                ]),
                 'target_qpos_range': [
-                    (0, 0, 0.04, 0, 0, 0)
+                    (0, 0, 0.045, 0, 0, 0)
                 ],
+                'reward_keys_and_weights': {
+                    # Dense reward (want z reward to be 10x in magnitude)
+                    'object_to_target_z_position_distance_reward': 10,
+                    'object_to_target_xy_position_distance_reward': 0.1,
+                    'object_to_target_orientation_distance_reward': 0,
+
+                    # 'sparse_position_reward': 1
+                },
+                'observation_keys': (
+                    'object_position',
+                    'object_quaternion',
+                    'claw_qpos',
+                    'last_action'
+                ),
+                # Camera settings for video
+                'camera_settings': {
+                    'distance': 0.35,
+                    'elevation': -15,
+                    'lookat': (0, 0, 0.05),
+                },
             },
+
+            # === Translation Tasks ===
             'TranslateMultiPuckFixed-v0': {
                 'init_qpos_ranges': (
-                    ((0.1, 0.1, 0, 0, 0, 0), (0.1, 0.1, 0, 0, 0, 0)),
-                    ((-0.1, -0.1, 0, 0, 0, 0), (-0.1, -0.1, 0, 0, 0, 0)),
+                    ((0.05, 0.05, 0, 0, 0, 0), (0.05, 0.05, 0, 0, 0, 0)),
+                    ((-0.05, -0.05, 0, 0, 0, 0), (-0.05, -0.05, 0, 0, 0, 0)),
                 ),
                 'target_qpos_ranges': (
-                    ((0.1, -0.1, 0, 0, 0, 0), (0.1, -0.1, 0, 0, 0, 0)),
-                    ((-0.1, 0.1, 0, 0, 0, 0), (-0.1, 0.1, 0, 0, 0, 0)),
+                    ((0.05, -0.05, 0, 0, 0, 0), (0.05, -0.05, 0, 0, 0, 0)),
+                    ((-0.05, 0.05, 0, 0, 0, 0), (-0.05, 0.05, 0, 0, 0, 0)),
                 ),
                 'observation_keys': (
                     'claw_qpos',

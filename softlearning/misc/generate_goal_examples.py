@@ -55,7 +55,9 @@ def get_ddl_goal_state_from_variant(variant):
     domain = train_env_params['domain']
     task = train_env_params['task']
 
-    gen_func = SUPPORTED_ENVS_UNIVERSE_DOMAIN[universe][domain]
+    domain_generators = SUPPORTED_ENVS_UNIVERSE_DOMAIN_TASK[universe][domain]
+    gen_func = domain_generators.get(task, domain_generators[DEFAULT_TASK_KEY])
+
     goal_state = gen_func(env,
                           include_transitions=False,
                           num_total_examples=1,
@@ -80,8 +82,9 @@ def get_goal_transitions_from_variant(variant):
     task = train_env_params['task']
 
     try:
-        gen_func = SUPPORTED_ENVS_UNIVERSE_DOMAIN[universe][domain]
-        # TODO: Add goal kwargs
+        # TODO: Add goal generation kwargs (goal threshold, etc.)
+        domain_generators = SUPPORTED_ENVS_UNIVERSE_DOMAIN_TASK[universe][domain]
+        gen_func = domain_generators.get(task, domain_generators[DEFAULT_TASK_KEY])
         goal_transitions = gen_func(env, include_transitions=True)
     except KeyError:
         raise NotImplementedError
@@ -199,7 +202,7 @@ def generate_pusher_2d_goals(env,
 def generate_point_2d_goals(env,
                             num_total_examples=500,
                             rollout_length=15,
-                            goal_threshold=0.25,
+                            goal_threshold=0.1,
                             include_transitions=True,
                             save_image=True):
     from copy import deepcopy
@@ -301,8 +304,9 @@ def get_goal_example_from_variant(variant):
         goal_examples = generate_push_goal_examples(total_goal_examples, env)
     elif task in PICK_TASKS:
         goal_examples = generate_pick_goal_examples(total_goal_examples, env, variant['task'])
-    elif SUPPORTED_ENVS_UNIVERSE_DOMAIN.get(universe, {}).get(domain, None):
-        gen_func = SUPPORTED_ENVS_UNIVERSE_DOMAIN[universe][domain]
+    elif SUPPORTED_ENVS_UNIVERSE_DOMAIN_TASK.get(universe, {}).get(domain, None):
+        domain_generators = SUPPORTED_ENVS_UNIVERSE_DOMAIN_TASK[universe][domain]
+        gen_func = domain_generators.get(task, domain_generators[DEFAULT_TASK_KEY])
         include_transitions = (
             variant['algorithm_params']['type'] == 'VICEDynamicsAware')
         goal_examples = gen_func(env,
@@ -537,11 +541,16 @@ def generate_door_goal_examples(total_goal_examples, env):
 
     return goal_examples
 
+from .goal_collection.dclaw import generate_lift_dd_goals
 
-SUPPORTED_ENVS_UNIVERSE_DOMAIN = {
+DEFAULT_TASK_KEY = '__DEFAULT__'
+SUPPORTED_ENVS_UNIVERSE_DOMAIN_TASK = {
     'gym': {
-        'Point2D': generate_point_2d_goals,
-        'Pusher2D': generate_pusher_2d_goals,
+        'Point2D': {DEFAULT_TASK_KEY: generate_point_2d_goals},
+        'Pusher2D': {DEFAULT_TASK_KEY: generate_pusher_2d_goals},
+        'DClaw': {
+            'LiftDDFixed-v0': generate_lift_dd_goals,
+        }
     }
 }
 

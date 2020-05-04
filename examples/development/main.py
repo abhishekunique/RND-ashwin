@@ -56,7 +56,7 @@ class ExperimentRunner(tune.Trainable):
         evaluation_environment = self.evaluation_environment = (
             get_environment_from_params(environment_params['evaluation'])
             if 'evaluation' in environment_params
-            else training_environment)
+            else copy.deepcopy(training_environment))
 
         replay_pool = self.replay_pool = (
             get_replay_pool_from_variant(variant, training_environment))
@@ -186,7 +186,7 @@ class ExperimentRunner(tune.Trainable):
         evaluation_environment = self.evaluation_environment = (
             get_environment_from_params(environment_params['evaluation'])
             if 'evaluation' in environment_params
-            else training_environment)
+            else copy.deepcopy(training_environment))
         num_goals = training_environment.num_goals
         if self._share_pool:
             self.replay_pool = get_replay_pool_from_variant(variant, training_environment)

@@ -61,6 +61,9 @@ NUM_EPOCHS_UNIVERSE_DOMAIN_TASK = {
         },
         'Pusher2D': {
             DEFAULT_KEY: 300,
+        },
+        'DClaw': {
+            DEFAULT_KEY: 500,
         }
     },
 }
@@ -115,10 +118,24 @@ ALGORITHM_PARAMS_ADDITIONAL = {
 
             'train_distance_fn_every_n_steps': 64, # tune.grid_search([16, 64]),
 
-            # 'ext_rew_coeff': tune.grid_search([0.5, 1]),
+            'ext_reward_coeff': tune.grid_search([0.5, 1]),
             'normalize_ext_reward_gamma': tune.grid_search([0.99, 1]),
-            'use_env_intrinsic_reward': tune.grid_search([True]),
+            # 'use_env_intrinsic_reward': tune.grid_search([True]),
             'ddl_batch_size': 256,
+
+            'rnd_int_rew_coeff': 1,
+        },
+        'rnd_params': {
+            'convnet_params': {
+                'conv_filters': (16, 32, 64),
+                'conv_kernel_sizes': (3, 3, 3),
+                'conv_strides': (2, 2, 2),
+                'normalization_type': None,
+            },
+            'fc_params': {
+                'hidden_layer_sizes': (256, 256),
+                'output_size': 512,
+            },
         }
     },
 
@@ -170,6 +187,14 @@ DISTANCE_FN_KWARGS_UNIVERSE_DOMAIN_TASK = {
                 )
             },
         },
+        'DClaw': {
+            # **{
+            #     key: {'observation_keys': ('object_pos', )}
+            #     for key in (
+            #         'Simple-v0',
+            #     )
+            # },
+        }
     }
 }
 
@@ -249,6 +274,29 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_STATE = {
                     'object_pos',
                     # 'target_pos'
                 ),
+            },
+        },
+        'DClaw': {
+            'LiftDDFixed-v0': {
+                'init_qpos_range': tune.grid_search([
+                    ((0, 0, 0.041, 1.017, 0, 0), (0, 0, 0.041, 1.017, 0, 0))
+                ]),
+                'target_qpos_range': [
+                    (0, 0, 0.045, 0, 0, 0)
+                ],
+                'reward_keys_and_weights': {'sparse_position_reward': 1},
+                'observation_keys': (
+                    'object_position',
+                    'object_quaternion',
+                    'claw_qpos',
+                    'last_action'
+                ),
+                # Camera settings for video
+                'camera_settings': {
+                    'distance': 0.35,
+                    'elevation': -15,
+                    'lookat': (0, 0, 0.05),
+                },
             },
         },
     },
