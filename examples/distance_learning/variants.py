@@ -80,13 +80,17 @@ ALGORITHM_PARAMS_BASE = {
         'epoch_length': 1000,
         'train_every_n_steps': 1,
         'n_train_repeat': 1,
-        'eval_render_kwargs': {},
         'eval_n_episodes': 3,
         'eval_deterministic': True,
         'save_training_video_frequency': 5,
         'discount': 0.99,
         'tau': 5e-3,
         'reward_scale': 1.0,
+        'eval_render_kwargs': {
+            'width': 480,
+            'height': 480,
+            'mode': 'rgb_array',
+        },
     },
 }
 
@@ -138,14 +142,34 @@ ALGORITHM_PARAMS_ADDITIONAL = {
             },
         }
     },
+    'DynamicsAwareEmbeddingDDL': {
+        'type': 'DynamicsAwareEmbeddingDDL',
+        'kwargs': {
+            'reparameterize': REPARAMETERIZE,
+            'lr': 3e-4,
+            'target_update_interval': 1,
+            'tau': 5e-3,
+            'target_entropy': 'auto',
+            'action_prior': 'uniform',
+            'n_initial_exploration_steps': int(1e3),
+            'n_epochs': 200,
 
+            'train_distance_fn_every_n_steps': tune.grid_search([16, 64]),
+            'ddl_batch_size': 256,
+
+            # 'ext_reward_coeff': tune.grid_search([0.5, 1]),
+            # 'normalize_ext_reward_gamma': tune.grid_search([0.99, 1]),
+            # 'use_env_intrinsic_reward': tune.grid_search([True]),
+            # 'rnd_int_rew_coeff': 0,
+        },
+    }
 }
 
 DEFAULT_NUM_EPOCHS = 200
 NUM_CHECKPOINTS = 10
 
 """
-Distance estimator params
+Distance Estimator params
 """
 
 DISTANCE_FN_PARAMS_BASE = {
@@ -153,6 +177,7 @@ DISTANCE_FN_PARAMS_BASE = {
     'kwargs': {
         'hidden_layer_sizes': (M, ) * N,
         'observation_keys': None,
+        'embedding_dim': 2,
     }
 }
 
@@ -162,7 +187,7 @@ DISTANCE_FN_KWARGS_UNIVERSE_DOMAIN_TASK = {
             **{
                 key: {'observation_keys': ('state_observation', )}
                 for key in (
-                    # 'Fixed-v0',
+                    'Fixed-v0',
                     'SingleWall-v0',
                     'Maze-v0',
                     'BoxWall-v1',
@@ -171,7 +196,7 @@ DISTANCE_FN_KWARGS_UNIVERSE_DOMAIN_TASK = {
             **{
                 key: {'observation_keys': ('onehot_observation', )}
                 for key in (
-                    'Fixed-v0',
+                    # 'Fixed-v0',
                     # 'SingleWall-v0',
                     # 'Maze-v0',
                     # 'BoxWall-v1',
@@ -205,16 +230,17 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_STATE = {
             'Fixed-v0': {
                 'action_scale': tune.grid_search([0.5]),
                 'images_are_rgb': True,
-                'init_pos_range': ((-2, -2), (-2, -2)), # Fixed reset
-                # 'init_pos_range': None,             # Random reset
+                # 'init_pos_range': ((-2, -2), (-2, -2)), # Fixed reset
+                'init_pos_range': None,             # Random reset
                 'target_pos_range': ((2, 2), (2, 2)), # Set the goal to (x, y) = (2, 2)
                 # 'target_pos_range': ((0, 0), (0, 0)), # Set the goal to (x, y) = (0, 0)
                 'render_onscreen': False,
 
-                'n_bins': 10,
-                'show_discrete_grid': True,
-                'observation_keys': ('onehot_observation', ),
-                # 'observation_keys': ('state_observation', ),
+                # 'n_bins': 10,
+                # 'show_discrete_grid': True,
+
+                # 'observation_keys': ('onehot_observation', ),
+                'observation_keys': ('state_observation', ),
             },
             'SingleWall-v0': {
                 # 'boundary_distance': tune.grid_search([4, 8]),
@@ -240,14 +266,14 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_STATE = {
                 'images_are_rgb': True,
 
                 'reward_type': 'none',
-                'use_count_reward': True,
-                'show_discrete_grid': False,
-                'n_bins': 50,
+                # 'use_count_reward': True,
+                # 'show_discrete_grid': False,
+                # 'n_bins': 50,
 
                 # === EASY ===
                 'wall_shape': 'easy-maze',
-                'init_pos_range': ((-2.5, -3), (-2.5, -3)),
-                'target_pos_range': ((2.5, -3), (2.5, -3)),
+                'init_pos_range': ((-2.5, -2.5), (-2.5, -2.5)),
+                'target_pos_range': ((2.5, -2.5), (2.5, -2.5)),
                 # === MEDIUM ===
                 # 'wall_shape': 'medium-maze',
                 # 'init_pos_range': ((-3, -3), (-3, -3)),

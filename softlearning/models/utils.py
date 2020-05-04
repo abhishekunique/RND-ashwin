@@ -7,6 +7,52 @@ from softlearning.utils.tensorflow import nest
 from softlearning.preprocessors.utils import get_preprocessor_from_params
 
 
+def get_embedding_from_variant(variant, env, *args, **kwargs):
+    from softlearning.models.ddl.distance_estimator import (
+        create_embedding_fn)
+
+    distance_fn_params = deepcopy(variant['distance_fn_params'])
+    distance_fn_kwargs = deepcopy(distance_fn_params['kwargs'])
+
+    observation_preprocessors_params = distance_fn_kwargs.pop(
+        'observation_preprocessors_params', {}).copy()
+    observation_keys = distance_fn_kwargs.pop(
+        'observation_keys', None) or env.observation_keys
+
+    observation_shapes = OrderedDict((
+        (key, value)
+        for key, value in env.observation_shape.items()
+        if key in observation_keys
+    ))
+
+    input_shapes = observation_shapes
+
+    observation_preprocessors = OrderedDict()
+    for name, observation_shape in observation_shapes.items():
+        preprocessor_params = observation_preprocessors_params.get(name, None)
+        if not preprocessor_params:
+            observation_preprocessors[name] = None
+            continue
+        observation_preprocessors[name] = get_preprocessor_from_params(
+            env, preprocessor_params)
+
+    preprocessors = observation_preprocessors
+
+    assert 'embedding_dim' in distance_fn_kwargs, (
+        'Must specify an embedding dimension in the distance function kwargs')
+    embedding_dim = distance_fn_kwargs.pop('embedding_dim')
+
+    embedding_fn = create_embedding_fn(
+        input_shapes=input_shapes,
+        embedding_dim=embedding_dim,
+        observation_keys=observation_keys,
+        *args,
+        preprocessors=preprocessors,
+        **distance_fn_kwargs,
+        **kwargs)
+    return embedding_fn
+
+
 def get_distance_estimator_from_variant(variant, env, *args, **kwargs):
     from softlearning.models.ddl.distance_estimator import (
         create_distance_estimator)

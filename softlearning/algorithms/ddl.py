@@ -157,7 +157,8 @@ class DDL(SAC):
 
         # === Set s1, s2 for training Qs ===
         feed_dict.update({
-            self._placeholders['s1'][key]: feed_dict[self._placeholders['observations'][key]]
+            self._placeholders['s1'][key]:
+            feed_dict[self._placeholders['observations'][key]]
             for key in self._distance_fn.observation_keys
         })
 
@@ -201,3 +202,86 @@ class DDL(SAC):
         })
 
         return diagnostics
+
+
+class DynamicsAwareEmbeddingDDL(DDL):
+    def __init__(
+            self,
+            distance_fn,
+            *args,
+            normalize_distance_targets=False,
+            use_l2_distance_targets=False,
+            **kwargs):
+
+        self._embedding_fn = distance_fn
+        self._normalize_distance_targets = normalize_distance_targets
+        self._use_l2_distance_targets = use_l2_distance_targets
+
+        super(DynamicsAwareEmbeddingDDL, self).__init__(distance_fn, *args, **kwargs)
+
+    def _embedding_fn_inputs(self, s):
+        return flatten_input_structure({
+            name: s[name]
+            for name in self._embedding_fn.observation_keys
+        })
+
+    def _init_ddl_update(self):
+        s1_input, s2_input = (
+            self._embedding_fn_inputs(self._placeholders['s1']),
+            self._embedding_fn_inputs(self._placeholders['s2'])
+        )
+        phi_s1, phi_s2 = (
+            self._embedding_fn(s1_input),
+            self._embedding_fn(s2_input),
+        )
+
+        # Want the L2 norm in the embedding space to match dynamical distance
+        # phi(s2) - phi(s1): batch_size x embedding_dim
+        distance_preds = self._distance_preds = (
+            tf.reduce_sum(tf.square(phi_s2 - phi_s1), axis=-1, keepdims=True))
+        distance_targets = self._placeholders['distances']
+
+        if self._normalize_distance_targets:
+            # In the range [0, 1] relative to the max path length, assuming that it
+            # is possible to move between the two states in <= max_path_length steps
+            distance_targets = distance_targets / self.sampler.max_path_length
+
+        elif self._use_l2_distance_targets:
+            # Use l2 distance between s1 and s2 observations as the distance targets
+            distance_targets = tf.zeros(distance_targets.shape)
+            # Aggregate distances between all observation keys
+            for key in self._placeholders['s1']:
+                distance_targets += tf.norm(
+                    self._placeholders['s2'][key] - self._placeholders['s1'][key],
+                    axis=-1, keepdims=True)
+
+        distance_loss = self._distance_loss = (
+            tf.compat.v1.losses.mean_squared_error(
+                labels=distance_targets,
+                predictions=distance_preds,
+                weights=0.5)
+        )
+
+        ddl_optimizer = self._ddl_optimizer = (
+            tf.compat.v1.train.AdamOptimizer(
+                learning_rate=self._ddl_lr,
+                name='embedding_fn_optimizer'))
+        self._ddl_train_op = ddl_optimizer.minimize(
+            loss=distance_loss,
+            var_list=self._embedding_fn.trainable_variables)
+
+    def _init_extrinsic_reward(self):
+        """
+        Initializes the DDL reward as -|phi(s) - phi(g)|
+        The feed dict should set one of the s1/s2 placeholders the goal
+        """
+        s1_input, s2_input = (
+            self._embedding_fn_inputs(self._placeholders['s1']),
+            self._embedding_fn_inputs(self._placeholders['s2'])
+        )
+        phi_s1, phi_s2 = (
+            self._embedding_fn(s1_input),
+            self._embedding_fn(s2_input),
+        )
+        distances_to_goal = tf.reduce_sum(tf.square(phi_s2 - phi_s1), axis=-1, keepdims=True)
+        self._unscaled_ext_reward = -distances_to_goal

@@ -1,7 +1,8 @@
 import sys
 from softlearning.policies.utils import (
     get_policy_from_variant, get_policy_from_params, get_policy)
-from softlearning.models.utils import get_distance_estimator_from_variant
+from softlearning.models.utils import (
+    get_distance_estimator_from_variant, get_embedding_from_variant)
 from softlearning.misc.generate_goal_examples import get_ddl_goal_state_from_variant
 
 from examples.instrument import run_example_local
@@ -13,14 +14,21 @@ class ExperimentRunnerDistanceLearning(ExperimentRunner):
         algorithm_kwargs = super()._get_algorithm_kwargs(variant)
         algorithm_type = variant['algorithm_params']['type']
 
+        env = algorithm_kwargs['training_environment']
+
         if algorithm_type == 'DDL':
-            env = algorithm_kwargs['training_environment']
             distance_fn = self.distance_fn = (
                 get_distance_estimator_from_variant(
                     self._variant, env))
             algorithm_kwargs['distance_fn'] = distance_fn
-            algorithm_kwargs['goal_state'] = (
-                get_ddl_goal_state_from_variant(self._variant))
+
+        elif algorithm_type == 'DynamicsAwareEmbeddingDDL':
+            embedding_fn = self.distance_fn = (
+                get_embedding_from_variant(self._variant, env))
+            algorithm_kwargs['distance_fn'] = embedding_fn
+
+        algorithm_kwargs['goal_state'] = (
+            get_ddl_goal_state_from_variant(self._variant))
 
         return algorithm_kwargs
 
