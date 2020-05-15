@@ -10,8 +10,9 @@ goal_directory = os.path.join(PROJECT_PATH, 'goal_pools')
 GOAL_POOL_PATHS_PER_ENV_PER_NUM_GOALS = {
     'TurnFreeValve3ResetFree-v0': {
         '2': (
-            f'free_screw_32x32/goal_{i}_{goal}'
-            for i, goal in enumerate([-90, 90])
+            f'free_screw_state/goal_{i}_{goal}'
+            # f'free_screw_32x32/goal_{i}_{goal}'
+            for i, goal in enumerate([180, 0])
         ),
     },
     'TurnResetFree-v0': {

@@ -41,7 +41,7 @@ def get_replay_pool_from_params(replay_pool_params, env, *args, **kwargs):
 
 
 def get_replay_pool_from_variant(variant, *args, **kwargs):
-    replay_pool_params = variant['replay_pool_params']
+    replay_pool_params = variant['replay_pool_params'].copy()
     replay_pool = get_replay_pool_from_params(
         replay_pool_params, *args, **kwargs)
 
