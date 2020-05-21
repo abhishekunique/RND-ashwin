@@ -101,6 +101,12 @@ def create_DynamicsAwareEmbeddingDDL_algorithm(variant, *args, **kwargs):
     return algorithm
 
 
+def create_DynamicsAwareEmbeddingVICE_algorithm(variant, *args, **kwargs):
+    from .ddl import DynamicsAwareEmbeddingVICE
+    algorithm = DynamicsAwareEmbeddingVICE(*args, **kwargs)
+    return algorithm
+
+
 def create_HERQLearning_algorithm(variant, *args, **kwargs):
     from .her_qlearning import HERQLearning
     algorithm = HERQLearning(*args, **kwargs)
@@ -132,6 +138,7 @@ ALGORITHM_CLASSES = {
     # === Dynamical Distance Methods ===
     'DDL': create_DDL_algorithm,
     'DynamicsAwareEmbeddingDDL': create_DynamicsAwareEmbeddingDDL_algorithm,
+    'DynamicsAwareEmbeddingVICE': create_DynamicsAwareEmbeddingVICE_algorithm,
 }
 
 

@@ -11,7 +11,7 @@ class DDL(SAC):
         self,
         distance_fn,
         goal_state,
-        train_distance_fn_every_n_steps=16,
+        train_distance_fn_every_n_steps=64,
         ddl_lr=3e-4,
         ddl_batch_size=256,
         **kwargs,
@@ -156,23 +156,24 @@ class DDL(SAC):
         placeholders_flat = flatten(self._placeholders)
 
         # === Set s1, s2 for training Qs ===
-        feed_dict.update({
-            self._placeholders['s1'][key]:
-            feed_dict[self._placeholders['observations'][key]]
-            for key in self._distance_fn.observation_keys
-        })
+        if self._goal_state:
+            feed_dict.update({
+                self._placeholders['s1'][key]:
+                feed_dict[self._placeholders['observations'][key]]
+                for key in self._distance_fn.observation_keys
+            })
 
-        batch_size = feed_dict[next(iter(feed_dict))].shape[0]
-        feed_dict.update({
-            self._placeholders['s2'][key]:
-            np.repeat(self._goal_state[key][None], batch_size, axis=0)
-            for key in self._distance_fn.observation_keys
-        })
+            batch_size = feed_dict[next(iter(feed_dict))].shape[0]
+            feed_dict.update({
+                self._placeholders['s2'][key]:
+                np.repeat(self._goal_state[key][None], batch_size, axis=0)
+                for key in self._distance_fn.observation_keys
+            })
 
         return feed_dict
 
     def _do_training(self, iteration, batch):
-        super(DDL, self)._do_training(iteration, batch)
+        super()._do_training(iteration, batch)
         if iteration % self._train_distance_fn_every_n_steps == 0:
             ddl_feed_dict = self._get_ddl_feed_dict()
             self._session.run(self._ddl_train_op, ddl_feed_dict)
@@ -186,20 +187,22 @@ class DDL(SAC):
             iteration, batch, training_paths, evaluation_paths)
 
         ddl_feed_dict = self._get_ddl_feed_dict()
-        goal_feed_dict = self._get_feed_dict(iteration, batch)
-
         overall_distance_loss = self._session.run(
             self._distance_loss,
             feed_dict=ddl_feed_dict)
 
-        goal_relative_distance_preds = self._session.run(
-            self._distance_preds,
-            feed_dict=goal_feed_dict)
-
         diagnostics.update({
             'ddl/overall_distance_loss': np.mean(overall_distance_loss),
-            'ddl/goal_relative_distance_preds': np.mean(goal_relative_distance_preds),
         })
+
+        if self._goal_state:
+            goal_feed_dict = self._get_feed_dict(iteration, batch)
+            goal_relative_distance_preds = self._session.run(
+                self._distance_preds,
+                feed_dict=goal_feed_dict)
+            diagnostics.update({
+                'ddl/goal_relative_distance_preds': np.mean(goal_relative_distance_preds),
+            })
 
         return diagnostics
 
@@ -211,11 +214,21 @@ class DynamicsAwareEmbeddingDDL(DDL):
             *args,
             normalize_distance_targets=False,
             use_l2_distance_targets=False,
+            use_separate_embeddings=False,
             **kwargs):
 
         self._embedding_fn = distance_fn
         self._normalize_distance_targets = normalize_distance_targets
         self._use_l2_distance_targets = use_l2_distance_targets
+        self._use_separate_embeddings = use_separate_embeddings
+
+        if self.use_separate_embeddings:
+            self._embedding_fns = [
+                distance_fn,
+                tf.keras.clone_model(distance_fn)
+            ]
+        else:
+            self._embedding_fns = [distance_fn, distance_fn]
 
         super(DynamicsAwareEmbeddingDDL, self).__init__(distance_fn, *args, **kwargs)
 
@@ -231,8 +244,8 @@ class DynamicsAwareEmbeddingDDL(DDL):
             self._embedding_fn_inputs(self._placeholders['s2'])
         )
         phi_s1, phi_s2 = (
-            self._embedding_fn(s1_input),
-            self._embedding_fn(s2_input),
+            self._embedding_fns[0](s1_input),
+            self._embedding_fns[1](s2_input),
         )
 
         # Want the L2 norm in the embedding space to match dynamical distance
@@ -242,13 +255,13 @@ class DynamicsAwareEmbeddingDDL(DDL):
         distance_targets = self._placeholders['distances']
 
         if self._normalize_distance_targets:
-            # In the range [0, 1] relative to the max path length, assuming that it
-            # is possible to move between the two states in <= max_path_length steps
-            distance_targets = distance_targets / self.sampler.max_path_length
+            # Distance targets are proportional to the squared norm in embedding space
+            # so dividing by a constant divides by the square of that constant in the embedding
+            distance_targets = distance_targets / np.sqrt(self.sampler.max_path_length)
 
-        elif self._use_l2_distance_targets:
+        if self._use_l2_distance_targets:
             # Use l2 distance between s1 and s2 observations as the distance targets
-            distance_targets = tf.zeros(distance_targets.shape)
+            distance_targets = tf.zeros_like(distance_targets)
             # Aggregate distances between all observation keys
             for key in self._placeholders['s1']:
                 distance_targets += tf.norm(
@@ -266,9 +279,16 @@ class DynamicsAwareEmbeddingDDL(DDL):
             tf.compat.v1.train.AdamOptimizer(
                 learning_rate=self._ddl_lr,
                 name='embedding_fn_optimizer'))
+
+        var_list = (
+            self._embedding_fn.trainable_variables
+            if not self._use_separate_embeddings
+            else (self._embedding_fns[0].trainable_variables
+                + self._embedding_fns[1].trainable_variables))
+
         self._ddl_train_op = ddl_optimizer.minimize(
             loss=distance_loss,
-            var_list=self._embedding_fn.trainable_variables)
+            var_list=var_list)
 
     def _init_extrinsic_reward(self):
         """
@@ -280,8 +300,21 @@ class DynamicsAwareEmbeddingDDL(DDL):
             self._embedding_fn_inputs(self._placeholders['s2'])
         )
         phi_s1, phi_s2 = (
-            self._embedding_fn(s1_input),
-            self._embedding_fn(s2_input),
+            self._embedding_fns[0](s1_input),
+            self._embedding_fns[1](s2_input),
         )
         distances_to_goal = tf.reduce_sum(tf.square(phi_s2 - phi_s1), axis=-1, keepdims=True)
         self._unscaled_ext_reward = -distances_to_goal
+
+
+from .vice import VICE
+class DynamicsAwareEmbeddingVICE(VICE, DynamicsAwareEmbeddingDDL):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    # def _epoch_before_hook(self, *args, **kwargs):
+    #     super()._epoch_before_hook(*args, **kwargs)
+    #     import ipdb; ipdb.set_trace()
+
+    # def _get_feed_dict(self, *args):
+    #     super(VICE, self)._get_feed_dict(*args)

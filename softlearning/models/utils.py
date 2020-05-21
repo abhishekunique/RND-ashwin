@@ -208,8 +208,37 @@ def get_reward_classifier_from_variant(variant, env, *args, **kwargs):
         if not preprocessor_params:
             observation_preprocessors[name] = None
             continue
-        observation_preprocessors[name] = get_preprocessor_from_params(
-            env, preprocessor_params)
+
+        preprocessor_type = preprocessor_params.get('type')
+        if preprocessor_type == 'PickledPreprocessor':
+            import pickle
+            preprocessor_kwargs = preprocessor_params.pop('kwargs', {})
+            assert 'preprocessor_path' in preprocessor_kwargs, (
+                'Need to specify a .pkl file to load the preprocessor')
+            with open(preprocessor_kwargs['preprocessor_path'], 'rb') as f:
+                data = pickle.load(f)
+                if 'extract_fn' in preprocessor_kwargs:
+                    extract_fn = (variant['reward_classifier_params']
+                                        ['kwargs']
+                                        ['observation_preprocessors_params']
+                                        [name]
+                                        ['kwargs'].pop('extract_fn'))
+                    # extract_fn = preprocessor_kwargs.pop('extract_fn')
+                    preprocessor = extract_fn(data)
+                else:
+                    preprocessor = data
+                if isinstance(preprocessor, tf.keras.Model):
+                    preprocessor.trainable = False
+                observation_preprocessors[name] = preprocessor
+
+        elif preprocessor_type == 'EmbeddingPreprocessor':
+            preprocessor_kwargs = preprocessor_params.pop('kwargs', {})
+            observation_preprocessors[name] = get_embedding_from_variant(
+                variant, env)
+
+        else:
+            observation_preprocessors[name] = get_preprocessor_from_params(
+                env, preprocessor_params)
 
     if dynamics_aware:
         preprocessors = {

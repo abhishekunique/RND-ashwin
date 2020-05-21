@@ -37,6 +37,7 @@ def create_feedforward_reward_classifier_function(input_shapes,
     reward_classifier_function = PicklableModel(
         inputs_flat, reward_classifier_function(preprocessed_inputs))
     reward_classifier_function.observation_keys = observation_keys
+    reward_classifier_function.observations_preprocessors = preprocessors
 
     return reward_classifier_function
 

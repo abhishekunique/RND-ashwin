@@ -24,7 +24,8 @@ class ExperimentRunnerClassifierRL(ExperimentRunner):
                 'VICE',
                 'VICEGAN',
                 'VICERAQ',
-                'VICEDynamicsAware'):
+                'VICEDynamicsAware',
+                'DynamicsAwareEmbeddingVICE'):
 
             reward_classifier = self.reward_classifier = (
                 get_reward_classifier_from_variant(
@@ -40,6 +41,13 @@ class ExperimentRunnerClassifierRL(ExperimentRunner):
             if algorithm_type == 'VICEDynamicsAware':
                 algorithm_kwargs['dynamics_model'] = (get_dynamics_model_from_variant(
                     self._variant, algorithm_kwargs['training_environment']))
+
+            elif algorithm_type == 'DynamicsAwareEmbeddingVICE':
+                # TODO(justinvyu): Get this working for any environment
+                self.distance_fn = algorithm_kwargs['distance_fn'] = (
+                    reward_classifier.observations_preprocessors['state_observation'])
+                # TODO(justinvyu): include goal state as one of the VICE goal exmaples? 
+                algorithm_kwargs['goal_state'] = None
 
         # === LOAD GOAL POOLS FOR MULTI GOAL ===
         elif algorithm_type in (
@@ -80,6 +88,11 @@ class ExperimentRunnerClassifierRL(ExperimentRunner):
             algorithm_kwargs['goal_examples_validation'] = (
                 goal_examples_validation)
 
+        if 'distance_estimator' in picklable.keys():
+            distance_fn = self.distance_fn = picklable['distance_estimator']
+            algorithm_kwargs['distance_fn'] = distance_fn
+            algorithm_kwargs['goal_state'] = None
+
         return algorithm_kwargs
 
     def _restore_multi_algorithm_kwargs(self, picklable, checkpoint_dir, variant):
@@ -110,6 +123,9 @@ class ExperimentRunnerClassifierRL(ExperimentRunner):
             picklables['reward_classifier'] = self.reward_classifier
         elif hasattr(self, 'reward_classifiers'):
             picklables['reward_classifiers'] = self.reward_classifiers
+
+        if hasattr(self, 'distance_fn'):
+            picklables['distance_estimator'] = self.distance_fn
 
         return picklables
 

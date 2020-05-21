@@ -94,6 +94,14 @@ def get_feedforward_preprocessor(name='feedforward_preprocessor', **kwargs):
 
     return preprocessor
 
+def get_embedding_preprocessor(
+        embedding_weights_path,
+        name='embedding_preprocessor',
+        **kwargs):
+    from softlearning.models.ddl.distance_estimator import create_embedding_fn
+    preprocessor = create_embedding_fn(nam=name, **kwargs)
+    return preprocessor
+
 PREPROCESSOR_FUNCTIONS = {
     'ConvnetPreprocessor': get_convnet_preprocessor,
     'FeedforwardPreprocessor': get_feedforward_preprocessor,
