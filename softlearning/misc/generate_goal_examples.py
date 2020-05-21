@@ -202,7 +202,7 @@ def generate_pusher_2d_goals(env,
 def generate_point_2d_goals(env,
                             num_total_examples=500,
                             rollout_length=15,
-                            goal_threshold=0.1,
+                            goal_threshold=0.05,
                             include_transitions=True,
                             save_image=True):
     from copy import deepcopy
@@ -541,7 +541,9 @@ def generate_door_goal_examples(total_goal_examples, env):
 
     return goal_examples
 
-from .goal_collection.dclaw import generate_lift_dd_goals
+from .goal_collection.dclaw import (
+    generate_lift_dd_goals,
+    generate_translate_puck_goals)
 
 DEFAULT_TASK_KEY = '__DEFAULT__'
 SUPPORTED_ENVS_UNIVERSE_DOMAIN_TASK = {
@@ -549,8 +551,9 @@ SUPPORTED_ENVS_UNIVERSE_DOMAIN_TASK = {
         'Point2D': {DEFAULT_TASK_KEY: generate_point_2d_goals},
         'Pusher2D': {DEFAULT_TASK_KEY: generate_pusher_2d_goals},
         'DClaw': {
+            DEFAULT_TASK_KEY: None,
             'LiftDDFixed-v0': generate_lift_dd_goals,
+            'TranslatePuckFixed-v0': generate_translate_puck_goals,
         }
     }
 }
-

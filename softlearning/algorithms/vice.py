@@ -45,9 +45,11 @@ class VICE(SACClassifier):
             # Still things left to explore
             env = self._training_environment.unwrapped
             first_occ_idxs = []
-            for i, negative in enumerate(negatives['state_observation']):
-                # TODO: Make this general for any enviornment
-                x_d, y_d = env._discretize_observation(negative)
+            for i in range(len(negatives[next(iter(negatives))])):
+                x_d, y_d = env._discretize_observation({
+                    key: val[i]
+                    for key, val in negatives.items()
+                })
                 if not self._seen_states[x_d][y_d]:
                 # if (x_d, y_d) not in self._seen_states:
                     first_occ_idxs.append(i)
