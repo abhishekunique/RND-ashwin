@@ -177,7 +177,7 @@ DISTANCE_FN_PARAMS_BASE = {
     'kwargs': {
         'hidden_layer_sizes': (M, ) * N,
         'observation_keys': None,
-        'embedding_dim': 2,
+        # 'embedding_dim': 2,
     }
 }
 
@@ -271,13 +271,13 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_STATE = {
                 # 'n_bins': 50,
 
                 # === EASY ===
-                'wall_shape': 'easy-maze',
-                'init_pos_range': ((-2.5, -2.5), (-2.5, -2.5)),
-                'target_pos_range': ((2.5, -2.5), (2.5, -2.5)),
+                # 'wall_shape': 'easy-maze',
+                # 'init_pos_range': ((-2.5, -2.5), (-2.5, -2.5)),
+                # 'target_pos_range': ((2.5, -2.5), (2.5, -2.5)),
                 # === MEDIUM ===
-                # 'wall_shape': 'medium-maze',
-                # 'init_pos_range': ((-3, -3), (-3, -3)),
-                # 'target_pos_range': ((3, 3), (3, 3)),
+                'wall_shape': 'medium-maze',
+                'init_pos_range': ((-3, -3), (-3, -3)),
+                'target_pos_range': ((3, 3), (3, 3)),
                 # === HARD ===
                 # 'wall_shape': 'hard-maze',
                 # 'init_pos_range': ((-3, -3), (-3, -3)),
