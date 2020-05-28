@@ -454,30 +454,30 @@ CLASSIFIER_PARAMS_PER_UNIVERSE_DOMAIN_TASK = {
             #     }
             # },
             # === Initialize an online embedding preprocessor ===
-            # **{
-            #     env: {
-            #         'observation_keys': ('state_observation', ),
-            #         'observation_preprocessors_params': {
-            #             'state_observation': {
-            #                 'type': 'EmbeddingPreprocessor',
-            #                 # (TODO) Figure out the best way to provide params
-            #                 # 'kwargs': {
-            #                 #     'hidden_layer_sizes': (M, ) * N,
-            #                 #     'observation_keys': None,
+            **{
+                env: {
+                    'observation_keys': ('state_observation', ),
+                    'observation_preprocessors_params': {
+                        'state_observation': {
+                            'type': 'EmbeddingPreprocessor',
+                            # (TODO) Figure out the best way to provide params
+                            'kwargs': {
+                                'hidden_layer_sizes': (M, ) * N,
+                                'observation_keys': None,
 
-            #                 #     # Output dimension if using an embedding
-            #                 #     'embedding_dim': 2,
+                            #     # Output dimension if using an embedding
+                                'embedding_dim': 2,
 
-            #                 #     # Use weight decay for distance fn
-            #                 #     # 'kernel_regularizer': tune.grid_search([None, tf.keras.regularizers.l2(5e-4)]),
-            #                 # }
-            #             },
-            #         }
-            #     }
-            #     for env in (
-            #         'Maze-v0', 'Fixed-v0'
-            #     )
-            # },
+                                # Use weight decay for distance fn
+                                'kernel_regularizer': tune.grid_search([None, tf.keras.regularizers.l2(5e-4)]),
+                            }
+                        },
+                    }
+                }
+                for env in (
+                    'Maze-v0', 'Fixed-v0'
+                )
+            },
         },
         'Pusher2D': {
             **{
