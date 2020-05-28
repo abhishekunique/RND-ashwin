@@ -266,7 +266,7 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_STATE = {
                 'images_are_rgb': True,
 
                 'reward_type': 'none',
-                # 'use_count_reward': True,
+                'use_count_reward': tune.grid_search([True, False]),
                 # 'show_discrete_grid': False,
                 # 'n_bins': 50,
 
