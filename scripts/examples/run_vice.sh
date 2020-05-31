@@ -1,13 +1,13 @@
 softlearning run_example_local examples.classifier_rl \
-        --exp-name=vice_test  `# This is the name your experiment will be saved under ~/ray_results` \
+        --exp-name=vice_gt_embedding  `# This is the name your experiment will be saved under ~/ray_results` \
         --algorithm=VICE  `# Algorithm of choice (ex: SAC, VICE, etc.)` \
         --num-samples=2  `# Number of seeds PER choice of hyperparameters (will be multiplied by number of param combinations if you tune over a bunch)` \
-        --trial-gpus=0  `# Number of GPUs that will be utilized PER seed` \
+        --trial-gpus=0.5  `# Number of GPUs that will be utilized PER seed` \
         --trial-cpus=2  `# Number of CPUs that will be utilized PER seed (doesn't really affect much)` \
         --universe=gym  `# Environment universe (usually gym)` \
         --domain=Point2D  `# Environment domain, your environment name should be something like <Domain><Task> concatenated together` \
-        --task=Fixed-v0  `# Training environment task` \
-        --task-evaluation=Fixed-v0  `# Evaluation environment task` \
+        --task=Maze-v0  `# Training environment task` \
+        --task-evaluation=Maze-v0  `# Evaluation environment task` \
         --video-save-frequency=25  `# Evaluation video save frequency (every _ iterations)` \
         --checkpoint-frequency=25  `# Checkpoint frequency (every _ iterations)` \
         --save-training-video-frequency=0 `# Training video save frequency (every _ rollouts); 0 = disabled` \

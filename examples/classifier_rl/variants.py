@@ -1,6 +1,7 @@
 from copy import deepcopy
 from ray import tune
 import numpy as np
+import tensorflow as tf
 
 from softlearning.misc.utils import get_git_rev, deep_update
 from softlearning.misc.generate_goal_examples import (
@@ -187,19 +188,21 @@ ALGORITHM_PARAMS_ADDITIONAL = {
             'classifier_lr': 1e-4,
             'classifier_batch_size': 128,
             'n_initial_exploration_steps': int(1e3),
-            'n_classifier_train_steps': tune.grid_search([2, 10]),
+            'n_classifier_train_steps': tune.grid_search([10]),
+            # 'n_classifier_train_steps': tune.grid_search([2, 10]),
             'classifier_optim_name': 'adam',
             'n_epochs': 200,
             'mixup_alpha': tune.grid_search([1.]),
             'save_training_video_frequency': 0,
 
             # Tune over the reward scaling between count based bonus and VICE reward
-            # 'ext_reward_coeff': tune.grid_search([0.5]),  # Needed for VICE + count-based
-            # 'normalize_ext_reward_gamma': tune.grid_search([0.99, 1]),
+            'ext_reward_coeff': tune.grid_search([0.5]),  # Needed for VICE + count-based
+            'normalize_ext_reward_gamma': tune.grid_search([0.99, 1]),
             # 'use_env_intrinsic_reward': tune.grid_search([True]),
             # 'rnd_int_rew_coeff': tune.sample_from([1]),
 
-            'positive_on_first_occurence': tune.grid_search([True, False]),
+            'positive_on_first_occurence': tune.grid_search([True]),
+            # 'positive_on_first_occurence': tune.grid_search([True, False]),
         },
         # === Using RND ===
         # 'rnd_params': {
@@ -379,6 +382,7 @@ CLASSIFIER_PARAMS_BASE = {
     'kwargs': {
         'hidden_layer_sizes': (M, ) * N,
         'observation_keys': None,
+        'kernel_regularizer': tune.grid_search([None, tf.keras.regularizers.l2(1e-3)]),
     },
 }
 
@@ -416,24 +420,24 @@ CLASSIFIER_PARAMS_PER_UNIVERSE_DOMAIN_TASK = {
                     # 'BoxWall-v1',
                 )
             },
-            # 'Maze-v0': {
-            #     'observation_keys': ('state_observation', ),
-            #     'observation_preprocessors_params': {
-            #         'state_observation': tune.grid_search([
-            #             {
-            #                 'type': 'PickledPreprocessor',
-            #                 'kwargs': {
-            #                     'preprocessor_path': (
-            #                         '/home/justinvyu/dev/vice/'
-            #                         'notebooks/reward_learning/embedding_fn_0.pkl'
-            #                     ),
-            #                     'extract_fn': tune.function(lambda fn: fn),
-            #                 },
-            #             },
-            #             # None,
-            #         ]),
-            #     }
-            # },
+            'Maze-v0': {
+                'observation_keys': ('state_observation', ),
+                'observation_preprocessors_params': {
+                    'state_observation': tune.grid_search([
+                        {
+                            'type': 'PickledPreprocessor',
+                            'kwargs': {
+                                'preprocessor_path': (
+                                    # Pretrained embedding using ground truth Manhattan distances
+                                    '/home/kevinli/reward-learning/notebooks/reward_learning/gt_embedding_fn.pkl'
+                                ),
+                                'extract_fn': tune.function(lambda fn: fn),
+                            },
+                        },
+                        # None,
+                    ]),
+                }
+            },
             # 'Fixed-v0': {
             #     'observation_keys': ('state_observation', ),
             #     'observation_preprocessors_params': {
@@ -475,7 +479,8 @@ CLASSIFIER_PARAMS_PER_UNIVERSE_DOMAIN_TASK = {
                     }
                 }
                 for env in (
-                    'Maze-v0', 'Fixed-v0'
+                    # 'Maze-v0', 
+                    'Fixed-v0'
                 )
             },
         },
@@ -644,8 +649,7 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_STATE = {
 
                 # === Use environment's count-based reward ===
                 'reward_type': 'none',
-                # 'use_count_reward': tune.grid_search([True, False]),
-                'use_count_reward': tune.grid_search([False]),
+                'use_count_reward': tune.grid_search([True, False]),
                 'n_bins': 100,  # Number of bins to discretize the space with
 
                 # === EASY ===
