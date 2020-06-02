@@ -196,12 +196,12 @@ ALGORITHM_PARAMS_ADDITIONAL = {
             'save_training_video_frequency': 0,
 
             # Tune over the reward scaling between count based bonus and VICE reward
-            'ext_reward_coeff': tune.grid_search([0.5]),  # Needed for VICE + count-based
-            'normalize_ext_reward_gamma': tune.grid_search([0.99, 1]),
+            # 'ext_reward_coeff': tune.grid_search([0.5]),  # Needed for VICE + count-based
+            # 'normalize_ext_reward_gamma': tune.grid_search([0.99, 1]),
             # 'use_env_intrinsic_reward': tune.grid_search([True]),
             # 'rnd_int_rew_coeff': tune.sample_from([1]),
 
-            'positive_on_first_occurence': tune.grid_search([True]),
+            'positive_on_first_occurence': tune.grid_search([True, False]),
             # 'positive_on_first_occurence': tune.grid_search([True, False]),
         },
         # === Using RND ===
@@ -382,7 +382,7 @@ CLASSIFIER_PARAMS_BASE = {
     'kwargs': {
         'hidden_layer_sizes': (M, ) * N,
         'observation_keys': None,
-        'kernel_regularizer': tune.grid_search([None, tf.keras.regularizers.l2(1e-3)]),
+        'kernel_regularizer_lambda': tune.grid_search([5e-4, 1e-3, 5e-3]),
     },
 }
 
@@ -648,8 +648,9 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_STATE = {
                 'images_are_rgb': True,
 
                 # === Use environment's count-based reward ===
-                'reward_type': 'none',
-                'use_count_reward': tune.grid_search([True, False]),
+                'reward_type': tune.grid_search(['logits', 'none']),
+                'use_count_reward': False,
+                # 'use_count_reward': tune.grid_search([True, False]),
                 'n_bins': 100,  # Number of bins to discretize the space with
 
                 # === EASY ===

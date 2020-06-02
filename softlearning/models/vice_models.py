@@ -9,7 +9,7 @@ def create_feedforward_reward_classifier_function(input_shapes,
                                                   preprocessors=None,
                                                   observation_keys=None,
                                                   name='feedforward_reward_classifier',
-                                                  kernel_regularizer=tf.keras.regularizers.l2(0.001),
+                                                  kernel_regularizer_lambda=1e-3,
                                                   # output_activation=tf.math.log_sigmoid,
                                                   **kwargs):
     inputs_flat = create_inputs(input_shapes)
@@ -30,7 +30,7 @@ def create_feedforward_reward_classifier_function(input_shapes,
     reward_classifier_function = feedforward_model(
         *args,
         output_size=1,
-        kernel_regularizer=kernel_regularizer,
+        kernel_regularizer=tf.keras.regularizers.l2(kernel_regularizer_lambda) if kernel_regularizer_lambda > 0 else None,
         name=name,
         # output_activation=output_activation,
         **kwargs)
