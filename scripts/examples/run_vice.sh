@@ -1,7 +1,7 @@
 softlearning run_example_local examples.classifier_rl \
-        --exp-name=high_reg_vice `# This is the name your experiment will be saved under ~/ray_results` \
+        --exp-name=test_vice_dropout_and_wd `# This is the name your experiment will be saved under ~/ray_results` \
         --algorithm=VICE  `# Algorithm of choice (ex: SAC, VICE, etc.)` \
-        --num-samples=3  `# Number of seeds PER choice of hyperparameters (will be multiplied by number of param combinations if you tune over a bunch)` \
+        --num-samples=2  `# Number of seeds PER choice of hyperparameters (will be multiplied by number of param combinations if you tune over a bunch)` \
         --trial-gpus=0.5  `# Number of GPUs that will be utilized PER seed` \
         --trial-cpus=2  `# Number of CPUs that will be utilized PER seed (doesn't really affect much)` \
         --universe=gym  `# Environment universe (usually gym)` \

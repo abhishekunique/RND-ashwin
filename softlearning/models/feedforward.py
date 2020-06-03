@@ -18,6 +18,7 @@ def feedforward_model(hidden_layer_sizes,
                       activation='relu',
                       output_activation='linear',
                       preprocessors=None,
+                      dropout=None,
                       name='feedforward_model',
                       *args,
                       **kwargs):
@@ -27,13 +28,25 @@ def feedforward_model(hidden_layer_sizes,
         x = tf.concat(x, axis=-1)
         return x
 
-    model = PicklableSequential((
-        tfkl.Lambda(cast_and_concat),
-        *[
+    if dropout:
+        layers = nest.flatten([
+            [
+                tf.keras.layers.Dense(
+                    hidden_layer_size, *args, activation=activation, **kwargs),
+                tf.keras.layers.Dropout(dropout) 
+            ]
+            for hidden_layer_size in hidden_layer_sizes
+        ])
+    else:
+        layers = [
             tf.keras.layers.Dense(
                 hidden_layer_size, *args, activation=activation, **kwargs)
             for hidden_layer_size in hidden_layer_sizes
-        ],
+        ]
+
+    model = PicklableSequential((
+        tfkl.Lambda(cast_and_concat),
+        *layers,
         tf.keras.layers.Dense(
             output_size, *args, activation=output_activation, **kwargs)
     ), name=name)
