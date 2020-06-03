@@ -382,7 +382,7 @@ CLASSIFIER_PARAMS_BASE = {
     'kwargs': {
         'hidden_layer_sizes': (M, ) * N,
         'observation_keys': None,
-        'kernel_regularizer': tune.grid_search([None, tf.keras.regularizers.l2(0.1), tf.keras.regularizers.l2(0.5)]),
+        'kernel_regularizer_lambda': tune.grid_search([None, 0.1, 0.5]),
         'dropout': tune.grid_search([None, 0.2, 0.5])
     },
 }
