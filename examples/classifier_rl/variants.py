@@ -429,7 +429,7 @@ CLASSIFIER_PARAMS_PER_UNIVERSE_DOMAIN_TASK = {
                             'kwargs': {
                                 'preprocessor_path': (
                                     # Pretrained embedding using ground truth Manhattan distances
-                                    '/home/kevinli/reward-learning/notebooks/reward_learning/gt_embedding_fn.pkl'
+                                    '/home/kevinli/reward-learning/notebooks/reward_learning/gt_embedding_fn_pairwise.pkl'
                                 ),
                                 'extract_fn': tune.function(lambda fn: fn),
                             },

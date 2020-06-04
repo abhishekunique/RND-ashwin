@@ -8,7 +8,7 @@ softlearning run_example_local examples.classifier_rl \
         --domain=Point2D  `# Environment domain, your environment name should be something like <Domain><Task> concatenated together` \
         --task=Maze-v0  `# Training environment task` \
         --task-evaluation=Maze-v0  `# Evaluation environment task` \
-        --video-save-frequency=2  `# Evaluation video save frequency (every _ iterations)` \
+        --video-save-frequency=25  `# Evaluation video save frequency (every _ iterations)` \
         --checkpoint-frequency=25  `# Checkpoint frequency (every _ iterations)` \
         --save-training-video-frequency=0 `# Training video save frequency (every _ rollouts); 0 = disabled` \
         --checkpoint-replay-pool=True  `# Whether or not to save the replay pool on checkpointing` \
