@@ -196,13 +196,13 @@ ALGORITHM_PARAMS_ADDITIONAL = {
             'save_training_video_frequency': 0,
 
             # Tune over the reward scaling between count based bonus and VICE reward
-            'ext_reward_coeff': tune.grid_search([0.5, 1]),  # Needed for VICE + count-based
-            'normalize_ext_reward_gamma': tune.grid_search([0.99, 1]),
+            'ext_reward_coeff': tune.grid_search([0.5,1]),  # Needed for VICE + count-based
+            'normalize_ext_reward_gamma': tune.grid_search([0.99]),
             # 'use_env_intrinsic_reward': tune.grid_search([True]),
             # 'rnd_int_rew_coeff': tune.sample_from([1]),
 
-            'positive_on_first_occurence': tune.grid_search([True]),
-            # 'positive_on_first_occurence': tune.grid_search([True, False]),
+            #'positive_on_first_occurence': tune.grid_search([True]),
+            'positive_on_first_occurence': tune.grid_search([True, False]),
         },
         # === Using RND ===
         # 'rnd_params': {
@@ -382,7 +382,7 @@ CLASSIFIER_PARAMS_BASE = {
     'kwargs': {
         'hidden_layer_sizes': (M, ) * N,
         'observation_keys': None,
-        'kernel_regularizer_lambda': tune.grid_search([5e-4, 1e-3]),
+        'kernel_regularizer_lambda': tune.grid_search([None, 1e-4, 1e-3]),
     },
 }
 
@@ -429,7 +429,7 @@ CLASSIFIER_PARAMS_PER_UNIVERSE_DOMAIN_TASK = {
                             'kwargs': {
                                 'preprocessor_path': (
                                     # Pretrained embedding using ground truth Manhattan distances
-                                    '/home/kevinli/reward-learning/notebooks/reward_learning/gt_embedding_fn_pairwise.pkl'
+                                    '/home/kevinli/reward-learning/notebooks/reward_learning/gt_embedding_fn_pairwise_exp_fixed.pkl'
                                 ),
                                 'extract_fn': tune.function(lambda fn: fn),
                             },
