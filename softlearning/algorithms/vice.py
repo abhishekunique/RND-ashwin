@@ -17,9 +17,10 @@ class VICE(SACClassifier):
     Dibya Ghosh, Larry Yang, Sergey Levine, NIPS 2018.
     """
 
-    def __init__(self, *args, positive_on_first_occurence=False, **kwargs):
+    def __init__(self, *args, positive_on_first_occurence=False, gradient_penalty_weight=0, **kwargs):
         super(VICE, self).__init__(*args, **kwargs)
         self._positive_on_first_occurence = positive_on_first_occurence
+        self._gradient_penalty_weight = gradient_penalty_weight
         if positive_on_first_occurence:
             env = self._training_environment.unwrapped
             # self._seen_states = set()
@@ -133,12 +134,15 @@ class VICE(SACClassifier):
         # pi / (pi + f), f / (f + pi)
         log_pi_log_p_concat = tf.concat([log_pi, log_p], axis=1)
 
+        gradient_penalty = \
+            self._gradient_penalty_weight * tf.norm(tf.gradients(log_p, self._classifier.layers[1].outputs), ord=2, axis=-1)
+
         self._classifier_loss_t = tf.reduce_mean(
             tf.compat.v1.losses.softmax_cross_entropy(
                 self._placeholders['labels'],
                 log_pi_log_p_concat,
             )
-        )
+        ) + gradient_penalty
         self._classifier_training_op = self._get_classifier_training_op()
 
     def _epoch_after_hook(self, *args, **kwargs):

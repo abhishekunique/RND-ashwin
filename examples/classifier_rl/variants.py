@@ -201,8 +201,10 @@ ALGORITHM_PARAMS_ADDITIONAL = {
             # 'use_env_intrinsic_reward': tune.grid_search([True]),
             # 'rnd_int_rew_coeff': tune.sample_from([1]),
 
+            'gradient_penalty_weight': tune.grid_search([0, 0.5, 10]),
+
             #'positive_on_first_occurence': tune.grid_search([True]),
-            'positive_on_first_occurence': tune.grid_search([True, False]),
+            'positive_on_first_occurence': tune.grid_search([True]),
         },
         # === Using RND ===
         # 'rnd_params': {
@@ -382,7 +384,7 @@ CLASSIFIER_PARAMS_BASE = {
     'kwargs': {
         'hidden_layer_sizes': (M, ) * N,
         'observation_keys': None,
-        'kernel_regularizer_lambda': tune.grid_search([None, 1e-4, 1e-3]),
+        'kernel_regularizer_lambda': tune.grid_search([1e-3, 1e-1]),
     },
 }
 
