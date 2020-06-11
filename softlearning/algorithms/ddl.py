@@ -309,7 +309,13 @@ class DynamicsAwareEmbeddingDDL(DDL):
 
 from .vice import VICE
 class DynamicsAwareEmbeddingVICE(VICE, DynamicsAwareEmbeddingDDL):
-    def __init__(self, *args, **kwargs):
+    def __init__(
+        self, 
+        *args, 
+        use_ground_truth_distances=False, 
+        **kwargs
+    ):
+        self._use_ground_truth_distances = use_ground_truth_distances
         super().__init__(*args, **kwargs)
 
     # def _epoch_before_hook(self, *args, **kwargs):
@@ -318,3 +324,46 @@ class DynamicsAwareEmbeddingVICE(VICE, DynamicsAwareEmbeddingDDL):
 
     # def _get_feed_dict(self, *args):
     #     super(VICE, self)._get_feed_dict(*args)
+
+    def _get_ddl_feed_dict(self):
+        if not self._use_ground_truth_distances:
+            return super()._get_ddl_feed_dict()
+
+        # Sample pairs of points randomly within the same trajectories
+        s1_indices = self.sampler.pool.random_indices(self._ddl_batch_size)
+        max_path_length = self.sampler.max_path_length
+        low = s1_indices // max_path_length * max_path_length
+        high = (s1_indices // max_path_length + 1) * max_path_length
+        s2_indices = np.random.randint(low, high)
+
+        # # Sample pairs of points randomly within the same trajectories
+        # s1_indices = self.sampler.pool.random_indices(self._ddl_batch_size)
+        # max_path_length = self.sampler.max_path_length
+        # delta = np.random.randint(max_path_length - s1_indices % max_path_length)
+        # s2_indices = s1_indices + delta
+
+        # # Shuffle indices so s2 doesn't always come after s1 in the trajectory
+        # combined = np.vstack((s1_indices, s2_indices))
+        # rand_indices = np.random.randint(0, 2, size=combined.shape[-1])
+        # take_indices = np.vstack((rand_indices, 1-rand_indices))
+        # s1_indices, s2_indices = np.take_along_axis(combined, take_indices, axis=0)
+
+        s1 = self.sampler.pool.batch_by_indices(s1_indices)
+        s2 = self.sampler.pool.batch_by_indices(s2_indices)
+
+        # Compute ground truth distances to use for training
+        s1_pos, s2_pos = s1['observations']['state_observation'], s2['observations']['state_observation']
+        distances = self._env.unwrapped._medium_maze_manhattan_distance(s1_pos, s2_pos)
+
+        feed_dict = {
+            **{
+                self._placeholders['s1'][key]: s1['observations'][key]
+                for key in self._distance_fn.observation_keys
+            },
+            **{
+                self._placeholders['s2'][key]: s2['observations'][key]
+                for key in self._distance_fn.observation_keys
+            },
+            self._placeholders['distances']: distances,
+        }
+        return feed_dict
