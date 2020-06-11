@@ -122,12 +122,12 @@ ALGORITHM_PARAMS_ADDITIONAL = {
 
             'train_distance_fn_every_n_steps': 64, # tune.grid_search([16, 64]),
 
-            'ext_reward_coeff': tune.grid_search([0.5, 1]),
-            'normalize_ext_reward_gamma': tune.grid_search([0.99, 1]),
-            # 'use_env_intrinsic_reward': tune.grid_search([True]),
+            'ext_reward_coeff': tune.grid_search([0.1, 0.25, 0.5]),
+            'normalize_ext_reward_gamma': tune.grid_search([1]),
+            'use_env_intrinsic_reward': tune.grid_search([True]),
             'ddl_batch_size': 256,
 
-            'rnd_int_rew_coeff': 1,
+            #'rnd_int_rew_coeff': tune.grid_search([None, 1]),
         },
         'rnd_params': {
             'convnet_params': {
@@ -266,7 +266,7 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_STATE = {
                 'images_are_rgb': True,
 
                 'reward_type': 'none',
-                'use_count_reward': tune.grid_search([True, False]),
+                'use_count_reward': tune.grid_search([True]),
                 # 'show_discrete_grid': False,
                 # 'n_bins': 50,
 

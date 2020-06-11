@@ -18,9 +18,9 @@ class VICE(SACClassifier):
     """
 
     def __init__(self, *args, positive_on_first_occurence=False, gradient_penalty_weight=0, **kwargs):
+        self._gradient_penalty_weight = gradient_penalty_weight
         super(VICE, self).__init__(*args, **kwargs)
         self._positive_on_first_occurence = positive_on_first_occurence
-        self._gradient_penalty_weight = gradient_penalty_weight
         if positive_on_first_occurence:
             env = self._training_environment.unwrapped
             # self._seen_states = set()
@@ -29,13 +29,13 @@ class VICE(SACClassifier):
                 for _ in range(env.n_bins + 1)
             ]
 
-    # def _init_extrinsic_reward(self):
-    #     classifier_inputs = flatten_input_structure({
-    #         name: self._placeholders['observations'][name]
-    #         for name in self._classifier.observation_keys
-    #     })
-    #     observation_log_p = self._classifier(classifier_inputs)
-    #     self._reward_t = self._unscaled_ext_reward = observation_log_p
+#    def _init_extrinsic_reward(self):
+#        classifier_inputs = flatten_input_structure({
+#            name: tf.exp(self._placeholders['observations'][name])
+#            for name in self._classifier.observation_keys
+#        })
+#        observation_log_p = self._classifier(classifier_inputs)
+#        self._reward_t = self._unscaled_ext_reward = observation_log_p
 
     def _get_classifier_feed_dict(self):
         negatives = self.sampler.random_batch(
@@ -134,15 +134,18 @@ class VICE(SACClassifier):
         # pi / (pi + f), f / (f + pi)
         log_pi_log_p_concat = tf.concat([log_pi, log_p], axis=1)
 
-        gradient_penalty = \
-            self._gradient_penalty_weight * tf.norm(tf.gradients(log_p, self._classifier.layers[1].outputs), ord=2, axis=-1)
+#        self._classifier.summary()
+#        gradient = tf.norm(tf.gradients(log_p, self._classifier.layers[1].outputs), ord=2, axis=-1)
+#        gradient_penalty = \
+#            self._gradient_penalty_weight * gradient
 
         self._classifier_loss_t = tf.reduce_mean(
             tf.compat.v1.losses.softmax_cross_entropy(
                 self._placeholders['labels'],
                 log_pi_log_p_concat,
             )
-        ) + gradient_penalty
+#            + gradient_penalty
+        )
         self._classifier_training_op = self._get_classifier_training_op()
 
     def _epoch_after_hook(self, *args, **kwargs):

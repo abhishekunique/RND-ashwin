@@ -570,6 +570,8 @@ class SAC(RLAlgorithm):
             self._placeholders['reward']['running_ext_rew_std'])
         diagnosables['total_reward'] = self._total_reward
 
+        diagnosables['int_reward'] = self._int_reward
+
         diagnostic_metrics = OrderedDict((
             ('mean', tf.reduce_mean),
             ('std', lambda x: tfp.stats.stddev(x, sample_axis=None)),

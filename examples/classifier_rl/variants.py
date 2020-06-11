@@ -196,12 +196,13 @@ ALGORITHM_PARAMS_ADDITIONAL = {
             'save_training_video_frequency': 0,
 
             # Tune over the reward scaling between count based bonus and VICE reward
-            'ext_reward_coeff': tune.grid_search([0.5,1]),  # Needed for VICE + count-based
-            'normalize_ext_reward_gamma': tune.grid_search([0.99]),
-            # 'use_env_intrinsic_reward': tune.grid_search([True]),
+            'ext_reward_coeff': tune.grid_search([0.25, 0.5]),  # Needed for VICE + count-based
+            'normalize_ext_reward_gamma': tune.grid_search([0.99, 1]),
+            'use_env_intrinsic_reward': tune.grid_search([True]),
+
             # 'rnd_int_rew_coeff': tune.sample_from([1]),
 
-            'gradient_penalty_weight': tune.grid_search([0, 0.5, 10]),
+            #'gradient_penalty_weight': tune.grid_search([0, 0.5, 10]),
 
             #'positive_on_first_occurence': tune.grid_search([True]),
             'positive_on_first_occurence': tune.grid_search([True]),
@@ -382,9 +383,9 @@ NUM_CHECKPOINTS = 10
 CLASSIFIER_PARAMS_BASE = {
     'type': 'feedforward_classifier',
     'kwargs': {
-        'hidden_layer_sizes': (M, ) * N,
+        'hidden_layer_sizes': (M,) * N,
         'observation_keys': None,
-        'kernel_regularizer_lambda': tune.grid_search([1e-3, 1e-1]),
+        'kernel_regularizer_lambda': tune.grid_search([None, 1e-3]),
     },
 }
 
@@ -422,24 +423,24 @@ CLASSIFIER_PARAMS_PER_UNIVERSE_DOMAIN_TASK = {
                     # 'BoxWall-v1',
                 )
             },
-            'Maze-v0': {
-                'observation_keys': ('state_observation', ),
-                'observation_preprocessors_params': {
-                    'state_observation': tune.grid_search([
-                        {
-                            'type': 'PickledPreprocessor',
-                            'kwargs': {
-                                'preprocessor_path': (
-                                    # Pretrained embedding using ground truth Manhattan distances
-                                    '/home/kevinli/reward-learning/notebooks/reward_learning/gt_embedding_fn_pairwise_exp_fixed.pkl'
-                                ),
-                                'extract_fn': tune.function(lambda fn: fn),
-                            },
-                        },
-                        # None,
-                    ]),
-                }
-            },
+            #'Maze-v0': {
+            #    'observation_keys': ('state_observation', ),
+            #    'observation_preprocessors_params': {
+            #        'state_observation': tune.grid_search([
+            #            {
+            #                'type': 'PickledPreprocessor',
+            #                'kwargs': {
+            #                    'preprocessor_path': (
+            #                        # Pretrained embedding using ground truth Manhattan distances
+            #                        '/home/kevinli/reward-learning/notebooks/reward_learning/gt_embedding_fn_pairwise_exp_fixed.pkl'
+            #                    ),
+            #                    'extract_fn': tune.function(lambda fn: fn),
+            #                },
+            #            },
+            #            # None,
+            #        ]),
+            #    }
+            #},
             # 'Fixed-v0': {
             #     'observation_keys': ('state_observation', ),
             #     'observation_preprocessors_params': {
