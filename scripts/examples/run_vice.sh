@@ -1,8 +1,8 @@
 softlearning run_example_local examples.classifier_rl \
-        --exp-name=vice_reproduce_justins `# This is the name your experiment will be saved under ~/ray_results` \
+        --exp-name=test_vice_differences `# This is the name your experiment will be saved under ~/ray_results` \
         --algorithm=VICE  `# Algorithm of choice (ex: SAC, VICE, etc.)` \
         --num-samples=2  `# Number of seeds PER choice of hyperparameters (will be multiplied by number of param combinations if you tune over a bunch)` \
-        --trial-gpus=0.37  `# Number of GPUs that will be utilized PER seed` \
+        --trial-gpus=0.18  `# Number of GPUs that will be utilized PER seed` \
         --trial-cpus=2  `# Number of CPUs that will be utilized PER seed (doesn't really affect much)` \
         --universe=gym  `# Environment universe (usually gym)` \
         --domain=Point2D  `# Environment domain, your environment name should be something like <Domain><Task> concatenated together` \
