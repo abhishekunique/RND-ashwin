@@ -222,7 +222,7 @@ class DynamicsAwareEmbeddingDDL(DDL):
         self._use_l2_distance_targets = use_l2_distance_targets
         self._use_separate_embeddings = use_separate_embeddings
 
-        if self.use_separate_embeddings:
+        if self._use_separate_embeddings:
             self._embedding_fns = [
                 distance_fn,
                 tf.keras.clone_model(distance_fn)
@@ -353,7 +353,7 @@ class DynamicsAwareEmbeddingVICE(VICE, DynamicsAwareEmbeddingDDL):
 
         # Compute ground truth distances to use for training
         s1_pos, s2_pos = s1['observations']['state_observation'], s2['observations']['state_observation']
-        distances = self._env.unwrapped._medium_maze_manhattan_distance(s1_pos, s2_pos)
+        distances = self._training_environment._env.unwrapped._medium_maze_manhattan_distance(s1_pos, s2_pos)[:,None]
 
         feed_dict = {
             **{
