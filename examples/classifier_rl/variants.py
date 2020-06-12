@@ -188,7 +188,7 @@ ALGORITHM_PARAMS_ADDITIONAL = {
             'classifier_lr': 1e-4,
             'classifier_batch_size': 128,
             'n_initial_exploration_steps': int(1e3),
-            'n_classifier_train_steps': tune.grid_search([10]),
+            'n_classifier_train_steps': tune.grid_search([2]),
             # 'n_classifier_train_steps': tune.grid_search([2, 10]),
             'classifier_optim_name': 'adam',
             'n_epochs': 200,
@@ -205,7 +205,7 @@ ALGORITHM_PARAMS_ADDITIONAL = {
             #'gradient_penalty_weight': tune.grid_search([0, 0.5, 10]),
 
             #'positive_on_first_occurence': tune.grid_search([True]),
-            'positive_on_first_occurence': tune.grid_search([True]),
+            'positive_on_first_occurence': tune.grid_search([False]),
         },
         # === Using RND ===
         # 'rnd_params': {
@@ -241,19 +241,20 @@ ALGORITHM_PARAMS_ADDITIONAL = {
 
             # === EMBEDDING TRAINING PARAMS ===
             'use_ground_truth_distances': tune.grid_search([True]),
-            'train_distance_fn_every_n_steps': tune.grid_search([8, 16, 64]),
+            'train_distance_fn_every_n_steps': tune.grid_search([16, 64]),
             'ddl_batch_size': 256,
+            'ddl_clip_length': tune.grid_search([None, 10, 50]),
 
-            # 'normalize_distance_targets': tune.grid_search([True, False]),
+            'normalize_distance_targets': tune.grid_search([True, False]),
             # 'use_l2_distance_targets': tune.grid_search([True, False]),
 
             # Tune over the reward scaling between count based bonus and VICE reward
-            'ext_reward_coeff': tune.grid_search([0.25, 0.5]),
+            'ext_reward_coeff': tune.grid_search([0.5]),
             'normalize_ext_reward_gamma': tune.grid_search([1]),
             'use_env_intrinsic_reward': tune.grid_search([True]),
             # 'rnd_int_rew_coeff': tune.sample_from([1]),
 
-            'positive_on_first_occurence': tune.grid_search([True]),
+            'positive_on_first_occurence': tune.grid_search([False]),
         },
         # === Using RND ===
         # 'rnd_params': {
@@ -654,7 +655,7 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_STATE = {
                 # === Use environment's count-based reward ===
                 'reward_type': tune.grid_search(['none']),
                 'use_count_reward': tune.grid_search([True]),
-                'n_bins': 100,  # Number of bins to discretize the space with
+                'n_bins': 50,  # Number of bins to discretize the space with
 
                 # === EASY ===
                 # 'wall_shape': 'easy-maze',

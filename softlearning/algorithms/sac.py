@@ -569,8 +569,9 @@ class SAC(RLAlgorithm):
         diagnosables['running_ext_reward_std'] = (
             self._placeholders['reward']['running_ext_rew_std'])
         diagnosables['total_reward'] = self._total_reward
-
-        diagnosables['int_reward'] = self._int_reward
+        
+        if self._int_reward != 0:
+            diagnosables['int_reward'] = self._int_reward
 
         diagnostic_metrics = OrderedDict((
             ('mean', tf.reduce_mean),

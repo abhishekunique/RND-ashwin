@@ -99,8 +99,8 @@ class DDL(SAC):
         high = (s1_indices // max_path_length + 1) * max_path_length
 
         if self._ddl_clip_length:
-            low = np.max(low, s1_indices - self._ddl_clip_length)
-            high = np.min(high, s1_indices + self._ddl_clip_length)
+            low = np.max([low, s1_indices - self._ddl_clip_length], axis=0)
+            high = np.min([high, s1_indices + self._ddl_clip_length], axis=0)
 
         s2_indices = np.random.randint(low, high)
 
@@ -124,7 +124,7 @@ class DDL(SAC):
             s1_pos, s2_pos = s1['observations']['state_observation'], s2['observations']['state_observation']
             distances = self._training_environment._env.unwrapped._medium_maze_manhattan_distance(s1_pos, s2_pos)[:,None]
         else:
-            distances = np.abs(s1_indices - s2_indices)[:,None]
+            distances = np.abs(s1_indices - s2_indices).astype(np.float32)[:,None]
 
         feed_dict = {
             **{
