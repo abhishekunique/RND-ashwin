@@ -338,13 +338,7 @@ class DynamicsAwareEmbeddingDDL(DDL):
 
 from .vice import VICE
 class DynamicsAwareEmbeddingVICE(VICE, DynamicsAwareEmbeddingDDL):
-    def __init__(
-        self, 
-        *args, 
-        use_ground_truth_distances=False, 
-        **kwargs
-    ):
-        self._use_ground_truth_distances = use_ground_truth_distances
+    def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
     # def _epoch_before_hook(self, *args, **kwargs):
