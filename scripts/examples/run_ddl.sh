@@ -1,8 +1,8 @@
 softlearning run_example_local examples.distance_learning `# Notice, the variants will be taken from the examples/distance_learning directory!!` \
-        --exp-name=test_ddl_classification `# This is the name your experiment will be saved under ~/ray_results` \
+        --exp-name=test_ddl_clip_sym `# This is the name your experiment will be saved under ~/ray_results` \
         --algorithm=DDL `# Algorithm of choice (ex: DDL, etc.) ` \
         --num-samples=1 `# Number of seeds PER choice of hyperparameters (will be multiplied by number of param combinations if you tune over a bunch)` \
-        --trial-gpus=0.16 `# Number of GPUs that will be utilized PER seed` \
+        --trial-gpus=0.125 `# Number of GPUs that will be utilized PER seed` \
         --trial-cpus=1 `# Number of CPUs that will be utilized PER seed (doesn't really affect much)` \
         --universe=gym `# Environment universe (usually gym)` \
         --domain=Point2D `# Environment domain, your environment name should be something like <Domain><Task> concatenated together` \

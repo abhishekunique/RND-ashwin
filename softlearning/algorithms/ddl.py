@@ -20,10 +20,12 @@ class DDL(SAC):
         **kwargs,
     ):
         self._distance_fn = distance_fn
-        if hasattr(self._distance_fn, 'classifier_params'):
+        if hasattr(self._distance_fn, 'classifier_params') and self._distance_fn.classifier_params is not None:
             self._ddl_use_classification = True
             self._ddl_max_distance = self._distance_fn.classifier_params['max_distance']
             self._ddl_bins = self._distance_fn.classifier_params['bins']
+        else:
+            self._ddl_use_classification = False
 
         # TODO: Make a goal proposer
         self._goal_state = goal_state
