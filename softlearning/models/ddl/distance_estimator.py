@@ -45,6 +45,7 @@ def create_distance_estimator(input_shapes,
                               observation_keys=None,
                               goal_keys=None,
                               name='distance_estimator',
+                              classifier_params=None,
                               **kwargs):
     inputs_flat = create_inputs(input_shapes)
     preprocessors_flat = (
@@ -61,9 +62,11 @@ def create_distance_estimator(input_shapes,
         in zip(preprocessors_flat, inputs_flat)
     ]
 
+    output_size = 1 if not classifier_params else int(classifier_params.get('bins', 1) + 1)
+
     distance_fn = feedforward_model(
         *args,
-        output_size=1,
+        output_size=output_size,
         name=name,
         **kwargs)
 
@@ -73,6 +76,7 @@ def create_distance_estimator(input_shapes,
     distance_fn.observation_keys = observation_keys or tuple()
     distance_fn.goal_keys = goal_keys or tuple()
     distance_fn.all_keys = distance_fn.observation_keys + distance_fn.goal_keys
+    distance_fn.classifier_params = classifier_params
 
     # distance_fn.observations_preprocessors = preprocessors['s1']
     # distance_fn.preprocessed_inputs_fn = preprocessed_inputs_fn

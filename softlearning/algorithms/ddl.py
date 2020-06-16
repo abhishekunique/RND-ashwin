@@ -18,8 +18,13 @@ class DDL(SAC):
         ddl_batch_size=256,
         **kwargs,
     ):
-        # TODO: Make a goal proposer
         self._distance_fn = distance_fn
+        if hasattr(self._distance_fn, 'classifier_params'):
+            self._ddl_use_classification = True
+            self._ddl_max_distance = self._distance_fn.classifier_params['max_distance']
+            self._ddl_bins = self._distance_fn.classifier_params['bins']
+
+        # TODO: Make a goal proposer
         self._goal_state = goal_state
 
         self._train_distance_fn_every_n_steps = train_distance_fn_every_n_steps
@@ -76,12 +81,27 @@ class DDL(SAC):
 
         distance_targets = self._placeholders['distances']
 
-        distance_loss = self._distance_loss = (
-            tf.compat.v1.losses.mean_squared_error(
-                labels=distance_targets,
-                predictions=distance_preds,
-                weights=0.5)
-        )
+        if self._ddl_use_classification:
+            # Convert numerical distances into bins
+            distance_labels = (
+                tf.squeeze(tf.clip_by_value(
+                     distance_targets // (self._ddl_max_distance // self._ddl_bins), 
+                     0, self._ddl_bins
+                ), axis=1)
+            )
+           
+            distance_loss = self._distance_loss = (
+                tf.compat.v1.losses.sparse_softmax_cross_entropy_with_logits(
+                    labels=distance_labels,
+                    logits=distance_preds)
+            )
+        else:
+            distance_loss = self._distance_loss = (
+                tf.compat.v1.losses.mean_squared_error(
+                    labels=distance_targets,
+                    predictions=distance_preds,
+                    weights=0.5)
+            )
 
         ddl_optimizer = self._ddl_optimizer = (
             tf.compat.v1.train.AdamOptimizer(
@@ -178,6 +198,8 @@ class DDL(SAC):
         distance_fn_inputs = self._distance_fn_inputs(
             s1=self._placeholders['s1'], s2=self._placeholders['s2'])
         distances_to_goal = self._distance_fn(distance_fn_inputs)
+        if self._ddl_use_classification:
+            distances_to_goal = tf.argmax(distances_to_goal, axis=-1, output_type=tf.float32)[:,None]
         self._unscaled_ext_reward = -distances_to_goal
 
     def _get_feed_dict(self, iteration, batch):
