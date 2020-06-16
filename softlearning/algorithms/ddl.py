@@ -14,6 +14,7 @@ class DDL(SAC):
         train_distance_fn_every_n_steps=64,
         use_ground_truth_distances=False,
         ddl_lr=3e-4,
+        ddl_symmetric=False,
         ddl_clip_length=None,
         ddl_batch_size=256,
         **kwargs,
@@ -30,6 +31,7 @@ class DDL(SAC):
         self._train_distance_fn_every_n_steps = train_distance_fn_every_n_steps
         self._use_ground_truth_distances = use_ground_truth_distances
         self._ddl_lr = ddl_lr
+        self._ddl_symmetric = ddl_symmetric
         self._ddl_clip_length = ddl_clip_length
         self._ddl_batch_size = ddl_batch_size
 
@@ -116,26 +118,21 @@ class DDL(SAC):
         # Sample pairs of points randomly within the same trajectories
         s1_indices = self.sampler.pool.random_indices(self._ddl_batch_size)
         max_path_length = self.sampler.max_path_length
-        low = s1_indices // max_path_length * max_path_length
-        high = (s1_indices // max_path_length + 1) * max_path_length
 
+        if self._ddl_symmetric:
+            # Sample s1, s2 randomly within a trajectory (either one can come first)
+            low = s1_indices // max_path_length * max_path_length
+            high = (s1_indices // max_path_length + 1) * max_path_length
+        else:
+            # s2 must come *after* s1 in the trajectory
+            low = s1_indices
+            high = (s1_indices // max_path_length + 1) * max_path_length
+        
         if self._ddl_clip_length:
             low = np.max([low, s1_indices - self._ddl_clip_length], axis=0)
             high = np.min([high, s1_indices + self._ddl_clip_length], axis=0)
 
         s2_indices = np.random.randint(low, high)
-
-        # # Sample pairs of points randomly within the same trajectories
-        # s1_indices = self.sampler.pool.random_indices(self._ddl_batch_size)
-        # max_path_length = self.sampler.max_path_length
-        # delta = np.random.randint(max_path_length - s1_indices % max_path_length)
-        # s2_indices = s1_indices + delta
-
-        # # Shuffle indices so s2 doesn't always come after s1 in the trajectory
-        # combined = np.vstack((s1_indices, s2_indices))
-        # rand_indices = np.random.randint(0, 2, size=combined.shape[-1])
-        # take_indices = np.vstack((rand_indices, 1-rand_indices))
-        # s1_indices, s2_indices = np.take_along_axis(combined, take_indices, axis=0)
 
         s1 = self.sampler.pool.batch_by_indices(s1_indices)
         s2 = self.sampler.pool.batch_by_indices(s2_indices)
