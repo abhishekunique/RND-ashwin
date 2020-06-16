@@ -16,6 +16,7 @@ class DDL(SAC):
         ddl_lr=3e-4,
         ddl_symmetric=False,
         ddl_clip_length=None,
+        ddl_train_steps=1,
         ddl_batch_size=256,
         **kwargs,
     ):
@@ -35,6 +36,7 @@ class DDL(SAC):
         self._ddl_lr = ddl_lr
         self._ddl_symmetric = ddl_symmetric
         self._ddl_clip_length = ddl_clip_length
+        self._ddl_train_steps = ddl_train_steps
         self._ddl_batch_size = ddl_batch_size
 
         super(DDL, self).__init__(**kwargs)
@@ -226,8 +228,9 @@ class DDL(SAC):
     def _do_training(self, iteration, batch):
         super()._do_training(iteration, batch)
         if iteration % self._train_distance_fn_every_n_steps == 0:
-            ddl_feed_dict = self._get_ddl_feed_dict()
-            self._session.run(self._ddl_train_op, ddl_feed_dict)
+            for _ in range(self._ddl_train_steps):
+                ddl_feed_dict = self._get_ddl_feed_dict()
+                self._session.run(self._ddl_train_op, ddl_feed_dict)
 
     def get_diagnostics(self,
                         iteration,

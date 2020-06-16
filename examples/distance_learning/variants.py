@@ -122,11 +122,12 @@ ALGORITHM_PARAMS_ADDITIONAL = {
 
             'train_distance_fn_every_n_steps': tune.grid_search([16, 64]),
 
-            'ext_reward_coeff': tune.grid_search([0.25]),
+            'ext_reward_coeff': tune.grid_search([0.25, 0.5]),
             'normalize_ext_reward_gamma': tune.grid_search([1]),
             'use_env_intrinsic_reward': tune.grid_search([True]),
-            'ddl_symmetric': tune.grid_search([True, False]),
+            'ddl_symmetric': tune.grid_search([False]),
             # 'ddl_clip_length': tune.grid_search([None, 20, 50]),
+            'ddl_train_steps': tune.grid_search([2, 4, 10]),
             'ddl_batch_size': 256,
 
             #'rnd_int_rew_coeff': tune.grid_search([None, 1]),
@@ -534,7 +535,7 @@ def get_variant_spec_base(universe, domain, task, task_eval,
             'type': 'SimpleReplayPool',
             'kwargs': {
                 # 'max_size': int(5e5),
-                'max_size': int(5e4),
+                'max_size': [int(5e4)],
             }
         },
         'sampler_params': {
