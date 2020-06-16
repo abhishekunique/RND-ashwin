@@ -83,15 +83,16 @@ class DDL(SAC):
 
         if self._ddl_use_classification:
             # Convert numerical distances into bins
-            distance_labels = (
+            distance_labels = tf.cast(
                 tf.squeeze(tf.clip_by_value(
                      distance_targets // (self._ddl_max_distance // self._ddl_bins), 
                      0, self._ddl_bins
-                ), axis=1)
+                ), axis=1),
+                tf.int32
             )
            
             distance_loss = self._distance_loss = (
-                tf.compat.v1.losses.sparse_softmax_cross_entropy_with_logits(
+                tf.compat.v1.nn.sparse_softmax_cross_entropy_with_logits(
                     labels=distance_labels,
                     logits=distance_preds)
             )
@@ -199,7 +200,7 @@ class DDL(SAC):
             s1=self._placeholders['s1'], s2=self._placeholders['s2'])
         distances_to_goal = self._distance_fn(distance_fn_inputs)
         if self._ddl_use_classification:
-            distances_to_goal = tf.argmax(distances_to_goal, axis=-1, output_type=tf.float32)[:,None]
+            distances_to_goal = tf.cast(tf.argmax(distances_to_goal, axis=-1), tf.float32)[:,None] * (self._ddl_max_distance // self._ddl_bins)
         self._unscaled_ext_reward = -distances_to_goal
 
     def _get_feed_dict(self, iteration, batch):

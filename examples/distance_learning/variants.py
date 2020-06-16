@@ -122,7 +122,7 @@ ALGORITHM_PARAMS_ADDITIONAL = {
 
             'train_distance_fn_every_n_steps': tune.grid_search([16, 64]),
 
-            'ext_reward_coeff': tune.grid_search([0.25, 0.5]),
+            'ext_reward_coeff': tune.grid_search([0.25]),
             'normalize_ext_reward_gamma': tune.grid_search([1]),
             'use_env_intrinsic_reward': tune.grid_search([True]),
             'ddl_batch_size': 256,
@@ -178,8 +178,8 @@ DISTANCE_FN_PARAMS_BASE = {
         'hidden_layer_sizes': (M, ) * N,
         'observation_keys': None,
         'classifier_params': {
-            'max_distance': 100,
-            'bins': 20,
+            'max_distance': tune.grid_search([20, 50, 100]),
+            'bins': tune.grid_search([10, 20]),
         },
         # 'embedding_dim': 2,
     }
