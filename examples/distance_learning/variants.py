@@ -180,10 +180,10 @@ DISTANCE_FN_PARAMS_BASE = {
     'kwargs': {
         'hidden_layer_sizes': (M, ) * N,
         'observation_keys': None,
-        'classifier_params': {
-            'max_distance': tune.grid_search([20, 40, 100]),
-            'bins': tune.grid_search([10, 20]),
-        },
+        #'classifier_params': {
+        #    'max_distance': tune.grid_search([20, 40, 100]),
+        #    'bins': tune.grid_search([10, 20]),
+        #},
         # 'embedding_dim': 2,
     }
 }
@@ -535,7 +535,7 @@ def get_variant_spec_base(universe, domain, task, task_eval,
             'type': 'SimpleReplayPool',
             'kwargs': {
                 # 'max_size': int(5e5),
-                'max_size': [int(5e4)],
+                'max_size': tune.grid_search([int(5e4)]),
             }
         },
         'sampler_params': {
