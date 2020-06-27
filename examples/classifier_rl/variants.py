@@ -106,8 +106,8 @@ ALGORITHM_PARAMS_ADDITIONAL = {
             'n_initial_exploration_steps': int(1e3),
             'n_epochs': 200,
 
-            # 'rnd_int_rew_coeff': tune.sample_from([0, 1]),
-            # 'normalize_ext_reward_gamma': tune.grid_search([0.99]),
+            'rnd_int_rew_coeff': tune.sample_from([0, 1]),
+            'normalize_ext_reward_gamma': tune.grid_search([1]),
         },
         'rnd_params': {
             'convnet_params': {
@@ -655,16 +655,20 @@ ENVIRONMENT_PARAMS_PER_UNIVERSE_DOMAIN_TASK_STATE = {
                 # === Use environment's count-based reward ===
                 'reward_type': 'none',
                 'use_count_reward': True,
-                'n_bins': tune.grid_search([50, 100]),  # Number of bins to discretize the space with
+                'n_bins': tune.grid_search([100]),  # Number of bins to discretize the space with
 
                 # === EASY ===
+
+                'wall_shape': 'empty',
+                'init_pos_range': ((0, 0), (0, 0)),
+                'target_pos_range': ((2.5, -2.5), (2.5, -2.5)),
                 # 'wall_shape': 'easy-maze',
                 # 'init_pos_range': ((-2.5, -2.5), (-2.5, -2.5)),
                 # 'target_pos_range': ((2.5, -2.5), (2.5, -2.5)),
                 # === MEDIUM ===
-                'wall_shape': 'medium-maze',
-                'init_pos_range': ((-3, -3), (-3, -3)),
-                'target_pos_range': ((3, 3), (3, 3)),
+                # 'wall_shape': 'medium-maze',
+                # 'init_pos_range': ((-3, -3), (-3, -3)),
+                # 'target_pos_range': ((3, 3), (3, 3)),
                 # === HARD ===
                 # 'wall_shape': 'hard-maze',
                 # 'init_pos_range': ((-3, -3), (-3, -3)),

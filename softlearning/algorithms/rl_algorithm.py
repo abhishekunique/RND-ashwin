@@ -5,7 +5,7 @@ from itertools import count
 import gtimer as gt
 import math
 import os
-
+import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
 from tensorflow.python.training import training_util
@@ -378,6 +378,26 @@ class RLAlgorithm(Checkpointable):
                 ('train-steps', self._num_train_steps),
             )))
 
+            obs = self._pool.last_n_batch(self._pool.size)['observations']['state_observation']
+            plt.cla()
+            plt.clf()
+            plt.xlim(-20, 20)
+            plt.ylim(-20, 20)
+            plt.plot(obs[:, 0], obs[:, 1])
+            plt.savefig('traj_plot_%d.png'%(self._epoch))
+            if self._rnd_int_rew_coeff:
+                errors = []
+                for i in np.arange(-20, 20, 0.5):
+                    error = []
+                    for j in np.arange(-20, 20, 0.5):
+                        curr_pos = np.array([i, j])
+                        err = self._session.run(self._rnd_errors, {self._placeholders['observations']['state_observation']: [curr_pos]})[0]
+                        error.append(err)
+                    errors.append(error)
+                plt.cla()
+                plt.clf()
+                plt.imshow(np.asarray(errors)[:,:,0])
+                plt.savefig('errors_%d.png'%(self._epoch))
             if self._eval_render_kwargs and hasattr(
                     evaluation_environment, 'render_rollouts'):
                 # TODO(hartikainen): Make this consistent such that there's no
